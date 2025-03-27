@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Secure Messaging</title>
+    <style>
+        /* Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Main Container */
+        .messaging-container {
+            display: flex;
+            height: 100vh;
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
+        }
+
+        /* User List Section */
+        .user-list {
+            width: 350px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .search-bar {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        /* User Card */
+        .user-card {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 8px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .user-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(5px);
+        }
+
+        .user-card.active {
+            background: linear-gradient(90deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-left: 4px solid #00ff88;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+
+        /* Chat Section */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: messageAppear 0.4s ease forwards;
+        }
+
+        @keyframes messageAppear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            position: relative;
+        }
+
+        .message.sent {
+            justify-content: flex-end;
+        }
+
+        .message.sent .message-content {
+            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+            color: #000;
+        }
+
+        .message.received .message-content {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Message Input */
+        .message-input-container {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            resize: none;
+            min-height: 50px;
+            max-height: 150px;
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            padding: 15px 25px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 50px;
+        }
+
+        .send-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .send-button:active {
+            transform: translateY(0);
+        }
+
+        /* Status Indicators */
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: auto;
+        }
+
+        .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
+        .offline { background: #666; }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="messaging-container">
+        <!-- User List -->
+        <div class="user-list">
+            <div class="search-bar">
+                <input type="text" class="search-input" placeholder="Search team members...">
+            </div>
+            
+            <!-- User Cards -->
+            <div class="user-card active">
+                <img src="https://via.placeholder.com/40" class="user-avatar" alt="User">
+                <div class="user-info">
+                    <h4>YASIR</h4>
+                    <p>Last message preview...</p>
+                </div>
+                <div class="status-indicator online"></div>
+            </div>
+            
+            <!-- More users... -->
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>FAHAN Logistics</h2>
+                <p>3 members online</p>
+            </div>
+
+            <div class="chat-messages">
+                <!-- Messages -->
+                <div class="message received">
+                    <div class="message-content">
+                        <p>Hey team, the shipment is delayed by 2 hours.</p>
+                        <span class="message-time">10:30 AM</span>
+                    </div>
+                </div>
+
+                <div class="message sent">
+                    <div class="message-content">
+                        <p>Understood. Adjusting schedule accordingly.</p>
+                        <span class="message-time">10:31 AM</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="message-input-container">
+                <textarea class="message-input" placeholder="Type your message..."></textarea>
+                <button class="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+// Add proper auth initialization
+const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('supabase.auth.token');
+        window.location.href = 'login.html';
+    }
+});
+
+// Check session validity
+if (!session || Date.now() >= session.expires_at * 1000) {
+    window.location.href = 'login.html';
+}
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://twsqvdxhsfvdibhpfvqr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // State management
+        let currentUser = null;
+        let selectedUser = null;
+        let users = [];
+        let messages = [];
+
+        // DOM Elements
+        const userList = document.querySelector('.user-list');
+        const chatMessages = document.querySelector('.chat-messages');
+        const messageInput = document.querySelector('.message-input');
+        const sendButton = document.querySelector('.send-button');
+        const searchInput = document.querySelector('.search-input');
+
+        // Initialize the app
+        async function initializeApp() {
+            try {
+                // Get current user
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                if (userError) throw userError;
+                currentUser = user;
+                console.log('Current user:', currentUser);
+
+                // Load all users
+                await loadUsers();
+                
+                // Set up real-time subscription for messages
+                setupRealtimeSubscription();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                alert('Error initializing the app. Please try logging in again.');
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Load all users
+        async function loadUsers() {
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .neq('id', currentUser.id);
+
+                if (error) throw error;
+                users = data;
+                displayUsers(users);
+            } catch (error) {
+                console.error('Error loading users:', error);
+                alert('Failed to load users');
+            }
+        }
+
+        // Display users in the sidebar
+        function displayUsers(usersToShow) {
+            userList.innerHTML = `
+                <div class="search-bar">
+                    <input type="text" class="search-input" placeholder="Search team members...">
+                </div>
+            `;
+
+            usersToShow.forEach(user => {
+                const userCard = document.createElement('div');
+                userCard.className = `user-card ${user.id === selectedUser?.id ? 'active' : ''}`;
+                userCard.setAttribute('data-user-id', user.id);
+                userCard.innerHTML = `
+                    <img src="${user.avatar_url || 'https://via.placeholder.com/40'}" class="user-avatar" alt="${user.name}">
+                    <div class="user-info">
+                        <h4>${user.name}</h4>
+                        <p>${user.status || 'Offline'}</p>
+                    </div>
+                    <div class="status-indicator ${user.status === 'online' ? 'online' : 'offline'}"></div>
+                `;
+                userCard.addEventListener('click', () => switchUser(user));
+                userList.appendChild(userCard);
+            });
+        }
+
+        // Switch user conversation
+        async function switchUser(user) {
+            selectedUser = user;
+            document.querySelectorAll('.user-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            const selectedCard = document.querySelector(`.user-card[data-user-id="${user.id}"]`);
+            if (selectedCard) {
+                selectedCard.classList.add('active');
+            }
+            await loadMessages(user.id);
+        }
+
+        // Load messages for selected user
+        async function loadMessages(userId) {
+            try {
+                const { data, error } = await supabase
+                    .from('messages')
+                    .select('*')
+                    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUser.id})`)
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+                messages = data;
+                displayMessages();
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                alert('Failed to load messages');
+            }
+        }
+
+        // Send message
+        async function sendMessage() {
+            try {
+                if (!selectedUser) {
+                    alert('Please select a user to send a message to');
+                    return;
+                }
+
+                const content = messageInput.value.trim();
+                if (!content) {
+                    alert('Please enter a message');
+                    return;
+                }
+
+                console.log('Sending message:', {
+                    sender_id: currentUser.id,
+                    receiver_id: selectedUser.id,
+                    content: content
+                });
+
+                const { data, error } = await supabase
+                    .from('messages')
+                    .insert([
+                        {
+                            sender_id: currentUser.id,
+                            receiver_id: selectedUser.id,
+                            content: content,
+                            is_read: false
+                        }
+                    ])
+                    .select();
+
+                if (error) throw error;
+
+                console.log('Message sent successfully:', data);
+                messageInput.value = '';
+                messages.push(data[0]);
+                displayMessages();
+            } catch (error) {
+                console.error('Error sending message:', error);
+                alert('Failed to send message: ' + error.message);
+            }
+        }
+
+        // Set up real-time subscription
+        function setupRealtimeSubscription() {
+            supabase
+                .channel('messages')
+                .on('postgres_changes', 
+                    { 
+                        event: 'INSERT', 
+                        schema: 'public', 
+                        table: 'messages',
+                        filter: `or(sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id})`
+                    }, 
+                    payload => {
+                        if (selectedUser && 
+                            (payload.new.sender_id === selectedUser.id || 
+                             payload.new.receiver_id === selectedUser.id)) {
+                            messages.push(payload.new);
+                            displayMessages();
+                        }
+                    }
+                )
+                .subscribe();
+        }
+
+        // Event Listeners
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredUsers = users.filter(user => 
+                user.name.toLowerCase().includes(searchTerm)
+            );
+            displayUsers(filteredUsers);
+        });
+
+        // Initialize the app
+        initializeApp();
+    </script>
