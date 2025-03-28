@@ -10,8 +10,13 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Serve static files
-app.use(express.static('.'));
+app.use(express.static(__dirname));
 app.use(express.json());
+
+// Root route - serve login.html
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/login.html');
+});
 
 // Authentication endpoint
 app.post('/auth/login', async (req, res) => {
