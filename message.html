@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Secure Messaging</title>
+    <title>Secure Logistics Messaging</title>
     <style>
         * {
             margin: 0;
@@ -247,7 +247,7 @@
     <div class="messaging-container" style="display: none;">
         <div class="user-list">
             <div class="search-bar">
-                <input type="text" class="search-input" id="user-search" name="user-search" placeholder="Search team members...">
+                <input type="text" class="search-input" placeholder="Search team members...">
             </div>
             <div class="loading-state">
                 <div class="loading-spinner"></div>
@@ -264,40 +264,59 @@
             </div>
             <div class="chat-messages"></div>
             <div class="message-input-container">
-                <textarea class="message-input" id="message-input" name="message" placeholder="Type your message..." disabled></textarea>
-                <button class="send-button" id="send-button" disabled>Send</button>
+                <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
+                <button class="send-button" disabled>Send</button>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Configuration
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
 
-        // Initialize Supabase client
+        // Initialize Supabase with enhanced session handling
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             auth: {
                 persistSession: true,
-                autoRefreshToken: true
+                autoRefreshToken: true,
+                detectSessionInUrl: false,
+                storage: {
+                    getItem: (key) => {
+                        // Check multiple possible storage locations
+                        return localStorage.getItem(key) || 
+                               localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                               localStorage.getItem('supabase_session');
+                    },
+                    setItem: (key, value) => localStorage.setItem(key, value),
+                    removeItem: (key) => localStorage.removeItem(key)
+                }
             }
         });
 
-        // Global variables
         let currentUser = null;
         let selectedUser = null;
         let presenceChannel = null;
         let messagesChannel = null;
-        let typingTimeout = null;
 
-        // Initialize app
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Check session
+                // Check session with multiple fallbacks
                 const { data: { session }, error } = await supabase.auth.getSession();
+                
                 if (error || !session) {
-                    throw new Error("Please login first");
+                    // Try to recover session from localStorage
+                    const sessionData = localStorage.getItem('supabase_session');
+                    if (sessionData) {
+                        try {
+                            const parsedSession = JSON.parse(sessionData);
+                            await supabase.auth.setSession(parsedSession);
+                        } catch (e) {
+                            throw new Error("Please login again");
+                        }
+                    } else {
+                        throw new Error("Please login first");
+                    }
                 }
 
                 currentUser = session.user;
@@ -309,8 +328,8 @@
                 // Show app interface
                 document.querySelector('.session-check').style.display = 'none';
                 document.querySelector('.messaging-container').style.display = 'flex';
-                document.getElementById('message-input').disabled = false;
-                document.getElementById('send-button').disabled = false;
+                document.querySelector('.message-input').disabled = false;
+                document.querySelector('.send-button').disabled = false;
 
                 // Load data
                 await loadUsers();
@@ -329,6 +348,66 @@
                 `;
             }
         });
+
+        async function setupRealtime() {
+            updateConnectionStatus("Connecting to real-time service...");
+            
+            try {
+                // Presence channel
+                presenceChannel = supabase.channel('presence-channel', {
+                    config: { presence: { key: currentUser.id } }
+                })
+                .on('presence', { event: 'sync' }, () => {
+                    const state = presenceChannel.presenceState();
+                    updateOnlineStatus(Object.keys(state));
+                })
+                .subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        await presenceChannel.track({ online_at: new Date().toISOString() });
+                        updateConnectionStatus("Connected");
+                    }
+                });
+
+                // Messages channel
+                messagesChannel = supabase.channel('messages-channel')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'messages',
+                        filter: `or(receiver_id=eq.${currentUser.id},sender_id=eq.${currentUser.id})`
+                    }, (payload) => {
+                        handleNewMessage(payload.new);
+                    })
+                    .subscribe();
+
+                // Connection state handlers
+                supabase.realtime.on('open', () => updateConnectionStatus("Connected"));
+                supabase.realtime.on('close', () => {
+                    updateConnectionStatus("Reconnecting...", true);
+                    setTimeout(setupRealtime, 3000);
+                });
+                supabase.realtime.on('error', (error) => {
+                    console.error("Realtime error:", error);
+                    updateConnectionStatus("Connection error", true);
+                });
+
+            } catch (error) {
+                console.error("Realtime connection error:", error);
+                updateConnectionStatus("Realtime failed: " + error.message, true);
+                setTimeout(setupRealtime, 5000);
+            }
+        }
+
+        function handleNewMessage(message) {
+            if (!selectedUser || 
+                (message.sender_id === selectedUser.id || message.receiver_id === selectedUser.id)) {
+                addMessageToChat(
+                    message.content,
+                    message.sender_id === currentUser.id,
+                    message.created_at
+                );
+            }
+        }
 
         async function loadUsers() {
             try {
@@ -354,7 +433,7 @@
             const userList = document.querySelector('.user-list');
             userList.innerHTML = `
                 <div class="search-bar">
-                    <input type="text" class="search-input" id="user-search" placeholder="Search team members...">
+                    <input type="text" class="search-input" placeholder="Search team members...">
                 </div>
             `;
 
@@ -396,7 +475,7 @@
         }
 
         function setupSearch() {
-            document.getElementById('user-search').addEventListener('input', (e) => {
+            document.querySelector('.search-input').addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 document.querySelectorAll('.user-card').forEach(card => {
                     const name = card.querySelector('h4').textContent.toLowerCase();
@@ -446,7 +525,7 @@
         }
 
         async function sendMessage() {
-            const input = document.getElementById('message-input');
+            const input = document.querySelector('.message-input');
             const content = input.value.trim();
             if (!content || !selectedUser) return;
 
@@ -505,59 +584,6 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        function setupRealtime() {
-            // Presence channel
-            presenceChannel = supabase.channel('presence-channel', {
-                config: { presence: { key: currentUser.id } }
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = presenceChannel.presenceState();
-                const onlineUsers = Object.keys(state).map(key => state[key][0].user_id);
-                updateOnlineStatus(onlineUsers);
-            })
-            .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                if (payload.receiver_id === currentUser.id) {
-                    showTypingIndicator(payload.sender_id);
-                }
-            });
-
-            // Messages channel
-            messagesChannel = supabase.channel('messages-channel')
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `or(receiver_id=eq.${currentUser.id},sender_id=eq.${currentUser.id})`
-                }, (payload) => {
-                    handleNewMessage(payload.new);
-                });
-
-            // Subscribe
-            presenceChannel.subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({ 
-                        user_id: currentUser.id,
-                        online_at: new Date().toISOString(),
-                        status: 'online'
-                    });
-                    updateConnectionStatus("Connected");
-                }
-            });
-            
-            messagesChannel.subscribe();
-        }
-
-        function handleNewMessage(message) {
-            if (!selectedUser || 
-                (message.sender_id === selectedUser.id || message.receiver_id === selectedUser.id)) {
-                addMessageToChat(
-                    message.content,
-                    message.sender_id === currentUser.id,
-                    message.created_at
-                );
-            }
-        }
-
         function updateConnectionStatus(message, isError = false) {
             const status = document.querySelector('.connection-status');
             status.textContent = message;
@@ -582,6 +608,16 @@
             document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
         }
 
+        function formatLastOnline(date) {
+            if (!date) return 'Offline';
+            
+            const diff = (Date.now() - new Date(date)) / 60000;
+            if (diff < 1) return 'Just now';
+            if (diff < 60) return `${Math.floor(diff)}m ago`;
+            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
+            return `${Math.floor(diff/1440)}d ago`;
+        }
+
         function showTypingIndicator(userId) {
             const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
             if (partner) {
@@ -596,7 +632,7 @@
         function showLoading() {
             document.querySelector('.user-list').innerHTML = `
                 <div class="search-bar">
-                    <input type="text" class="search-input" id="user-search" placeholder="Search team members...">
+                    <input type="text" class="search-input" placeholder="Search team members...">
                 </div>
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
@@ -615,21 +651,21 @@
         }
 
         function showSendLoading() {
-            const btn = document.getElementById('send-button');
+            const btn = document.querySelector('.send-button');
             btn.disabled = true;
             btn.textContent = 'Sending...';
         }
 
         function hideSendLoading() {
-            const btn = document.getElementById('send-button');
+            const btn = document.querySelector('.send-button');
             btn.disabled = false;
             btn.textContent = 'Send';
         }
 
         function setupEventListeners() {
-            document.getElementById('send-button').addEventListener('click', sendMessage);
+            document.querySelector('.send-button').addEventListener('click', sendMessage);
 
-            document.getElementById('message-input').addEventListener('keypress', (e) => {
+            document.querySelector('.message-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     sendMessage();
@@ -639,7 +675,7 @@
             let isTyping = false;
             let lastTypingTime = 0;
             
-            document.getElementById('message-input').addEventListener('input', () => {
+            document.querySelector('.message-input').addEventListener('input', () => {
                 if (!selectedUser) return;
                 
                 const now = Date.now();
@@ -648,10 +684,7 @@
                     presenceChannel.send({
                         type: 'broadcast',
                         event: 'typing',
-                        payload: { 
-                            userId: currentUser.id, 
-                            receiver_id: selectedUser.id 
-                        }
+                        payload: { userId: currentUser.id, partnerId: selectedUser.id }
                     });
                 }
                 
@@ -672,16 +705,6 @@
             window.addEventListener('offline', () => {
                 updateConnectionStatus("Offline - No connection", true);
             });
-        }
-
-        function formatLastOnline(date) {
-            if (!date) return 'Offline';
-            
-            const diff = (Date.now() - new Date(date)) / 60000;
-            if (diff < 1) return 'Just now';
-            if (diff < 60) return `${Math.floor(diff)}m ago`;
-            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
-            return `${Math.floor(diff/1440)}d ago`;
         }
     </script>
 </body>
