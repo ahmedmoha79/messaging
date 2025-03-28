@@ -277,89 +277,79 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
 
         // Global variables
-        let supabaseClient, presenceChannel, typingTimeout;
+        let supabaseClient, presenceChannel, messagesChannel, typingTimeout;
         let selectedUser = null, currentUserId = null;
-
-        // Initialize Supabase client with enhanced configuration
-        function initializeSupabaseClient() {
-            return supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    storage: {
-                        getItem: (key) => {
-                            const value = localStorage.getItem(key);
-                            console.log("Reading from storage:", key, value);
-                            return value;
-                        },
-                        setItem: (key, value) => {
-                            console.log("Writing to storage:", key, value);
-                            localStorage.setItem(key, value);
-                        },
-                        removeItem: (key) => {
-                            console.log("Removing from storage:", key);
-                            localStorage.removeItem(key);
-                        }
-                    }
-                }
-            });
-        }
-
-        // Enhanced session check with debugging
-        async function checkSession() {
-            console.log("Starting session check...");
-            
-            // 1. First try normal session check
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
-            console.log("Initial session check:", { session, error });
-            
-            if (session) return session;
-            
-            // 2. If no session, try localStorage fallback
-            const storageKey = 'sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token';
-            const sessionData = localStorage.getItem(storageKey);
-            console.log("LocalStorage session data:", sessionData);
-            
-            if (sessionData) {
-                try {
-                    const parsed = JSON.parse(sessionData);
-                    console.log("Parsed session data:", parsed);
-                    
-                    if (parsed?.access_token) {
-                        console.log("Attempting to set session from storage...");
-                        const { data: { session: recoveredSession }, error: recoveryError } = 
-                            await supabaseClient.auth.setSession({
-                                access_token: parsed.access_token,
-                                refresh_token: parsed.refresh_token
-                            });
-                        
-                        console.log("Session recovery result:", { recoveredSession, recoveryError });
-                        return recoveredSession;
-                    }
-                } catch (e) {
-                    console.error("Session parse error:", e);
-                }
-            }
-            
-            return null;
-        }
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize Supabase client
-                supabaseClient = initializeSupabaseClient();
+                // Initialize Supabase client with enhanced configuration
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: false,
+                        storage: {
+                            getItem: (key) => {
+                                const value = localStorage.getItem(key);
+                                console.log("Reading from storage:", key, value);
+                                return value;
+                            },
+                            setItem: (key, value) => {
+                                console.log("Writing to storage:", key, value);
+                                localStorage.setItem(key, value);
+                            },
+                            removeItem: (key) => {
+                                console.log("Removing from storage:", key);
+                                localStorage.removeItem(key);
+                            }
+                        }
+                    }
+                });
+
+                // Check for existing session with retry logic
+                let session = null;
+                let attempts = 0;
+                const maxAttempts = 3;
                 
-                // Check session with timeout
-                const session = await Promise.race([
-                    checkSession(),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error("Session check timed out")), 10000)
-                    )
-                ]);
+                while (attempts < maxAttempts && !session) {
+                    try {
+                        const { data: { session: currentSession }, error } = await supabaseClient.auth.getSession();
+                        if (error) throw error;
+                        session = currentSession;
+                        
+                        if (!session) {
+                            // Try to recover from localStorage directly
+                            const storageKey = 'sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token';
+                            const sessionData = localStorage.getItem(storageKey);
+                            
+                            if (sessionData) {
+                                try {
+                                    const parsedSession = JSON.parse(sessionData);
+                                    if (parsedSession?.access_token) {
+                                        await supabaseClient.auth.setSession({
+                                            access_token: parsedSession.access_token,
+                                            refresh_token: parsedSession.refresh_token
+                                        });
+                                        const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
+                                        session = recoveredSession;
+                                    }
+                                } catch (e) {
+                                    console.error("Session parse error:", e);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Session check error (attempt " + (attempts + 1) + "):", error);
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+                    }
+                }
 
                 if (!session) {
-                    throw new Error("No active session found");
+                    throw new Error("No active session found after multiple attempts");
                 }
 
                 currentUserId = session.user.id;
@@ -401,7 +391,7 @@
             
             try {
                 // Presence channel for online status
-                presenceChannel = supabaseClient.channel('online-status', {
+                presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         presence: { 
                             key: currentUserId
@@ -420,7 +410,7 @@
                 });
 
                 // Messages channel
-                const messagesChannel = supabaseClient.channel('message-updates')
+                messagesChannel = supabaseClient.channel('messages-channel')
                     .on('postgres_changes', {
                         event: 'INSERT',
                         schema: 'public',
