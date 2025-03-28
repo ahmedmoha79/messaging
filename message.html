@@ -419,21 +419,16 @@
                     .subscribe();
 
                 // Connection state tracking
-const realtime = supabaseClient.realtime;
-        
-// Handle connection opened
-realtime.onOpen(() => {
+supabaseClient.realtime.on('open', () => {
     updateConnectionStatus("Connected (Realtime active)");
 });
 
-// Handle connection closed
-realtime.onClose(() => {
+supabaseClient.realtime.on('close', () => {
     updateConnectionStatus("Reconnecting...", true);
     setTimeout(initializeRealtime, 3000);
 });
 
-// Handle errors
-realtime.onError((error) => {
+supabaseClient.realtime.on('error', (error) => {
     console.error("Realtime error:", error);
     updateConnectionStatus("Error: " + error.message, true);
     setTimeout(initializeRealtime, 5000);
