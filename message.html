@@ -305,12 +305,56 @@ window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     }
   }
 });
-               / Check for existing session with retry logic
+             // New session check with debugging
+async function checkSession() {
+  console.log("Starting session check...");
+  
+  // 1. First try normal session check
+  const { data: { session }, error } = await supabaseClient.auth.getSession();
+  console.log("Initial session check:", { session, error });
+  
+  if (session) return session;
+  
+  // 2. If no session, try localStorage fallback
+  const storageKey = 'sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token';
+  const sessionData = localStorage.getItem(storageKey);
+  console.log("LocalStorage session data:", sessionData);
+  
+  if (sessionData) {
+    try {
+      const parsed = JSON.parse(sessionData);
+      console.log("Parsed session data:", parsed);
+      
+      if (parsed?.access_token) {
+        console.log("Attempting to set session from storage...");
+        const { data: { session: recoveredSession }, error: recoveryError } = 
+          await supabaseClient.auth.setSession({
+            access_token: parsed.access_token,
+            refresh_token: parsed.refresh_token
+          });
+        
+        console.log("Session recovery result:", { recoveredSession, recoveryError });
+        return recoveredSession;
+      }
+    } catch (e) {
+      console.error("Session parse error:", e);
+    }
+  }
+  
+  return null;
+}
+
+// Usage in your initialization:
+const session = await checkSession();
+console.log("Final session:", session);
 
 if (!session) {
-    window.location.href = 'login.html';
-    return;
+  console.log("No session found, redirecting to login");
+  window.location.href = 'login.html';
+  return;
 }
+
+currentUserId = session.user.id;
 
                 currentUserId = session.user.id;
 
