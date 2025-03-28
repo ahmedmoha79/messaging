@@ -1,379 +1,177 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const cors = require('cors');
 require('dotenv').config();
+
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Initialize Supabase client
+// CORS Configuration
+app.use(cors({
+  origin: process.env.CLIENT_ORIGIN || 'http://localhost:3000',
+  credentials: true
+}));
+
+// Supabase Client Configuration
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // Changed to service key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Serve static files
+// Middleware
 app.use(express.static(__dirname));
 app.use(express.json());
 
-// Root route - serve login.html
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/login.html');
-});
+// Authentication Middleware
+const authenticateUser = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Authentication required' });
 
-// Authentication endpoint
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ error: 'Invalid authentication' });
+
+    req.user = user;
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Authentication error' });
+  }
+};
+
+// Routes
+app.get('/', (req, res) => res.sendFile(__dirname + '/login.html'));
+
+// Enhanced Login Endpoint
 app.post('/auth/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        
-        // Validate input
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Missing credentials' });
 
-        // Attempt to sign in with Supabase
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-            options: {
-                redirectTo: `${process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'}/message.html`
-            }
-        });
-        
-        if (error) {
-            console.error('Login error:', error);
-            if (error.message.includes('captcha')) {
-                return res.status(401).json({ error: 'Please try logging in again. If the issue persists, contact support.' });
-            }
-            return res.status(401).json({ error: 'Invalid email or password' });
-        }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return res.status(401).json({ error: error.message });
 
-        // Verify user exists in users table
-        const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
+    // Get or create user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
 
-        if (userError) {
-            console.error('User verification error:', userError);
-            // If user doesn't exist in users table, create them
-            if (userError.code === 'PGRST116') {
-                const { error: insertError } = await supabase
-                    .from('users')
-                    .insert([
-                        {
-                            id: data.user.id,
-                            name: data.user.email.split('@')[0],
-                            email: data.user.email,
-                            status: 'online',
-                            lastonline: new Date().toISOString()
-                        }
-                    ]);
-                
-                if (insertError) {
-                    console.error('User creation error:', insertError);
-                    return res.status(500).json({ error: 'Error creating user profile' });
-                }
-                
-                // Return session data with new user
-                return res.json({
-                    session: data.session,
-                    user: {
-                        id: data.user.id,
-                        name: data.user.email.split('@')[0],
-                        email: data.user.email,
-                        status: 'online'
-                    }
-                });
-            }
-            return res.status(500).json({ error: 'Error verifying user profile' });
-        }
+    if (profileError) {
+      const { error: createError } = await supabase
+        .from('users')
+        .insert([{
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.email.split('@')[0],
+          status: 'online',
+          lastonline: new Date().toISOString()
+        }]);
 
-        // Return session data
-        res.json({
-            session: data.session,
-            user: userData
-        });
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+      if (createError) throw createError;
     }
+
+    return res.json({
+      session: data.session,
+      user: profile || {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.email.split('@')[0],
+        status: 'online'
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Server error during login' });
+  }
 });
 
-// Signup endpoint
-app.post('/auth/signup', async (req, res) => {
-    try {
-        const { email, password, name } = req.body;
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email,
-            password
-        });
-        
-        if (authError) throw authError;
+// User Management Endpoints
+app.get('/api/users', authenticateUser, async (req, res) => {
+  try {
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('lastonline', { ascending: false });
 
-        // Create user profile
-        const { error: profileError } = await supabase
-            .from('users')
-            .insert([
-                {
-                    id: authData.user.id,
-                    name: name,
-                    email: email,
-                    status: 'online',
-                    lastonline: new Date().toISOString()
-                }
-            ]);
+    if (error) throw error;
 
-        if (profileError) throw profileError;
-        res.json(authData);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
+    const processedUsers = users.map(user => ({
+      ...user,
+      status: calculateUserStatus(user.lastonline)
+    }));
+
+    res.json(processedUsers);
+  } catch (error) {
+    console.error('Users error:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
 });
 
-// Get current user endpoint
-app.get('/auth/user', async (req, res) => {
-    try {
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) {
-            throw new Error('No token provided');
-        }
+// Message Endpoints
+app.get('/api/messages/:partnerId', authenticateUser, async (req, res) => {
+  try {
+    const currentUser = req.user.id;
+    const partnerId = req.params.partnerId;
 
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (error) throw error;
-        res.json(user);
-    } catch (error) {
-        res.status(401).json({ error: error.message });
-    }
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${currentUser},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${currentUser})`)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // Mark messages as read
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('receiver_id', currentUser)
+      .eq('sender_id', partnerId);
+
+    res.json(messages);
+  } catch (error) {
+    console.error('Messages error:', error);
+    res.status(500).json({ error: 'Failed to load messages' });
+  }
 });
 
-// Debug endpoint to check users
-app.get('/debug/users', async (req, res) => {
-    try {
-        const token = req.headers.authorization?.split(' ')[1];
-        
-        if (!token) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
+app.post('/api/messages', authenticateUser, async (req, res) => {
+  try {
+    const { receiver_id, content } = req.body;
+    if (!receiver_id || !content) return res.status(400).json({ error: 'Missing required fields' });
 
-        // Verify user is authenticated
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-        if (userError) {
-            return res.status(401).json({ error: 'Invalid authentication' });
-        }
+    const { data: message, error } = await supabase
+      .from('messages')
+      .insert([{
+        sender_id: req.user.id,
+        receiver_id,
+        content,
+        is_read: false
+      }])
+      .select()
+      .single();
 
-        // Get all users
-        const { data: users, error } = await supabase
-            .from('users')
-            .select('*')
-            .order('lastonline', { ascending: false });
-        
-        if (error) {
-            console.error('Users fetch error:', error);
-            return res.status(500).json({ error: 'Failed to fetch users' });
-        }
+    if (error) throw error;
 
-        // Process user status
-        const now = new Date();
-        const processedUsers = users.map(user => {
-            const lastOnline = new Date(user.lastonline);
-            const diffMinutes = Math.floor((now - lastOnline) / 60000);
-            
-            // Update status based on last online time
-            if (diffMinutes > 5) {
-                return {
-                    ...user,
-                    status: 'offline'
-                };
-            }
-            return user;
-        });
+    // Update user status
+    await supabase
+      .from('users')
+      .update({ lastonline: new Date().toISOString() })
+      .eq('id', req.user.id);
 
-        res.json(processedUsers);
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+    res.json(message);
+  } catch (error) {
+    console.error('Send error:', error);
+    res.status(500).json({ error: 'Message send failed' });
+  }
 });
 
-// Debug endpoint to check messages
-app.get('/debug/messages', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('messages')
-            .select('*');
-        
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// Helper Functions
+function calculateUserStatus(lastonline) {
+  const last = new Date(lastonline);
+  const diff = (Date.now() - last.getTime()) / 1000;
+  return diff < 300 ? 'online' : 'offline';
+}
 
-// Debug endpoint to check specific user
-app.get('/debug/user/:id', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', req.params.id)
-            .single();
-        
-        if (error) throw error;
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Test message sending endpoint
-app.post('/debug/send-message', async (req, res) => {
-    try {
-        const { sender_id, receiver_id, content } = req.body;
-        const token = req.headers.authorization?.split(' ')[1];
-        
-        console.log('Received message request:', {
-            sender_id,
-            receiver_id,
-            content,
-            hasToken: !!token
-        });
-        
-        // Validate input
-        if (!sender_id || !receiver_id || !content) {
-            console.error('Missing required fields:', { sender_id, receiver_id, content });
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
-
-        // Verify sender is authenticated
-        if (!token) {
-            console.error('No authentication token provided');
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        // Verify sender matches token
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-        if (userError) {
-            console.error('Auth error:', userError);
-            return res.status(401).json({ error: 'Invalid authentication' });
-        }
-
-        if (user.id !== sender_id) {
-            console.error('Sender ID mismatch:', { tokenUserId: user.id, sender_id });
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
-
-        // Insert message into database
-        console.log('Inserting message into database...');
-        const { data, error } = await supabase
-            .from('messages')
-            .insert([
-                {
-                    sender_id,
-                    receiver_id,
-                    content,
-                    is_read: false
-                }
-            ])
-            .select();
-        
-        if (error) {
-            console.error('Message insert error:', error);
-            return res.status(500).json({ error: error.message });
-        }
-
-        console.log('Message sent successfully:', data[0]);
-        res.json(data[0]);
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get messages between two users
-app.get('/debug/messages/:senderId/:receiverId', async (req, res) => {
-    try {
-        const { senderId, receiverId } = req.params;
-        const token = req.headers.authorization?.split(' ')[1];
-        
-        console.log('Fetching messages:', {
-            senderId,
-            receiverId,
-            hasToken: !!token
-        });
-
-        // Verify authentication
-        if (!token) {
-            console.error('No authentication token provided');
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        // Verify user is authorized to view these messages
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-        if (userError) {
-            console.error('Auth error:', userError);
-            return res.status(401).json({ error: 'Invalid authentication' });
-        }
-
-        if (user.id !== senderId && user.id !== receiverId) {
-            console.error('User not authorized to view these messages');
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
-        
-        const { data, error } = await supabase
-            .from('messages')
-            .select('*')
-            .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`)
-            .order('created_at', { ascending: true });
-        
-        if (error) {
-            console.error('Message fetch error:', error);
-            return res.status(500).json({ error: error.message });
-        }
-
-        console.log('Messages fetched successfully:', data.length);
-        res.json(data);
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Update user status endpoint
-app.post('/debug/update-status', async (req, res) => {
-    try {
-        const { userId } = req.body;
-        const token = req.headers.authorization?.split(' ')[1];
-        
-        if (!token) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        // Verify user is authorized
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-        if (userError || user.id !== userId) {
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
-
-        // Update user status
-        const { error: updateError } = await supabase
-            .from('users')
-            .update({
-                status: 'online',
-                lastonline: new Date().toISOString()
-            })
-            .eq('id', userId);
-
-        if (updateError) {
-            console.error('Status update error:', updateError);
-            return res.status(500).json({ error: 'Failed to update status' });
-        }
-
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Server error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-}); 
+// Server Initialization
+app.listen(port, () => console.log(`Server running on port ${port}`));
