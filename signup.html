@@ -121,7 +121,7 @@
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" required>
+                <input type="password" id="password" required minlength="6">
             </div>
             <button type="submit">Sign Up</button>
         </form>
@@ -132,13 +132,12 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Function to show debug info
-        function showDebugInfo(message) {
-            const debugInfo = document.getElementById('debugInfo');
-            debugInfo.textContent = message;
-            debugInfo.style.display = 'block';
-        }
+        const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
+        
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // Function to show error
         function showError(message) {
@@ -149,40 +148,62 @@
 
         document.getElementById('signupForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             
             // Clear previous messages
             document.getElementById('errorMessage').style.display = 'none';
-            document.getElementById('debugInfo').style.display = 'none';
 
             try {
-                showDebugInfo('Attempting to create account...');
-                
-                const response = await fetch('/auth/signup', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name, email, password })
-                });
-
-                const data = await response.json();
-                showDebugInfo('Signup response: ' + JSON.stringify(data));
-
-                if (data.error) {
-                    throw new Error(data.error);
+                // Validate inputs
+                if (!name || !email || !password) {
+                    throw new Error('All fields are required');
+                }
+                if (password.length < 6) {
+                    throw new Error('Password must be at least 6 characters');
                 }
 
-                alert('Account created successfully! Please check your email to confirm your account.');
+                // Sign up with Supabase
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            name: name,
+                            lastonline: new Date().toISOString()
+                        }
+                    }
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                // Insert user into public.users table
+                const { error: dbError } = await supabase
+                    .from('users')
+                    .insert([
+                        { 
+                            id: data.user.id, 
+                            email: email,
+                            name: name,
+                            lastonline: new Date().toISOString()
+                        }
+                    ]);
+
+                if (dbError) {
+                    console.error('Database insert error:', dbError);
+                    // Don't throw error here - auth was successful
+                }
+
+                alert('Account created successfully! Please check your email to verify your account.');
                 window.location.href = 'login.html';
             } catch (error) {
                 console.error('Signup error:', error);
-                showError(error.message);
-                showDebugInfo('Full error: ' + JSON.stringify(error));
+                showError(error.message || 'Failed to create account. Please try again.');
             }
         });
     </script>
 </body>
-</html> 
+</html>
