@@ -363,13 +363,91 @@
             }
         });
 
-        // Fixed Realtime functionality
-        async function initializeRealtime() {
-            updateConnectionStatus("Connecting to real-time service...");
-            
-            try {
-                // Presence channel for online status
-                presenceChannel = supabaseClient.channel('presence-channel', {
+       // Fixed Realtime functionality
+async function initializeRealtime() {
+    updateConnectionStatus("Connecting to real-time service...");
+    
+    try {
+        // 1. Presence channel for online status
+        presenceChannel = supabaseClient.channel('online-status', {
+            config: { 
+                presence: { 
+                    key: currentUserId
+                } 
+            }
+        })
+        .on('presence', { event: 'sync' }, () => {
+            const state = presenceChannel.presenceState();
+            const onlineUsers = Object.keys(state).map(key => state[key][0].user_id);
+            updateOnlineStatus(onlineUsers);
+        })
+        .on('broadcast', { event: 'typing' }, ({ payload }) => {
+            if (payload.receiver_id === currentUserId) {
+                showTypingIndicator(payload.sender_id);
+            }
+        });
+
+        // 2. Messages channel
+        const messagesChannel = supabaseClient.channel('message-updates')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+            }, (payload) => {
+                handleNewMessage(payload.new);
+            });
+
+        // 3. Subscribe to channels
+        await presenceChannel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await presenceChannel.track({ 
+                    user_id: currentUserId,
+                    online_at: new Date().toISOString(),
+                    status: 'online'
+                });
+                updateConnectionStatus("Connected");
+            }
+        });
+        
+        await messagesChannel.subscribe();
+
+        // 4. Connection state handlers
+        const realtime = supabaseClient.realtime;
+        
+        realtime.onOpen(() => {
+            updateConnectionStatus("Realtime connected");
+        });
+
+        realtime.onClose(() => {
+            updateConnectionStatus("Reconnecting...", true);
+            setTimeout(initializeRealtime, 3000);
+        });
+
+        realtime.onError((error) => {
+            console.error("Realtime error:", error);
+            updateConnectionStatus("Connection error", true);
+            setTimeout(initializeRealtime, 5000);
+        });
+
+    } catch (error) {
+        console.error("Realtime connection error:", error);
+        updateConnectionStatus("Realtime failed: " + error.message, true);
+        setTimeout(initializeRealtime, 5000);
+    }
+}
+
+// NEW FUNCTION - ADD THIS RIGHT AFTER THE initializeRealtime() FUNCTION
+function handleNewMessage(message) {
+    if (!selectedUser || 
+        (message.sender_id === selectedUser.id || message.receiver_id === selectedUser.id)) {
+        addMessageToChat(
+            message.content,
+            message.sender_id === currentUserId,
+            message.created_at
+        );
+    }
+}
                     config: { 
                         presence: { 
                             key: currentUserId
