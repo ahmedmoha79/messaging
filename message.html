@@ -219,11 +219,32 @@
             text-align: right;
             margin-top: 5px;
         }
+        .session-check {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .session-check h2 {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
+    <div class="session-check">
+        <h2>Checking your session...</h2>
+        <div class="loading-spinner"></div>
+    </div>
+
     <div class="connection-status">Connecting...</div>
-    <div class="messaging-container">
+    <div class="messaging-container" style="display: none;">
         <div class="user-list">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
@@ -262,39 +283,118 @@
         // Initialize app
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Check for existing session
-                const sessionData = localStorage.getItem('sb-twsqvdxhsfvdibhpfvqr-auth-token') || 
-                                  localStorage.getItem('session');
-                
-                if (!sessionData) {
-                    window.location.href = 'login.html';
-                    return;
-                }
-
                 // Initialize Supabase client with proper configuration
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
                         persistSession: true,
                         autoRefreshToken: true,
                         detectSessionInUrl: false,
-                        storage: localStorage
+                        storage: {
+                            getItem: (key) => {
+                                // Check all possible storage locations
+                                return localStorage.getItem(key) || 
+                                       localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                       localStorage.getItem('session');
+                            },
+                            setItem: (key, value) => localStorage.setItem(key, value),
+                            removeItem: (key) => localStorage.removeItem(key)
+                        }
                     }
                 });
 
-                // Get current session
-                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-                if (sessionError) throw sessionError;
-                if (!currentSession) {
+                // Check for existing session with multiple fallbacks
+                const checkSession = async () => {
+                    try {
+                        // First try the standard method
+                        const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+                        if (sessionError) throw sessionError;
+                        
+                        if (currentSession) {
+                            return currentSession;
+                        }
+
+                        // If no session found, try to recover from localStorage directly
+                        const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                            localStorage.getItem('session');
+                        
+                        if (sessionData) {
+                            try {
+                                const parsedSession = JSON.parse(sessionData);
+                                if (parsedSession && parsedSession.access_token) {
+                                    // Set the session manually
+                                    await supabaseClient.auth.setSession({
+                                        access_token: parsedSession.access_token,
+                                        refresh_token: parsedSession.refresh_token
+                                    });
+                                    const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
+                                    return recoveredSession;
+                                }
+                            } catch (e) {
+                                console.error("Failed to parse session data:", e);
+                            }
+                        }
+
+                        return null;
+                    } catch (error) {
+                        console.error("Session check error:", error);
+                        return null;
+                    }
+                };
+
+                // Check session with retry logic
+                let sessionCheckAttempts = 0;
+                const maxSessionCheckAttempts = 3;
+                
+                const attemptSessionCheck = async () => {
+                    session = await checkSession();
+                    
+                    if (!session && sessionCheckAttempts < maxSessionCheckAttempts) {
+                        sessionCheckAttempts++;
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        return attemptSessionCheck();
+                    }
+                    
+                    return session;
+                };
+
+                session = await attemptSessionCheck();
+
+                if (!session) {
+                    console.log("No valid session found, redirecting to login");
                     window.location.href = 'login.html';
                     return;
                 }
 
-                session = currentSession;
                 currentUserId = session.user.id;
                 
-                // Verify session
-                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-                if (authError) throw authError;
+                // Verify session with retry logic
+                let userCheckAttempts = 0;
+                const maxUserCheckAttempts = 3;
+                let user = null;
+                
+                while (userCheckAttempts < maxUserCheckAttempts && !user) {
+                    try {
+                        const { data: { user: currentUser }, error: authError } = await supabaseClient.auth.getUser();
+                        if (authError) throw authError;
+                        user = currentUser;
+                    } catch (error) {
+                        console.error("User verification attempt failed:", error);
+                        userCheckAttempts++;
+                        if (userCheckAttempts < maxUserCheckAttempts) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+
+                if (!user) {
+                    throw new Error("Failed to verify user after multiple attempts");
+                }
+
+                // Hide session check and show app
+                document.querySelector('.session-check').style.display = 'none';
+                document.querySelector('.messaging-container').style.display = 'flex';
 
                 // Enable UI elements
                 document.querySelector('.message-input').disabled = false;
@@ -307,9 +407,13 @@
 
             } catch (error) {
                 console.error("Initialization error:", error);
-                updateConnectionStatus("Initialization failed: " + error.message, true);
-                showError('user-list', 'Failed to initialize. Please login again.');
-                setTimeout(() => window.location.href = 'login.html', 3000);
+                document.querySelector('.session-check h2').textContent = "Session verification failed";
+                document.querySelector('.session-check').innerHTML += `
+                    <p style="color: #ff4444; margin-top: 10px;">${error.message}</p>
+                    <button onclick="window.location.href='login.html'" style="margin-top: 20px; padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; color: #000; font-weight: bold;">
+                        Go to Login Page
+                    </button>
+                `;
             }
         });
 
@@ -520,8 +624,6 @@
                     .from('users')
                     .update({ lastonline: new Date().toISOString() })
                     .eq('id', currentUserId);
-                
-                // Don't add message here - it will be added via the realtime subscription
                 
             } catch (error) {
                 console.error('Failed to send message:', error);
