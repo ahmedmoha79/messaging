@@ -261,7 +261,7 @@
                 currentUserId = session.user.id;
                 
                 // Initialize Supabase client with proper configuration
-                supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
                         persistSession: true,
                         autoRefreshToken: true,
