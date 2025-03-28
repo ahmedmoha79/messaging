@@ -473,23 +473,21 @@
                     })
                     .subscribe();
 
-                // Connection state tracking
-                supabaseClient.realtime.onOpen(() => {
-                    updateConnectionStatus("Connected (Realtime active)");
-                });
+// Connection state tracking
+supabaseClient.realtime.on('open', () => {
+    updateConnectionStatus("Connected (Realtime active)");
+});
 
-                supabaseClient.realtime.onClose(() => {
-                    updateConnectionStatus("Reconnecting...", true);
-                    setTimeout(initializeRealtime, 3000);
-                });
+supabaseClient.realtime.on('close', () => {
+    updateConnectionStatus("Reconnecting...", true);
+    setTimeout(initializeRealtime, 3000);
+});
 
-                supabaseClient.realtime.onError((error) => {
-                    console.error("Realtime error:", error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                });
-
-            } catch (error) {
+supabaseClient.realtime.on('error', (error) => {
+    console.error("Realtime error:", error);
+    updateConnectionStatus("Error: " + error.message, true);
+    setTimeout(initializeRealtime, 5000);
+});            } catch (error) {
                 console.error("Realtime connection error:", error);
                 updateConnectionStatus("Realtime failed: " + error.message, true);
                 setTimeout(initializeRealtime, 5000); // Retry after 5 seconds
