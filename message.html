@@ -223,42 +223,18 @@
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
             </div>
-            
-            <!-- User Cards -->
-            <div class="user-card active">
-                <img src="https://via.placeholder.com/40" class="user-avatar" alt="User">
-                <div class="user-info">
-                    <h4>YASIR</h4>
-                    <p>Last message preview...</p>
-                </div>
-                <div class="status-indicator online"></div>
-            </div>
-            
-            <!-- More users... -->
+            <!-- User cards will be dynamically added here -->
         </div>
 
         <!-- Chat Section -->
         <div class="chat-container">
             <div class="chat-header">
-                <h2>FAHAN Logistics</h2>
-                <p>3 members online</p>
+                <h2>Select a user to start chatting</h2>
+                <p id="onlineCount">Loading...</p>
             </div>
 
             <div class="chat-messages">
-                <!-- Messages -->
-                <div class="message received">
-                    <div class="message-content">
-                        <p>Hey team, the shipment is delayed by 2 hours.</p>
-                        <span class="message-time">10:30 AM</span>
-                    </div>
-                </div>
-
-                <div class="message sent">
-                    <div class="message-content">
-                        <p>Understood. Adjusting schedule accordingly.</p>
-                        <span class="message-time">10:31 AM</span>
-                    </div>
-                </div>
+                <!-- Messages will be dynamically added here -->
             </div>
 
             <div class="message-input-container">
@@ -267,20 +243,8 @@
             </div>
         </div>
     </div>
-// Add proper auth initialization
-const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_OUT') {
-        localStorage.removeItem('supabase.auth.token');
-        window.location.href = 'login.html';
-    }
-});
 
-// Check session validity
-if (!session || Date.now() >= session.expires_at * 1000) {
-    window.location.href = 'login.html';
-}
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
     <script>
         // Function to show debug info
         function showDebugInfo(message) {
@@ -324,6 +288,12 @@ if (!session || Date.now() >= session.expires_at * 1000) {
             sendButton.textContent = 'Send';
         }
 
+        // Update online count
+        function updateOnlineCount(users) {
+            const onlineCount = users.filter(user => user.status === 'online').length;
+            document.getElementById('onlineCount').textContent = `${onlineCount} members online`;
+        }
+
         // Load all users
         async function loadUsers() {
             try {
@@ -342,6 +312,9 @@ if (!session || Date.now() >= session.expires_at * 1000) {
                 const users = await response.json();
                 showDebugInfo('Loaded users: ' + JSON.stringify(users));
                 
+                // Update online count
+                updateOnlineCount(users);
+                
                 // Clear existing user cards
                 const userList = document.querySelector('.user-list');
                 userList.innerHTML = `
@@ -356,13 +329,28 @@ if (!session || Date.now() >= session.expires_at * 1000) {
                         const userCard = document.createElement('div');
                         userCard.className = 'user-card';
                         userCard.dataset.userId = user.id;
+                        
+                        // Calculate time since last online
+                        const lastOnline = new Date(user.lastonline);
+                        const now = new Date();
+                        const diffMinutes = Math.floor((now - lastOnline) / 60000);
+                        let statusText = 'Online';
+                        let statusClass = 'online';
+                        
+                        if (diffMinutes > 5) {
+                            statusText = diffMinutes < 60 ? `${diffMinutes}m ago` : 
+                                       diffMinutes < 1440 ? `${Math.floor(diffMinutes/60)}h ago` : 
+                                       `${Math.floor(diffMinutes/1440)}d ago`;
+                            statusClass = 'offline';
+                        }
+                        
                         userCard.innerHTML = `
                             <img src="https://via.placeholder.com/40" class="user-avatar" alt="${user.name}">
                             <div class="user-info">
                                 <h4>${user.name}</h4>
-                                <p>${user.status || 'Offline'}</p>
+                                <p>${statusText}</p>
                             </div>
-                            <div class="status-indicator ${user.status === 'online' ? 'online' : 'offline'}"></div>
+                            <div class="status-indicator ${statusClass}"></div>
                         `;
                         userList.appendChild(userCard);
                     }
@@ -389,6 +377,16 @@ if (!session || Date.now() >= session.expires_at * 1000) {
                         
                         // Load messages
                         await loadMessages(selectedUser.id);
+                    });
+                });
+
+                // Add search functionality
+                const searchInput = document.querySelector('.search-input');
+                searchInput.addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    document.querySelectorAll('.user-card').forEach(card => {
+                        const userName = card.querySelector('h4').textContent.toLowerCase();
+                        card.style.display = userName.includes(searchTerm) ? 'flex' : 'none';
                     });
                 });
             } catch (error) {
@@ -543,3 +541,5 @@ if (!session || Date.now() >= session.expires_at * 1000) {
         // Initialize the app
         loadUsers();
     </script>
+</body>
+</html>
