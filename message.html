@@ -426,13 +426,7 @@
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         presence: { 
-                            key: currentUserId,
-                            events: {
-                                sync: () => {
-                                    const state = presenceChannel.presenceState();
-                                    updateOnlineStatus(Object.keys(state));
-                                }
-                            }
+                            key: currentUserId
                         } 
                     }
                 })
@@ -468,26 +462,28 @@
                                 payload.new.sender_id === currentUserId,
                                 payload.new.created_at
                             );
+                        } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
+                            // If message is for current user but not the selected one, just add it
+                            addMessageToChat(
+                                payload.new.content, 
+                                payload.new.sender_id === currentUserId,
+                                payload.new.created_at
+                            );
                         }
                     })
                     .subscribe();
 
-                // NEW CONNECTION MONITORING IMPLEMENTATION
-                const realtime = supabaseClient.realtime;
-                
-                // Handle connection opened
-                realtime.onOpen(() => {
+                // Connection state tracking
+                supabaseClient.realtime.onOpen(() => {
                     updateConnectionStatus("Connected (Realtime active)");
                 });
-                
-                // Handle connection closed
-                realtime.onClose(() => {
+
+                supabaseClient.realtime.onClose(() => {
                     updateConnectionStatus("Reconnecting...", true);
                     setTimeout(initializeRealtime, 3000);
                 });
-                
-                // Handle errors
-                realtime.onError((error) => {
+
+                supabaseClient.realtime.onError((error) => {
                     console.error("Realtime error:", error);
                     updateConnectionStatus("Error: " + error.message, true);
                     setTimeout(initializeRealtime, 5000);
@@ -535,9 +531,15 @@
             }
 
             users.forEach(user => {
-                const lastOnline = new Date(user.lastonline);
-                const isOnline = (Date.now() - lastOnline) / 60000 < 5;
-                const statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
+                let statusText = 'Offline';
+                let isOnline = false;
+                
+                if (lastOnline) {
+                    const minutesSinceLastOnline = (Date.now() - lastOnline) / 60000;
+                    isOnline = minutesSinceLastOnline < 5;
+                    statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                }
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
@@ -627,6 +629,9 @@
                 
                 if (error) throw error;
                 
+                // Immediately add the message to the chat
+                addMessageToChat(content, true, new Date().toISOString());
+                
                 // Update last online status
                 await supabaseClient
                     .from('users')
@@ -682,16 +687,25 @@
                 if (indicator) {
                     indicator.classList.toggle('online', isOnline);
                     indicator.classList.toggle('offline', !isOnline);
+                    
+                    // Update status text
+                    const statusText = card.querySelector('p');
+                    if (statusText) {
+                        statusText.textContent = isOnline ? 'Online' : 'Offline';
+                    }
                 }
             });
             document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
         }
 
         function formatLastOnline(date) {
+            if (!date) return 'Offline';
+            
             const diff = (Date.now() - new Date(date)) / 60000;
-            return diff < 60 ? `${Math.floor(diff)}m ago` : 
-                   diff < 1440 ? `${Math.floor(diff/60)}h ago` : 
-                   `${Math.floor(diff/1440)}d ago`;
+            if (diff < 1) return 'Just now';
+            if (diff < 60) return `${Math.floor(diff)}m ago`;
+            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
+            return `${Math.floor(diff/1440)}d ago`;
         }
 
         function showTypingIndicator(userId) {
