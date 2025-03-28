@@ -247,7 +247,7 @@
     <div class="messaging-container" style="display: none;">
         <div class="user-list">
             <div class="search-bar">
-                <input type="text" class="search-input" placeholder="Search team members...">
+                <input type="text" class="search-input" id="user-search" name="user-search" placeholder="Search team members...">
             </div>
             <div class="loading-state">
                 <div class="loading-spinner"></div>
@@ -264,7 +264,7 @@
             </div>
             <div class="chat-messages"></div>
             <div class="message-input-container">
-                <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
+                <textarea class="message-input" id="message-input" name="message" placeholder="Type your message..." disabled></textarea>
                 <button class="send-button" disabled>Send</button>
             </div>
         </div>
@@ -278,90 +278,98 @@
 
         // Global variables
         let supabaseClient, presenceChannel, typingTimeout;
-        let selectedUser = null, currentUserId = null, session = null;
+        let selectedUser = null, currentUserId = null;
+
+        // Initialize Supabase client with enhanced configuration
+        function initializeSupabaseClient() {
+            return supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    storage: {
+                        getItem: (key) => {
+                            const value = localStorage.getItem(key);
+                            console.log("Reading from storage:", key, value);
+                            return value;
+                        },
+                        setItem: (key, value) => {
+                            console.log("Writing to storage:", key, value);
+                            localStorage.setItem(key, value);
+                        },
+                        removeItem: (key) => {
+                            console.log("Removing from storage:", key);
+                            localStorage.removeItem(key);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Enhanced session check with debugging
+        async function checkSession() {
+            console.log("Starting session check...");
+            
+            // 1. First try normal session check
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            console.log("Initial session check:", { session, error });
+            
+            if (session) return session;
+            
+            // 2. If no session, try localStorage fallback
+            const storageKey = 'sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token';
+            const sessionData = localStorage.getItem(storageKey);
+            console.log("LocalStorage session data:", sessionData);
+            
+            if (sessionData) {
+                try {
+                    const parsed = JSON.parse(sessionData);
+                    console.log("Parsed session data:", parsed);
+                    
+                    if (parsed?.access_token) {
+                        console.log("Attempting to set session from storage...");
+                        const { data: { session: recoveredSession }, error: recoveryError } = 
+                            await supabaseClient.auth.setSession({
+                                access_token: parsed.access_token,
+                                refresh_token: parsed.refresh_token
+                            });
+                        
+                        console.log("Session recovery result:", { recoveredSession, recoveryError });
+                        return recoveredSession;
+                    }
+                } catch (e) {
+                    console.error("Session parse error:", e);
+                }
+            }
+            
+            return null;
+        }
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize Supabase client - UPDATED VERSION
-window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    storage: {
-      getItem: (key) => {
-        const value = localStorage.getItem(key);
-        console.log("Reading from storage:", key, value); // Debug line
-        return value;
-      },
-      setItem: (key, value) => {
-        console.log("Writing to storage:", key, value); // Debug line
-        localStorage.setItem(key, value);
-      },
-      removeItem: (key) => {
-        console.log("Removing from storage:", key); // Debug line
-        localStorage.removeItem(key);
-      }
-    }
-  }
-});
-             // New session check with debugging
-async function checkSession() {
-  console.log("Starting session check...");
-  
-  // 1. First try normal session check
-  const { data: { session }, error } = await supabaseClient.auth.getSession();
-  console.log("Initial session check:", { session, error });
-  
-  if (session) return session;
-  
-  // 2. If no session, try localStorage fallback
-  const storageKey = 'sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token';
-  const sessionData = localStorage.getItem(storageKey);
-  console.log("LocalStorage session data:", sessionData);
-  
-  if (sessionData) {
-    try {
-      const parsed = JSON.parse(sessionData);
-      console.log("Parsed session data:", parsed);
-      
-      if (parsed?.access_token) {
-        console.log("Attempting to set session from storage...");
-        const { data: { session: recoveredSession }, error: recoveryError } = 
-          await supabaseClient.auth.setSession({
-            access_token: parsed.access_token,
-            refresh_token: parsed.refresh_token
-          });
-        
-        console.log("Session recovery result:", { recoveredSession, recoveryError });
-        return recoveredSession;
-      }
-    } catch (e) {
-      console.error("Session parse error:", e);
-    }
-  }
-  
-  return null;
-}
+                // Initialize Supabase client
+                supabaseClient = initializeSupabaseClient();
+                
+                // Check session with timeout
+                const session = await Promise.race([
+                    checkSession(),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("Session check timed out")), 10000)
+                    )
+                ]);
 
-// Usage in your initialization:
-const session = await checkSession();
-console.log("Final session:", session);
-
-if (!session) {
-  console.log("No session found, redirecting to login");
-  window.location.href = 'login.html';
-  return;
-}
-
-currentUserId = session.user.id;
+                if (!session) {
+                    throw new Error("No active session found");
+                }
 
                 currentUserId = session.user.id;
+                console.log("Authenticated user ID:", currentUserId);
 
                 // Verify user session
-                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-                if (authError) throw authError;
-                if (!user) throw new Error("User verification failed");
+                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                if (userError || !user) {
+                    throw new Error("User verification failed: " + (userError?.message || "No user data"));
+                }
 
                 // Show app interface
                 document.querySelector('.session-check').style.display = 'none';
@@ -387,138 +395,86 @@ currentUserId = session.user.id;
             }
         });
 
-       // Fixed Realtime functionality
-async function initializeRealtime() {
-    updateConnectionStatus("Connecting to real-time service...");
-    
-    try {
-        // 1. Presence channel for online status
-        presenceChannel = supabaseClient.channel('online-status', {
-            config: { 
-                presence: { 
-                    key: currentUserId
-                } 
-            }
-        })
-        .on('presence', { event: 'sync' }, () => {
-            const state = presenceChannel.presenceState();
-            const onlineUsers = Object.keys(state).map(key => state[key][0].user_id);
-            updateOnlineStatus(onlineUsers);
-        })
-        .on('broadcast', { event: 'typing' }, ({ payload }) => {
-            if (payload.receiver_id === currentUserId) {
-                showTypingIndicator(payload.sender_id);
-            }
-        });
-
-        // 2. Messages channel
-        const messagesChannel = supabaseClient.channel('message-updates')
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
-            }, (payload) => {
-                handleNewMessage(payload.new);
-            });
-
-        // 3. Subscribe to channels
-        await presenceChannel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                await presenceChannel.track({ 
-                    user_id: currentUserId,
-                    online_at: new Date().toISOString(),
-                    status: 'online'
+        // Realtime functionality
+        async function initializeRealtime() {
+            updateConnectionStatus("Connecting to real-time service...");
+            
+            try {
+                // Presence channel for online status
+                presenceChannel = supabaseClient.channel('online-status', {
+                    config: { 
+                        presence: { 
+                            key: currentUserId
+                        } 
+                    }
+                })
+                .on('presence', { event: 'sync' }, () => {
+                    const state = presenceChannel.presenceState();
+                    const onlineUsers = Object.keys(state).map(key => state[key][0].user_id);
+                    updateOnlineStatus(onlineUsers);
+                })
+                .on('broadcast', { event: 'typing' }, ({ payload }) => {
+                    if (payload.receiver_id === currentUserId) {
+                        showTypingIndicator(payload.sender_id);
+                    }
                 });
-                updateConnectionStatus("Connected");
-            }
-        });
-        
-        await messagesChannel.subscribe();
-
-        // 4. Connection state handlers
-        const realtime = supabaseClient.realtime;
-        
-        realtime.onOpen(() => {
-            updateConnectionStatus("Realtime connected");
-        });
-
-        realtime.onClose(() => {
-            updateConnectionStatus("Reconnecting...", true);
-            setTimeout(initializeRealtime, 3000);
-        });
-
-        realtime.onError((error) => {
-            console.error("Realtime error:", error);
-            updateConnectionStatus("Connection error", true);
-            setTimeout(initializeRealtime, 5000);
-        });
-
-    } catch (error) {
-        console.error("Realtime connection error:", error);
-        updateConnectionStatus("Realtime failed: " + error.message, true);
-        setTimeout(initializeRealtime, 5000);
-    }
-}
-
-// NEW FUNCTION - ADD THIS RIGHT AFTER THE initializeRealtime() FUNCTION
-function handleNewMessage(message) {
-    if (!selectedUser || 
-        (message.sender_id === selectedUser.id || message.receiver_id === selectedUser.id)) {
-        addMessageToChat(
-            message.content,
-            message.sender_id === currentUserId,
-            message.created_at
-        );
-    }
-}
 
                 // Messages channel
-                const messagesChannel = supabaseClient.channel('messages-channel')
+                const messagesChannel = supabaseClient.channel('message-updates')
                     .on('postgres_changes', {
                         event: 'INSERT',
                         schema: 'public',
                         table: 'messages',
                         filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
                     }, (payload) => {
-                        if (selectedUser && 
-                            (payload.new.sender_id === selectedUser.id || 
-                             payload.new.receiver_id === selectedUser.id)) {
-                            addMessageToChat(
-                                payload.new.content, 
-                                payload.new.sender_id === currentUserId,
-                                payload.new.created_at
-                            );
-                        } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
-                            addMessageToChat(
-                                payload.new.content, 
-                                payload.new.sender_id === currentUserId,
-                                payload.new.created_at
-                            );
-                        }
-                    })
-                    .subscribe();
+                        handleNewMessage(payload.new);
+                    });
 
-                // Connection state tracking
-supabaseClient.realtime.on('open', () => {
-    updateConnectionStatus("Connected (Realtime active)");
-});
+                // Subscribe to channels
+                await presenceChannel.subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        await presenceChannel.track({ 
+                            user_id: currentUserId,
+                            online_at: new Date().toISOString(),
+                            status: 'online'
+                        });
+                        updateConnectionStatus("Connected");
+                    }
+                });
+                
+                await messagesChannel.subscribe();
 
-supabaseClient.realtime.on('close', () => {
-    updateConnectionStatus("Reconnecting...", true);
-    setTimeout(initializeRealtime, 3000);
-});
+                // Connection state handlers
+                supabaseClient.realtime.on('open', () => {
+                    updateConnectionStatus("Realtime connected");
+                });
 
-supabaseClient.realtime.on('error', (error) => {
-    console.error("Realtime error:", error);
-    updateConnectionStatus("Error: " + error.message, true);
-    setTimeout(initializeRealtime, 5000);
-});
+                supabaseClient.realtime.on('close', () => {
+                    updateConnectionStatus("Reconnecting...", true);
+                    setTimeout(initializeRealtime, 3000);
+                });
+
+                supabaseClient.realtime.on('error', (error) => {
+                    console.error("Realtime error:", error);
+                    updateConnectionStatus("Connection error", true);
+                    setTimeout(initializeRealtime, 5000);
+                });
 
             } catch (error) {
                 console.error("Realtime connection error:", error);
                 updateConnectionStatus("Realtime failed: " + error.message, true);
                 setTimeout(initializeRealtime, 5000);
+            }
+        }
+
+        function handleNewMessage(message) {
+            if (!selectedUser || 
+                (message.sender_id === selectedUser.id || message.receiver_id === selectedUser.id)) {
+                addMessageToChat(
+                    message.content,
+                    message.sender_id === currentUserId,
+                    message.created_at
+                );
             }
         }
 
@@ -547,7 +503,7 @@ supabaseClient.realtime.on('error', (error) => {
             const userList = document.querySelector('.user-list');
             userList.innerHTML = `
                 <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
+                    <input type="text" class="search-input" id="user-search" name="user-search" placeholder="Search team members...">
                 </div>
             `;
 
@@ -743,7 +699,7 @@ supabaseClient.realtime.on('error', (error) => {
         function showLoading() {
             document.querySelector('.user-list').innerHTML = `
                 <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
+                    <input type="text" class="search-input" id="user-search" name="user-search" placeholder="Search team members...">
                 </div>
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
