@@ -292,6 +292,7 @@
         let supabaseClient, realtimeSubscription, presenceChannel, typingTimeout;
         let selectedUser = null, currentUserId = null, session = null;
         let unreadMessages = {}; // Track unread messages per user
+        let isRealtimeConnected = false;
 
         // When the page loads, we set everything up
         document.addEventListener('DOMContentLoaded', async () => {
@@ -417,6 +418,9 @@
                 // Update last online status
                 await updateLastOnline();
 
+                // Check connection status periodically
+                setInterval(checkConnectionStatus, 10000);
+
             } catch (error) {
                 console.error("Error setting up the app:", error);
                 document.querySelector('.session-check h2').textContent = "Login Check Failed";
@@ -428,6 +432,14 @@
                 `;
             }
         });
+
+        // Check if we're still connected to realtime
+        function checkConnectionStatus() {
+            if (!isRealtimeConnected) {
+                updateConnectionStatus("Reconnecting...", true);
+                initializeRealtime();
+            }
+        }
 
         // Set up all the click handlers and typing detection
         function setupEventListeners() {
@@ -569,6 +581,7 @@
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
                 userCard.dataset.userId = user.id;
+                userCard.dataset.lastOnline = user.last_online;
                 userCard.innerHTML = `
                     <img src="https://ui-avatars.com/api/?name=${
                         encodeURIComponent(user.full_name.split(' ')[0])}+${
@@ -708,7 +721,7 @@
             }
             
             // Remove typing indicator
-            document.querySelector('.typing-indicator')?.remove();
+            document.getElementById('typingIndicator').style.opacity = '0';
             
             const messageElement = document.createElement('div');
             messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
@@ -776,8 +789,7 @@
                     // Update status text if not already set
                     const statusText = item.querySelector('p');
                     if (statusText && statusText.textContent === 'Online') {
-                        const userElement = item;
-                        const lastOnline = userElement.dataset.lastOnline;
+                        const lastOnline = item.dataset.lastOnline;
                         statusText.textContent = lastOnline ? formatLastOnline(new Date(lastOnline)) : 'Offline';
                     }
                 }
@@ -897,6 +909,14 @@
             updateConnectionStatus("Connecting to real-time service...");
             
             try {
+                // First unsubscribe from any existing channels
+                if (presenceChannel) {
+                    await supabaseClient.removeChannel(presenceChannel);
+                }
+                if (realtimeSubscription) {
+                    await supabaseClient.removeChannel(realtimeSubscription);
+                }
+                
                 // Channel for showing who's online
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
@@ -918,11 +938,15 @@
                     if (payload.partnerId === currentUserId) {
                         document.getElementById('typingIndicator').style.opacity = '0';
                     }
-                })
-                .subscribe(async (status) => {
+                });
+                
+                await presenceChannel.subscribe(async (status) => {
                     if (status === 'SUBSCRIBED') {
                         await presenceChannel.track({ online_at: new Date().toISOString() });
+                        isRealtimeConnected = true;
                         updateConnectionStatus("Connected");
+                    } else {
+                        isRealtimeConnected = false;
                     }
                 });
 
@@ -968,27 +992,15 @@
                                 }
                             }
                         }
-                    })
-                    .subscribe();
-
-                // Handle connection state changes
-                supabaseClient.realtime.onOpen(() => {
-                    updateConnectionStatus("Connected");
-                });
-
-                supabaseClient.realtime.onClose(() => {
-                    updateConnectionStatus("Reconnecting...", true);
-                    setTimeout(initializeRealtime, 3000);
-                });
-
-                supabaseClient.realtime.onError((error) => {
-                    console.error("Realtime error:", error);
-                    updateConnectionStatus("Connection problem: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
+                    });
+                
+                await realtimeSubscription.subscribe((status) => {
+                    isRealtimeConnected = status === 'SUBSCRIBED';
                 });
 
             } catch (error) {
                 console.error("Realtime connection error:", error);
+                isRealtimeConnected = false;
                 updateConnectionStatus("Connection failed: " + error.message, true);
                 setTimeout(initializeRealtime, 5000);
             }
