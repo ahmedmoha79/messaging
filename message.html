@@ -301,36 +301,54 @@
                     }
                 });
 
-                // Check for existing session
-                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-                if (sessionError) throw sessionError;
-                session = currentSession;
+                // Check for existing session with retry logic
+let sessionCheckAttempts = 0;
+const maxSessionCheckAttempts = 3;
+let session = null;
 
-                // If no session found, try to recover from localStorage
-                if (!session) {
-                    const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                      localStorage.getItem('session');
-                    if (sessionData) {
-                        try {
-                            const parsedSession = JSON.parse(sessionData);
-                            if (parsedSession && parsedSession.access_token) {
-                                await supabaseClient.auth.setSession({
-                                    access_token: parsedSession.access_token,
-                                    refresh_token: parsedSession.refresh_token
-                                });
-                                const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                                session = recoveredSession;
-                            }
-                        } catch (e) {
-                            console.error("Failed to parse session data:", e);
-                        }
+while (sessionCheckAttempts < maxSessionCheckAttempts && !session) {
+    try {
+        // First try standard method
+        const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+        if (!sessionError) session = currentSession;
+        
+        // If still no session, try localStorage fallback
+        if (!session) {
+            const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                              localStorage.getItem('session');
+            if (sessionData) {
+                try {
+                    const parsedSession = JSON.parse(sessionData);
+                    if (parsedSession?.access_token) {
+                        await supabaseClient.auth.setSession({
+                            access_token: parsedSession.access_token,
+                            refresh_token: parsedSession.refresh_token
+                        });
+                        const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
+                        session = recoveredSession;
                     }
+                } catch (e) {
+                    console.error("Session parse error:", e);
                 }
+            }
+        }
+        
+        if (session) break;
+        
+    } catch (error) {
+        console.error("Session check error:", error);
+    }
+    
+    sessionCheckAttempts++;
+    if (sessionCheckAttempts < maxSessionCheckAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+}
 
-                if (!session) {
-                    window.location.href = 'login.html';
-                    return;
-                }
+if (!session) {
+    window.location.href = 'login.html';
+    return;
+}
 
                 currentUserId = session.user.id;
 
@@ -448,27 +466,6 @@ function handleNewMessage(message) {
         );
     }
 }
-                    config: { 
-                        presence: { 
-                            key: currentUserId
-                        } 
-                    }
-                })
-                .on('presence', { event: 'sync' }, () => {
-                    const state = presenceChannel.presenceState();
-                    updateOnlineStatus(Object.keys(state));
-                })
-                .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                    if (payload.partnerId === currentUserId) {
-                        showTypingIndicator(payload.userId);
-                    }
-                })
-                .subscribe(async (status) => {
-                    if (status === 'SUBSCRIBED') {
-                        await presenceChannel.track({ online_at: new Date().toISOString() });
-                        updateConnectionStatus("Connected");
-                    }
-                });
 
                 // Messages channel
                 const messagesChannel = supabaseClient.channel('messages-channel')
