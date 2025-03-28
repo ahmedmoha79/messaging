@@ -283,67 +283,29 @@
         // Initialize app
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize Supabase client
-                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: false,
-                        storage: {
-                            getItem: (key) => {
-                                return localStorage.getItem(key) || 
-                                       localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                       localStorage.getItem('session');
-                            },
-                            setItem: (key, value) => localStorage.setItem(key, value),
-                            removeItem: (key) => localStorage.removeItem(key)
-                        }
-                    }
-                });
-
-                // Check for existing session with retry logic
-let sessionCheckAttempts = 0;
-const maxSessionCheckAttempts = 3;
-let session = null;
-
-while (sessionCheckAttempts < maxSessionCheckAttempts && !session) {
-    try {
-        // First try standard method
-        const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-        if (!sessionError) session = currentSession;
-        
-        // If still no session, try localStorage fallback
-        if (!session) {
-            const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                              localStorage.getItem('session');
-            if (sessionData) {
-                try {
-                    const parsedSession = JSON.parse(sessionData);
-                    if (parsedSession?.access_token) {
-                        await supabaseClient.auth.setSession({
-                            access_token: parsedSession.access_token,
-                            refresh_token: parsedSession.refresh_token
-                        });
-                        const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                        session = recoveredSession;
-                    }
-                } catch (e) {
-                    console.error("Session parse error:", e);
-                }
-            }
-        }
-        
-        if (session) break;
-        
-    } catch (error) {
-        console.error("Session check error:", error);
+                // Initialize Supabase client - UPDATED VERSION
+window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    storage: {
+      getItem: (key) => {
+        const value = localStorage.getItem(key);
+        console.log("Reading from storage:", key, value); // Debug line
+        return value;
+      },
+      setItem: (key, value) => {
+        console.log("Writing to storage:", key, value); // Debug line
+        localStorage.setItem(key, value);
+      },
+      removeItem: (key) => {
+        console.log("Removing from storage:", key); // Debug line
+        localStorage.removeItem(key);
+      }
     }
-    
-    sessionCheckAttempts++;
-    if (sessionCheckAttempts < maxSessionCheckAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-}
+  }
+});
+               / Check for existing session with retry logic
 
 if (!session) {
     window.location.href = 'login.html';
