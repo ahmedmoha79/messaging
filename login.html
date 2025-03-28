@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Secure Messaging</title>
+    <title>Login - Secure Logistics</title>
     <style>
         * {
             margin: 0;
@@ -11,96 +11,84 @@
             box-sizing: border-box;
             font-family: 'Segoe UI', system-ui, sans-serif;
         }
-
         body {
             background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
-            color: #ffffff;
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: white;
         }
-
-        .login-container {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            padding: 40px;
-            border-radius: 20px;
+        .login-box {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 2rem;
+            border-radius: 15px;
             width: 100%;
             max-width: 400px;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.1);
         }
-
         h1 {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 2rem;
             color: #00ff88;
         }
-
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 1.5rem;
         }
-
         label {
             display: block;
-            margin-bottom: 8px;
-            color: #ffffff;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
         }
-
         input {
             width: 100%;
             padding: 12px;
             background: rgba(255, 255, 255, 0.05);
-            border: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             color: white;
-            font-size: 14px;
+            font-size: 1rem;
         }
-
         input:focus {
             outline: none;
-            background: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.05);
         }
-
         button {
             width: 100%;
             padding: 12px;
             background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
             border: none;
             border-radius: 8px;
-            color: #000;
+            color: black;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: transform 0.2s;
         }
-
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
         }
-
         .error-message {
             color: #ff4444;
-            margin-top: 10px;
             text-align: center;
+            margin-top: 1rem;
             display: none;
         }
-
         .signup-link {
             text-align: center;
-            margin-top: 20px;
+            margin-top: 1.5rem;
         }
-
         .signup-link a {
             color: #00ff88;
             text-decoration: none;
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h1>Login</h1>
+    <div class="login-box">
+        <h1>Logistics Portal</h1>
         <form id="loginForm">
             <div class="form-group">
                 <label for="email">Email</label>
@@ -112,9 +100,9 @@
             </div>
             <button type="submit">Login</button>
         </form>
-        <div id="errorMessage" class="error-message"></div>
+        <div class="error-message" id="errorMessage"></div>
         <div class="signup-link">
-            Don't have an account? <a href="signup.html">Sign up here</a>
+            New user? <a href="signup.html">Create account</a>
         </div>
     </div>
 
@@ -122,34 +110,38 @@
     <script>
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
+        
+        // Initialize Supabase once
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true
+            }
+        });
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const errorElement = document.getElementById('errorMessage');
             
-            document.getElementById('errorMessage').style.display = 'none';
-
+            errorElement.style.display = 'none';
+            
             try {
-                const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true
-                    }
-                });
-
                 const { data, error } = await supabase.auth.signInWithPassword({
                     email: email,
                     password: password
                 });
 
                 if (error) throw error;
-
+                
+                // Redirect after successful login
                 window.location.href = 'message.html';
+                
             } catch (error) {
+                errorElement.textContent = error.message;
+                errorElement.style.display = 'block';
                 console.error('Login error:', error);
-                document.getElementById('errorMessage').textContent = error.message;
-                document.getElementById('errorMessage').style.display = 'block';
             }
         });
     </script>
