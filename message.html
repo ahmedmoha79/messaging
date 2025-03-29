@@ -376,14 +376,24 @@
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 // Initialize Supabase client
-                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                // Simple bulletproof initialization
+supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        flowType: 'pkce' // ADD THIS LINE
+        storage: {
+            getItem: () => null, // Disable all local storage
+            setItem: () => null,
+            removeItem: () => null
+        }
     }
 });
+
+// Force fresh login every time
+await supabaseClient.auth.signOut();
+window.location.href = 'login.html';
+return;
 
                 // Check for existing session
                 const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
