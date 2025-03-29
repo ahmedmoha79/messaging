@@ -341,29 +341,56 @@
             });
 
             // Session handling remains the same
-            const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-            if (sessionError) throw sessionError;
-            session = currentSession;
+            console.log("Checking for existing session...");
+const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+console.log("Session check result:", { currentSession, sessionError });
 
-            if (!session) {
-                const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                if (sessionData) {
-                    try {
-                        const parsedSession = JSON.parse(sessionData);
-                        if (parsedSession && parsedSession.access_token) {
-                            await supabaseClient.auth.setSession({
-                                access_token: parsedSession.access_token,
-                                refresh_token: parsedSession.refresh_token
-                            });
-                            const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                            session = recoveredSession;
-                        }
-                    } catch (e) {
-                        console.error("Failed to parse session data:", e);
-                    }
+if (sessionError) {
+    console.error("Session error:", sessionError);
+    throw sessionError;
+}
+
+session = currentSession;
+
+if (!session) {
+    console.log("No active session found, checking localStorage...");
+    const storageKey = 'sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token';
+    const sessionData = localStorage.getItem(storageKey) || localStorage.getItem('session');
+    console.log("LocalStorage session data:", sessionData);
+
+    if (sessionData) {
+        try {
+            const parsedSession = JSON.parse(sessionData);
+            console.log("Parsed session:", parsedSession);
+            
+            if (parsedSession?.access_token) {
+                console.log("Attempting to set session from localStorage...");
+                const { data: { session: recoveredSession }, error: recoveryError } = await supabaseClient.auth.setSession({
+                    access_token: parsedSession.access_token,
+                    refresh_token: parsedSession.refresh_token
+                });
+                
+                if (recoveryError) {
+                    console.error("Session recovery error:", recoveryError);
+                    throw recoveryError;
                 }
+                
+                console.log("Session recovered successfully:", recoveredSession);
+                session = recoveredSession;
             }
+        } catch (e) {
+            console.error("Failed to parse session data:", e);
+            localStorage.removeItem(storageKey);
+            localStorage.removeItem('session');
+        }
+    }
+}
+
+if (!session) {
+    console.log("No valid session found, redirecting to login...");
+    window.location.href = 'login.html';
+    return;
+}
 
             if (!session) {
                 window.location.href = 'login.html';
