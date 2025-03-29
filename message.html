@@ -4,19 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logistics Secure Messaging</title>
-    <title>Chat Application</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: 'Segoe UI', system-ui, sans-serif;
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f5f5f5;
-            height: 100vh;
-            margin: 0;
         }
         body {
             background: #0a0a0a;
@@ -77,19 +70,12 @@
         .user-card {
             display: flex;
             align-items: center;
-
-        .container-fluid {
-            height: 100%;
             padding: 15px;
             margin: 8px 0;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
             background: rgba(255, 255, 255, 0.02);
-        }
-
-        .row {
-            height: 100%;
         }
         .user-card:hover {
             background: rgba(255, 255, 255, 0.05);
@@ -157,16 +143,10 @@
             padding: 15px 20px;
             background: rgba(255, 255, 255, 0.05);
             border: none;
-        .sidebar {
-            background-color: white;
             border-radius: 8px;
             color: white;
             resize: none;
             min-height: 50px;
-            padding: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            height: 100%;
-            overflow-y: auto;
         }
         .send-button {
             background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
@@ -196,18 +176,12 @@
             transition: opacity 0.3s ease;
         }
         .loading-state {
-        .chat-container {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 20px;
             color: #ffffff;
-            height: 100%;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            padding: 0;
         }
         .loading-spinner {
             width: 40px;
@@ -224,11 +198,6 @@
         .error-state {
             display: flex;
             flex-direction: column;
-        .chat-header {
-            padding: 15px;
-            border-bottom: 1px solid #f0f0f0;
-            display: flex;
-            justify-content: space-between;
             align-items: center;
             justify-content: center;
             padding: 20px;
@@ -242,15 +211,6 @@
             border-radius: 4px;
             color: #000;
             font-weight: bold;
-
-        .chat-header h3 {
-            margin: 0;
-            font-size: 18px;
-        }
-
-        .online-info {
-            font-size: 14px;
-            color: #666;
         }
         .message-time {
             font-size: 0.7em;
@@ -267,11 +227,6 @@
             bottom: 0;
             background: rgba(0, 0, 0, 0.8);
             display: flex;
-        .message-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-            display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
@@ -279,126 +234,6 @@
         }
         .session-check h2 {
             margin-bottom: 20px;
-        .message {
-            max-width: 70%;
-            padding: 10px 15px;
-            border-radius: 18px;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        .sent {
-            align-self: flex-end;
-            background-color: #0084ff;
-            color: white;
-            border-bottom-right-radius: 5px;
-        }
-
-        .received {
-            align-self: flex-start;
-            background-color: #f1f0f0;
-            color: black;
-            border-bottom-left-radius: 5px;
-        }
-
-        .message-content {
-            margin-bottom: 5px;
-            word-wrap: break-word;
-        }
-
-        .message-time {
-            font-size: 12px;
-            opacity: 0.7;
-            text-align: right;
-        }
-
-        .message-input {
-            display: flex;
-            padding: 15px;
-            border-top: 1px solid #f0f0f0;
-        }
-
-        .message-input textarea {
-            flex: 1;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            padding: 10px 15px;
-            resize: none;
-            outline: none;
-        }
-
-        .message-input button {
-            margin-left: 10px;
-            border: none;
-            background-color: #0084ff;
-            color: white;
-            border-radius: 20px;
-            padding: 0 20px;
-            cursor: pointer;
-        }
-
-        .users-container {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .users-container h3 {
-            margin-bottom: 15px;
-            font-size: 18px;
-        }
-
-        .user-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .user-item {
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .user-item:hover {
-            background-color: #f5f5f5;
-        }
-
-        .user-item.active {
-            background-color: #e6f2ff;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-left: 10px;
-        }
-
-        .online {
-            background-color: #4CAF50;
-        }
-
-        .offline {
-            background-color: #9e9e9e;
-        }
-
-        .unread-badge {
-            background-color: #ff3b30;
-            color: white;
-            font-size: 12px;
-            padding: 2px 6px;
-            border-radius: 10px;
-            display: none;
         }
     </style>
 </head>
@@ -413,16 +248,6 @@
         <div class="user-list">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Left sidebar with user list -->
-            <div class="col-md-3 sidebar">
-                <div class="users-container">
-                    <h3>Users</h3>
-                    <div class="user-list" id="user-list">
-                        <!-- Users will be populated here -->
-                    </div>
-                </div>
             </div>
             <div class="loading-state">
                 <div class="loading-spinner"></div>
@@ -430,30 +255,18 @@
             </div>
         </div>
         <div class="chat-container">
-
-            <!-- Chat area -->
-            <div class="col-md-9 chat-container">
             <div class="chat-header">
                 <h2>Select a user to start chatting</h2>
                 <p id="onlineCount">Loading...</p>
                 <div class="typing-indicator" id="typingIndicator">
                     <span id="partnerName"></span> is typing...
-                    <h3>Chatting with: <span id="selected-user-name">Select a user</span></h3>
-                    <div class="online-info">
-                        <span id="online-count">0</span> users online
                 </div>
             </div>
             <div class="chat-messages"></div>
             <div class="message-input-container">
                 <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
                 <button class="send-button" disabled>Send</button>
-                <div class="message-container" id="message-container">
-                    <!-- Messages will be populated here -->
             </div>
-
-                <div class="message-input">
-                    <textarea id="message-text" placeholder="Type your message..."></textarea>
-                    <button id="send-button">Send</button>
         </div>
     </div>
 
@@ -1186,34 +999,13 @@
                 updateConnectionStatus("Offline - No connection", true);
             });
         }
-
-    <script>
-        // Global variables
-        let currentUser = null;
-        let selectedUserId = null;
-        let authToken = null;
-        let allUsers = [];
-        let refreshInterval;
-
-        // On page load
     document.addEventListener('DOMContentLoaded', function() {
         if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
             Notification.requestPermission();
-            // Check if user is logged in
-            authToken = localStorage.getItem('authToken');
-            if (!authToken) {
-                window.location.href = '/login.html';
-                return;
         }
 
         connectWebSocket();
 
-            // Load current user
-            currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            console.log('Current user:', currentUser); // Debug info
-
-            // Setup event listeners
-            document.getElementById('send-button').addEventListener('click', sendMessage);
         document.getElementById('message-text').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -1224,99 +1016,21 @@
         setInterval(pollForNewMessages, MESSAGE_FETCH_INTERVAL);
         setInterval(sendHeartbeat, 30000);
 
-            // Initial data load
-            loadUsers();
-
-            // Set up refresh intervals
-            refreshInterval = setInterval(function() {
-                loadUsers();
         if (selectedUserId) {
             loadMessages(selectedUserId);
         }
-            }, 10000); // Refresh every 10 seconds
     });
 
     document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible') {
             if (selectedUserId) {
                 loadMessages(selectedUserId);
-        // Load users list
-        async function loadUsers() {
-            try {
-                const response = await fetch('/api/users', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
             }
-                });
 
             if (!socket || socket.readyState !== WebSocket.OPEN) {
                 connectWebSocket();
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        // Handle unauthorized
-                        localStorage.removeItem('authToken');
-                        window.location.href = '/login.html';
-                        return;
-            }
-                    throw new Error('Failed to load users');
-        }
-
-                const users = await response.json();
-                allUsers = users;
-
-                // Count online users
-                const onlineUsers = users.filter(user => user.status === 'online');
-                document.getElementById('online-count').textContent = onlineUsers.length;
-
-                // Render users list
-                renderUsersList(users);
-
-            } catch (error) {
-                console.error('Error loading users:', error);
             }
         }
-
-        // Render users list
-        function renderUsersList(users) {
-            const userListContainer = document.getElementById('user-list');
-            const currentUserItem = userListContainer.querySelector(`.user-item[data-user-id="${selectedUserId}"]`);
-            const wasSelected = currentUserItem !== null;
-
-            // Clear and rebuild the list
-            userListContainer.innerHTML = '';
-
-            users.forEach(user => {
-                // Skip the current user
-                if (user.id === currentUser.id) return;
-
-                const userDiv = document.createElement('div');
-                userDiv.className = `user-item ${selectedUserId === user.id ? 'active' : ''}`;
-                userDiv.setAttribute('data-user-id', user.id);
-                userDiv.onclick = () => selectUser(user.id, user.name || user.email.split('@')[0]);
-
-                // User info with status indicator
-                const userInfo = document.createElement('div');
-                userInfo.className = 'user-info';
-
-                const userName = document.createElement('span');
-                userName.className = 'user-name';
-                userName.textContent = user.name || user.email.split('@')[0];
-
-                const statusIndicator = document.createElement('span');
-                statusIndicator.className = `status-indicator ${user.status === 'online' ? 'online' : 'offline'}`;
-                statusIndicator.id = `status-${user.id}`;
-
-                userInfo.appendChild(userName);
-                userInfo.appendChild(statusIndicator);
-
-                // Unread badge
-                const unreadBadge = document.createElement('span');
-                unreadBadge.className = 'unread-badge';
-                unreadBadge.id = `unread-${user.id}`;
-
-                userDiv.appendChild(userInfo);
-                userDiv.appendChild(unreadBadge);
-                userListContainer.appendChild(userDiv);
     });
 
     window.addEventListener('beforeunload', function() {
@@ -1325,53 +1039,7 @@
                 type: 'logout',
                 user_id: currentUserId
             }));
-            // If the previously selected user is still in the list, reselect them
-            if (wasSelected && selectedUserId) {
-                const user = users.find(u => u.id === selectedUserId);
-                if (user) {
-                    const userElement = userListContainer.querySelector(`.user-item[data-user-id="${selectedUserId}"]`);
-                    if (userElement) userElement.classList.add('active');
-                }
-            }
         }
-
-        // Select a user to chat with
-        function selectUser(userId, userName) {
-            selectedUserId = userId;
-
-            // Update UI
-            document.querySelectorAll('.user-item').forEach(item => {
-                item.classList.remove('active');
-            });
-
-            const selectedItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
-            if (selectedItem) {
-                selectedItem.classList.add('active');
-
-                // Clear unread badge
-                const unreadBadge = document.getElementById(`unread-${userId}`);
-                if (unreadBadge) {
-                    unreadBadge.textContent = '';
-                    unreadBadge.style.display = 'none';
-        }
-            }
-
-            // Update chat header
-            document.getElementById('selected-user-name').textContent = userName || userId;
-
-            // Load messages
-            loadMessages(userId);
-        }
-
-        // Load messages for selected user
-        async function loadMessages(partnerId) {
-            if (!partnerId) return;
-
-            try {
-                const response = await fetch(`/api/messages/${partnerId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
     });
     </script>
 </body>
@@ -1381,107 +1049,3 @@
 {% endblock %}
 
 [The entire file contents as specified in the provided suggestion, replacing the previous implementation]
-
-                if (!response.ok) {
-                    throw new Error('Failed to load messages');
-                }
-
-                const messages = await response.json();
-                renderMessages(messages);
-
-            } catch (error) {
-                console.error('Error loading messages:', error);
-            }
-        }
-
-        // Render messages
-        function renderMessages(messages) {
-            const messageContainer = document.getElementById('message-container');
-            messageContainer.innerHTML = '';
-
-            messages.forEach(message => {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${message.sender_id === currentUser.id ? 'sent' : 'received'}`;
-
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'message-content';
-                contentDiv.textContent = message.content;
-
-                const timeDiv = document.createElement('div');
-                timeDiv.className = 'message-time';
-
-                // Format timestamp - handle both created_at and inserted_at
-                const timestamp = message.created_at || message.inserted_at;
-                const date = new Date(timestamp);
-                timeDiv.textContent = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-
-                messageDiv.appendChild(contentDiv);
-                messageDiv.appendChild(timeDiv);
-                messageContainer.appendChild(messageDiv);
-            });
-
-            // Scroll to bottom
-            messageContainer.scrollTop = messageContainer.scrollHeight;
-        }
-
-        // Send message
-        async function sendMessage() {
-            const messageText = document.getElementById('message-text').value.trim();
-            if (!messageText || !selectedUserId) return;
-
-            try {
-                // Log details for debugging
-                console.log('Sending message:', {
-                    sender_id: currentUser.id,
-                    receiver_id: selectedUserId,
-                    content: messageText
-                });
-
-                const response = await fetch('/api/messages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({
-                        sender_id: currentUser.id, // Explicitly include sender_id
-                        receiver_id: selectedUserId,
-                        content: messageText,
-                        is_read: false
-                    })
-                });
-
-                // Log the response for debugging
-                console.log('Response status:', response.status);
-                const responseData = await response.json();
-                console.log('Response data:', responseData);
-
-                if (!response.ok) {
-                    throw new Error(responseData.error || 'Failed to send message');
-                }
-
-                // Clear input
-                document.getElementById('message-text').value = '';
-
-                // Reload messages to show the new message
-                loadMessages(selectedUserId);
-
-            } catch (error) {
-                console.error('Error sending message:', error);
-                alert('Failed to send message: ' + error.message);
-            }
-        }
-
-        // Check for unread messages from all users
-        async function checkUnreadMessages() {
-            for (const user of allUsers) {
-                if (user.id === currentUser.id || user.id === selectedUserId) continue;
-
-                try {
-                    const response = await fetch(`/api/messages/${user.id}?unread=true`, {
-                        headers: {
-                            'Authorization': `Bearer ${authToken}`
-                        }
-                    });
-
-                    if
