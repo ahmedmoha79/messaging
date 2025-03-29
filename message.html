@@ -377,12 +377,13 @@
             try {
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: true
-                    }
-                });
+    auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce' // ADD THIS LINE
+    }
+});
 
                 // Check for existing session
                 const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
@@ -390,11 +391,13 @@
                 session = currentSession;
 
                 // If no session found, redirect to login
-                if (!session) {
-                    window.location.href = 'login.html';
-                    return;
-                }
-
+                if (!session?.user) {
+    // Clear any existing session data
+    localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
+    await supabaseClient.auth.signOut();
+    window.location.href = 'login.html';
+    return;
+}
                 currentUserId = session.user.id;
 
                 // Verify user session
