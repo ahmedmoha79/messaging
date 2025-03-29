@@ -282,11 +282,16 @@
                 loadingOverlay.style.display = 'none';
                 return true;
             } catch (error) {
-                console.error('Supabase initialization failed:', error);
-                showError('Failed to initialize database connection. Please refresh the page.');
-                logDebugError('Supabase initialization error:', error);
-                return false;
-            }
+    console.error('Supabase initialization failed:', error);
+    showError('Failed to initialize database connection. Please refresh the page.');
+    
+    if (DEBUG_MODE) {
+        logDebugError('Initialization failed - technical details:', {
+            toString: () => error.stack || error.toString()
+        });
+    }
+    return false;
+}
         }
 
         // Test Supabase connection
@@ -357,16 +362,16 @@
 
         // Log debug info
         function logDebugError(title, error) {
-            if (!DEBUG_MODE) return;
-            
-            debugInfo.style.display = 'block';
-            debugInfo.innerHTML = `
-                <strong>${title}</strong><br>
-                ${error.message || 'No error details'}<br>
-                <small>${new Date().toLocaleString()}</small>
-            `;
-            console.error(title, error);
-        }
+    if (!DEBUG_MODE) return;
+    
+    debugInfo.style.display = 'block';
+    debugInfo.innerHTML = `
+        <strong>Technical Details:</strong><br>
+        ${error.toString()}<br>
+        <small>${new Date().toLocaleString()}</small>
+    `;
+    console.error(title, error);
+}
 
         // Form submission
         signupForm.addEventListener('submit', async (e) => {
@@ -483,10 +488,16 @@
                 }, 5000);
 
             } catch (error) {
-                console.error('Registration error:', error);
-                showError(error.message || 'Registration failed. Please try again.');
-                logDebugError('Registration error:', error);
-            } finally {
+    console.error('Registration error:', error);
+    const userMessage = error.message || 'Registration failed. Please try again.';
+    showError(userMessage);
+    
+    if (DEBUG_MODE) {
+        logDebugError('Registration failed - technical details:', {
+            toString: () => error.stack || error.toString()
+        });
+    }
+} finally {
                 submitBtn.disabled = false;
                 spinner.style.display = 'none';
                 loadingOverlay.style.display = 'none';
