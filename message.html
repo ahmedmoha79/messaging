@@ -33,45 +33,6 @@
             background: #00ff8855;
             color: #00ff88;
         }
-        /* Mobile Menu Button - Add this EXACTLY here */
-.mobile-menu-btn {
-    display: none;
-    position: fixed;
-    top: 15px;
-    left: 15px;
-    background: rgba(0,0,0,0.7);
-    border: none;
-    color: white;
-    font-size: 24px;
-    z-index: 1001;
-    padding: 8px 12px;
-    border-radius: 8px;
-}
-
-/* Mobile Responsive Styles - Add this EXACTLY here */
-@media (max-width: 768px) {
-    .messaging-container {
-        flex-direction: column;
-        border-radius: 0;
-    }
-    .user-list {
-        width: 100%;
-        max-height: 40vh;
-        display: none;
-    }
-    .user-list.show {
-        display: block;
-    }
-    .chat-container {
-        max-height: 60vh;
-    }
-    .mobile-menu-btn {
-        display: block;
-    }
-    .message-content {
-        max-width: 85%;
-    }
-}
         .messaging-container {
             display: flex;
             height: 100vh;
@@ -251,47 +212,14 @@
             color: #000;
             font-weight: bold;
         }
-        .message-time {
-            font-size: 0.7em;
-            opacity: 0.7;
-            display: block;
-            text-align: right;
-            margin-top: 5px;
-        }
-        .session-check {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-        .session-check h2 {
-            margin-bottom: 20px;
-        }
     </style>
 </head>
 <body>
-    <div class="session-check">
-        <h2>Checking your session...</h2>
-        <div class="loading-spinner"></div>
-    </div>
-
     <div class="connection-status">Connecting...</div>
-    <div class="messaging-container" style="display: none;">
-    <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+    <div class="messaging-container">
         <div class="user-list">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
-            </div>
-            <div class="loading-state">
-                <div class="loading-spinner"></div>
-                <p>Loading users...</p>
             </div>
         </div>
         <div class="chat-container">
@@ -304,185 +232,103 @@
             </div>
             <div class="chat-messages"></div>
             <div class="message-input-container">
-                <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
-                <button class="send-button" disabled>Send</button>
+                <textarea class="message-input" placeholder="Type your message..."></textarea>
+                <button class="send-button">Send</button>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-    // Configuration and global variables remain the same
-    const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-    let supabaseClient, presenceChannel, typingTimeout;
-    let selectedUser = null, currentUserId = null, session = null;
+        // Configuration
+        const RENDER_URL = "https://messaging-37qg.onrender.com";
+        const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
 
-    document.addEventListener('DOMContentLoaded', async () => {
-        try {
-            // Supabase client initialization remains the same
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: false,
-                    storage: {
-                        getItem: (key) => {
-                            return localStorage.getItem(key) || 
-                                   localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                        },
-                        setItem: (key, value) => localStorage.setItem(key, value),
-                        removeItem: (key) => localStorage.removeItem(key)
-                    }
+        // Global variables
+        let supabaseClient, realtimeSubscription, presenceChannel, typingTimeout;
+        let selectedUser = null, currentUserId = null, session = null;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                session = JSON.parse(localStorage.getItem('session'));
+                if (!session) {
+                    window.location.href = 'login.html';
+                    return;
                 }
-            });
 
-            // Session handling remains the same
-            const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-            if (sessionError) throw sessionError;
-            session = currentSession;
+                currentUserId = session.user.id;
+                
+                // Initialize Supabase client with proper configuration
+                supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: false
+                    }
+                });
 
-            if (!session) {
-                const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                if (sessionData) {
-                    try {
-                        const parsedSession = JSON.parse(sessionData);
-                        if (parsedSession && parsedSession.access_token) {
-                            await supabaseClient.auth.setSession({
-                                access_token: parsedSession.access_token,
-                                refresh_token: parsedSession.refresh_token
-                            });
-                            const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                            session = recoveredSession;
+                // Verify session
+                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+                if (authError) throw authError;
+
+                // Load initial data
+                await loadUsers();
+                setupEventListeners();
+                initializeRealtime();
+
+            } catch (error) {
+                console.error("Initialization error:", error);
+                updateConnectionStatus("Initialization failed: " + error.message, true);
+            }
+        });
+
+        // Real-time functionality
+        async function initializeRealtime() {
+            updateConnectionStatus("Connecting to real-time service...");
+            
+            try {
+                // Presence channel for online status
+                presenceChannel = supabaseClient.channel('presence-channel', {
+                    config: { presence: { key: currentUserId } }
+                })
+                .on('presence', { event: 'sync' }, () => {
+                    const state = presenceChannel.presenceState();
+                    updateOnlineStatus(Object.keys(state));
+                })
+                .subscribe();
+
+                // Messages channel
+                realtimeSubscription = supabaseClient.channel('messages-channel')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'messages',
+                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                    }, (payload) => {
+                        if (selectedUser && 
+                            (payload.new.sender_id === selectedUser.id || 
+                             payload.new.receiver_id === selectedUser.id)) {
+                            loadMessages(selectedUser.id);
                         }
-                    } catch (e) {
-                        console.error("Failed to parse session data:", e);
-                    }
-                }
+                    })
+                    .subscribe();
+
+                // Connection monitoring
+                supabaseClient.realtime
+                    .onOpen(() => updateConnectionStatus("Connected (Realtime active)"))
+                    .onClose(() => updateConnectionStatus("Reconnecting...", true))
+                    .onError((err) => updateConnectionStatus("Error: " + err.message, true));
+
+                updateConnectionStatus("Connected");
+
+            } catch (error) {
+                console.error("Realtime connection error:", error);
+                updateConnectionStatus("Realtime failed: " + error.message, true);
+                setTimeout(initializeRealtime, 5000); // Retry after 5 seconds
             }
-
-            if (!session) {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            currentUserId = session.user.id;
-
-            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-            if (authError) throw authError;
-            if (!user) throw new Error("User verification failed");
-
-            document.querySelector('.session-check').style.display = 'none';
-            document.querySelector('.messaging-container').style.display = 'flex';
-            document.querySelector('.message-input').disabled = false;
-            document.querySelector('.send-button').disabled = false;
-
-            await loadUsers();
-            setupEventListeners();
-            initializeRealtime();
-
-        } catch (error) {
-            console.error("Initialization error:", error);
-            document.querySelector('.session-check').innerHTML = `
-                <h2>Session verification failed</h2>
-                <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                <button onclick="window.location.href='login.html'" 
-                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                    Go to Login
-                </button>
-            `;
         }
-    });
-
-    // FIXED REALTIME INITIALIZATION
-    async function initializeRealtime() {
-        updateConnectionStatus("Connecting to real-time service...");
-        
-        try {
-            // Remove existing channels if they exist
-            if (presenceChannel) {
-                supabaseClient.removeChannel(presenceChannel);
-            }
-
-            presenceChannel = supabaseClient.channel('presence-channel', {
-                config: { 
-                    presence: { 
-                        key: currentUserId
-                    } 
-                }
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = presenceChannel.presenceState();
-                updateOnlineStatus(Object.keys(state));
-            })
-            .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                if (payload.partnerId === currentUserId) {
-                    showTypingIndicator(payload.userId);
-                }
-            })
-            .subscribe(async (status, error) => {
-                if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({ online_at: new Date().toISOString() });
-                    updateConnectionStatus("Connected");
-                }
-                if (error) {
-                    console.error('Presence channel error:', error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                }
-            });
-
-            // Handle channel connection events
-            presenceChannel
-                .on('CLOSE', () => {
-                    updateConnectionStatus("Reconnecting...", true);
-                    setTimeout(initializeRealtime, 3000);
-                })
-                .on('ERROR', (error) => {
-                    console.error("Realtime error:", error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                });
-
-            const messagesChannel = supabaseClient.channel('messages-channel')
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
-                }, (payload) => {
-                    if (selectedUser && 
-                        (payload.new.sender_id === selectedUser.id || 
-                         payload.new.receiver_id === selectedUser.id)) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
-                    } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
-                    }
-                })
-                .subscribe((status, error) => {
-                    if (error) {
-                        console.error('Messages channel error:', error);
-                        setTimeout(initializeRealtime, 5000);
-                    }
-                });
-
-        } catch (error) {
-            console.error("Realtime connection error:", error);
-            updateConnectionStatus("Realtime failed: " + error.message, true);
-            setTimeout(initializeRealtime, 5000);
-        }
-    }
-
 
         // User management
         async function loadUsers() {
@@ -513,21 +359,10 @@
                 </div>
             `;
 
-            if (users.length === 0) {
-                userList.innerHTML += `<p style="padding: 20px; text-align: center;">No other users found</p>`;
-                return;
-            }
-
             users.forEach(user => {
-                const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                let statusText = 'Offline';
-                let isOnline = false;
-                
-                if (lastOnline) {
-                    const minutesSinceLastOnline = (Date.now() - lastOnline) / 60000;
-                    isOnline = minutesSinceLastOnline < 5;
-                    statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                }
+                const lastOnline = new Date(user.lastonline);
+                const isOnline = (Date.now() - lastOnline) / 60000 < 5;
+                const statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
@@ -583,16 +418,9 @@
                 if (error) throw error;
                 
                 messagesContainer.innerHTML = '';
-                if (messages.length === 0) {
-                    messagesContainer.innerHTML = '<div class="loading-state"><p>No messages yet. Start the conversation!</p></div>';
-                    return;
-                }
-                
                 messages.forEach(msg => {
-                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at);
+                    addMessageToChat(msg.content, msg.sender_id === currentUserId);
                 });
-                
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
             } catch (error) {
                 console.error('Failed to load messages:', error);
@@ -616,35 +444,31 @@
                 
                 if (error) throw error;
                 
-                addMessageToChat(content, true, new Date().toISOString());
-                
+                // Update last online status
                 await supabaseClient
                     .from('users')
                     .update({ lastonline: new Date().toISOString() })
                     .eq('id', currentUserId);
                 
+                addMessageToChat(content, true);
+                
             } catch (error) {
                 console.error('Failed to send message:', error);
-                showError('chat-messages', 'Failed to send message: ' + error.message);
+                alert('Failed to send message: ' + error.message);
             } finally {
                 hideSendLoading();
             }
         }
 
-        function addMessageToChat(content, isSent, timestamp) {
+        function addMessageToChat(content, isSent) {
             const messagesContainer = document.querySelector('.chat-messages');
-            
-            if (messagesContainer.querySelector('.loading-state')) {
-                messagesContainer.innerHTML = '';
-            }
-            
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
             messageDiv.innerHTML = `
                 <div class="message-content">
                     <p>${content}</p>
                     <span class="message-time">${
-                        new Date(timestamp || new Date()).toLocaleString([], {
+                        new Date().toLocaleString([], {
                             hour: '2-digit', 
                             minute: '2-digit',
                             month: 'short',
@@ -661,6 +485,7 @@
             const status = document.querySelector('.connection-status');
             status.textContent = message;
             status.classList.toggle('connected', !isError);
+            status.classList.toggle('disconnected', isError);
         }
 
         function updateOnlineStatus(onlineUserIds) {
@@ -668,27 +493,17 @@
                 const userId = card.dataset.userId;
                 const isOnline = onlineUserIds.includes(userId);
                 const indicator = card.querySelector('.status-indicator');
-                if (indicator) {
-                    indicator.classList.toggle('online', isOnline);
-                    indicator.classList.toggle('offline', !isOnline);
-                    
-                    const statusText = card.querySelector('p');
-                    if (statusText) {
-                        statusText.textContent = isOnline ? 'Online' : 'Offline';
-                    }
-                }
+                indicator.classList.toggle('online', isOnline);
+                indicator.classList.toggle('offline', !isOnline);
             });
             document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
         }
 
         function formatLastOnline(date) {
-            if (!date) return 'Offline';
-            
-            const diff = (Date.now() - new Date(date)) / 60000;
-            if (diff < 1) return 'Just now';
-            if (diff < 60) return `${Math.floor(diff)}m ago`;
-            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
-            return `${Math.floor(diff/1440)}d ago`;
+            const diff = (Date.now() - date) / 60000;
+            return diff < 60 ? `${Math.floor(diff)}m ago` : 
+                   diff < 1440 ? `${Math.floor(diff/60)}h ago` : 
+                   `${Math.floor(diff/1440)}d ago`;
         }
 
         function showTypingIndicator(userId) {
@@ -734,27 +549,19 @@
             btn.disabled = false;
             btn.textContent = 'Send';
         }
-       document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-    document.querySelector('.user-list').classList.toggle('show');
-});
 
         function setupEventListeners() {
+            // Send message
             document.querySelector('.send-button').addEventListener('click', async () => {
                 const input = document.querySelector('.message-input');
                 const content = input.value.trim();
-                if (!selectedUser) {
-                    alert('Please select a user first');
-                    return;
-                }
-                if (!content) {
-                    alert('Message cannot be empty');
-                    return;
-                }
+                if (!selectedUser) return alert('Please select a user first');
+                if (!content) return alert('Message cannot be empty');
                 await sendMessage(selectedUser.id, content);
                 input.value = '';
-                input.focus();
             });
 
+            // Enter key sends message
             document.querySelector('.message-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -762,41 +569,29 @@
                 }
             });
 
-            let isTyping = false;
-            let lastTypingTime = 0;
-            
+            // Typing detection
             document.querySelector('.message-input').addEventListener('input', () => {
                 if (!selectedUser) return;
-                
-                const now = Date.now();
-                if (!isTyping) {
-                    isTyping = true;
+                presenceChannel.send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: currentUserId, partnerId: selectedUser.id }
+                });
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
                     presenceChannel.send({
                         type: 'broadcast',
-                        event: 'typing',
-                        payload: { userId: currentUserId, partnerId: selectedUser.id }
+                        event: 'stopped-typing',
+                        payload: { userId: currentUserId }
                     });
-                }
-                
-                lastTypingTime = now;
-                
-                setTimeout(() => {
-                    if (now - lastTypingTime > 1000 && isTyping) {
-                        isTyping = false;
-                        presenceChannel.send({
-                            type: 'broadcast',
-                            event: 'stopped-typing',
-                            payload: { userId: currentUserId }
-                        });
-                    }
                 }, 1000);
             });
 
+            // Network detection
             window.addEventListener('online', () => {
                 updateConnectionStatus("Reconnecting...");
                 initializeRealtime();
             });
-            
             window.addEventListener('offline', () => {
                 updateConnectionStatus("Offline - No connection", true);
             });
