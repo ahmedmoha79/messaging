@@ -329,14 +329,13 @@ try {
     });
 
     // Enhanced session check with timeout
-    let sessionCheckTimeout;
-    const { data: { session: currentSession }, error: sessionError } = 
-        await Promise.race([
-            supabaseClient.auth.getSession(),
-            new Promise((_, reject) => {
-                sessionCheckTimeout = setTimeout(() => reject(new Error('Session check timeout')), 5000);
-            })
-        ]);
+    const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+if (sessionError || !currentSession) {
+    window.location.href = 'login.html';
+    return;
+}
+session = currentSession;
+currentUserId = session.user.id;
     
     clearTimeout(sessionCheckTimeout);
     if (sessionError) throw sessionError;
