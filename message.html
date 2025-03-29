@@ -33,45 +33,6 @@
             background: #00ff8855;
             color: #00ff88;
         }
-        /* Mobile Menu Button - Add this EXACTLY here */
-.mobile-menu-btn {
-    display: none;
-    position: fixed;
-    top: 15px;
-    left: 15px;
-    background: rgba(0,0,0,0.7);
-    border: none;
-    color: white;
-    font-size: 24px;
-    z-index: 1001;
-    padding: 8px 12px;
-    border-radius: 8px;
-}
-
-/* Mobile Responsive Styles - Add this EXACTLY here */
-@media (max-width: 768px) {
-    .messaging-container {
-        flex-direction: column;
-        border-radius: 0;
-    }
-    .user-list {
-        width: 100%;
-        max-height: 40vh;
-        display: none;
-    }
-    .user-list.show {
-        display: block;
-    }
-    .chat-container {
-        max-height: 60vh;
-    }
-    .mobile-menu-btn {
-        display: block;
-    }
-    .message-content {
-        max-width: 85%;
-    }
-}
         .messaging-container {
             display: flex;
             height: 100vh;
@@ -284,7 +245,6 @@
 
     <div class="connection-status">Connecting...</div>
     <div class="messaging-container" style="display: none;">
-    <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
         <div class="user-list">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
@@ -734,9 +694,6 @@
             btn.disabled = false;
             btn.textContent = 'Send';
         }
-       document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-    document.querySelector('.user-list').classList.toggle('show');
-});
 
         function setupEventListeners() {
             document.querySelector('.send-button').addEventListener('click', async () => {
