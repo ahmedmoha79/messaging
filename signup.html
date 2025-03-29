@@ -31,7 +31,6 @@
             max-width: 400px;
             box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
             position: relative;
-            overflow: hidden;
         }
 
         .loading-overlay {
@@ -114,7 +113,6 @@
             margin-top: 10px;
             font-size: 16px;
             position: relative;
-            overflow: hidden;
         }
 
         button:disabled {
@@ -249,9 +247,8 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Debug mode - set to true to see detailed error info
+        // Debug mode - shows technical error details
         const DEBUG_MODE = true;
         
         // DOM Elements
@@ -268,19 +265,28 @@
         const loadingText = document.getElementById('loadingText');
         const debugInfo = document.getElementById('debugInfo');
 
-        // Initialize Supabase
+        // Initialize Supabase with error handling
         let supabase;
-        try {
-            const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
-            const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-            
-            supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            
-            // Test connection immediately
-            testSupabaseConnection();
-        } catch (error) {
-            showError('Failed to initialize database connection. Please refresh the page.');
-            logDebugError('Supabase initialization error:', error);
+        async function initializeSupabase() {
+            try {
+                // Load Supabase client dynamically
+                const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+                
+                const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
+                const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
+                
+                supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+                
+                // Test connection
+                await testSupabaseConnection();
+                loadingOverlay.style.display = 'none';
+                return true;
+            } catch (error) {
+                console.error('Supabase initialization failed:', error);
+                showError('Failed to initialize database connection. Please refresh the page.');
+                logDebugError('Supabase initialization error:', error);
+                return false;
+            }
         }
 
         // Test Supabase connection
@@ -288,20 +294,18 @@
             try {
                 loadingText.textContent = "Connecting to database...";
                 
-                const { data, error } = await supabase
+                // Simple query to test connection
+                const { error } = await supabase
                     .from('users')
                     .select('*')
                     .limit(1);
                 
-                if (error) {
-                    throw error;
-                }
+                if (error) throw error;
                 
-                loadingOverlay.style.display = 'none';
+                return true;
             } catch (error) {
-                loadingText.textContent = "Connection failed";
-                showError('Database connection failed. Please try again later.');
-                logDebugError('Database connection test failed:', error);
+                console.error('Database connection test failed:', error);
+                throw new Error('Database connection failed');
             }
         }
 
@@ -367,6 +371,12 @@
         // Form submission
         signupForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Check if Supabase is initialized
+            if (!supabase) {
+                showError('Database connection not ready. Please refresh the page.');
+                return;
+            }
             
             submitBtn.disabled = true;
             spinner.style.display = 'block';
@@ -484,11 +494,14 @@
             }
         });
 
-        // Initial loading test
+        // Initialize the app
+        initializeSupabase();
+
+        // Connection timeout
         setTimeout(() => {
-            if (loadingOverlay.style.display === 'flex') {
-                loadingText.textContent = "Having trouble connecting...";
+            if (loadingOverlay.style.display === 'flex' && loadingText.textContent === "Initializing system...") {
                 showError('Connection is taking longer than expected. Please check your internet and refresh.');
+                loadingText.textContent = "Connection timeout";
             }
         }, 10000);
     </script>
