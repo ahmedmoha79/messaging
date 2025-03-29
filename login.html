@@ -97,15 +97,7 @@
             text-decoration: none;
         }
 
-        #debugInfo {
-            margin-top: 20px;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 5px;
-            font-size: 12px;
-            display: none;
-        }
-    </style>
+        </style>
 </head>
 <body>
     <div class="login-container">
@@ -122,20 +114,12 @@
             <button type="submit">Login</button>
         </form>
         <div id="errorMessage" class="error-message"></div>
-        <div id="debugInfo"></div>
         <div class="signup-link">
             Don't have an account? <a href="signup.html">Sign up here</a>
         </div>
     </div>
 
     <script>
-        // Function to show debug info
-        function showDebugInfo(message) {
-            const debugInfo = document.getElementById('debugInfo');
-            debugInfo.textContent = message;
-            debugInfo.style.display = 'block';
-        }
-
         // Function to show error
         function showError(message) {
             const errorMessage = document.getElementById('errorMessage');
@@ -143,52 +127,46 @@
             errorMessage.style.display = 'block';
         }
 
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            // Clear previous messages
-            document.getElementById('errorMessage').style.display = 'none';
-            document.getElementById('debugInfo').style.display = 'none';
+       document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    
+    // Clear previous error
+    document.getElementById('errorMessage').style.display = 'none';
 
-            try {
-                showDebugInfo('Attempting to login...');
-                
-                // Use our backend server for authentication
-                const response = await fetch('/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const data = await response.json();
-                showDebugInfo('Login response: ' + JSON.stringify(data));
-
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                // Store the session
-                localStorage.setItem('session', JSON.stringify(data.session));
-                showDebugInfo('Session stored: ' + JSON.stringify(data.session));
-
-                // Verify session was stored
-                const storedSession = localStorage.getItem('session');
-                if (!storedSession) {
-                    throw new Error('Failed to store session');
-                }
-
-                // Redirect to messaging page
-                window.location.href = 'message.html';
-            } catch (error) {
-                console.error('Login error:', error);
-                showError(error.message);
-                showDebugInfo('Full error: ' + JSON.stringify(error));
-            }
+    try {
+        // Use our backend server for authentication
+        const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
         });
+
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Store the session
+        localStorage.setItem('session', JSON.stringify(data.session));
+
+        // Verify session was stored
+        const storedSession = localStorage.getItem('session');
+        if (!storedSession) {
+            throw new Error('Failed to store session');
+        }
+
+        // Redirect to messaging page
+        window.location.href = 'message.html';
+    } catch (error) {
+        console.error('Login error:', error);
+        showError(error.message);
+    }
+});
     </script>
 </body>
 </html>
