@@ -357,7 +357,8 @@
     });
 
     // FIXED REALTIME INITIALIZATION
-    async function initializeRealtime() {
+    async function initializeRealtime() {console.log('Initializing realtime for UID:', currentUserId);
+console.log('Current online users:', onlineUserIds);
         updateConnectionStatus("Connecting to real-time service...");
         
         try {
@@ -367,22 +368,22 @@
             }
 
             presenceChannel = supabaseClient.channel('presence-channel', {
-                config: { 
-                    presence: { 
-                        key: currentUserId
-                    } 
-                }
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = presenceChannel.presenceState();
-                updateOnlineStatus(Object.keys(state));
-            })
-            .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                if (payload.partnerId === currentUserId) {
-                    showTypingIndicator(payload.userId);
-                }
-            })
-            .subscribe(async (status, error) => {
+    config: {
+        presence: {
+            key: currentUserId,
+            // Heartbeat every 15 seconds
+            heartbeatInterval: 15000 
+        }
+    }
+})
+.on('presence', { event: 'sync' }, () => {
+    const state = presenceChannel.presenceState();
+    // Only show users active in last 45 seconds
+    const onlineIds = Object.keys(state).filter(uid => 
+        Date.now() - new Date(state[uid][0].online_at) < 45000
+    );
+    updateOnlineStatus(onlineIds);
+})
                 if (status === 'SUBSCRIBED') {
                     await presenceChannel.track({ online_at: new Date().toISOString() });
                     updateConnectionStatus("Connected");
@@ -480,15 +481,9 @@
 
             users.forEach(user => {
                 const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                let statusText = 'Offline';
-                let isOnline = false;
-                
-                if (lastOnline) {
-                    const minutesSinceLastOnline = (Date.now() - lastOnline) / 60000;
-                    isOnline = minutesSinceLastOnline < 5;
-                    statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                }
-                
+                const isOnline = onlineUserIds.includes(user.id) || 
+                (lastOnline && (Date.now() - lastOnline) < 300000); // 5 minutes
+const statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
                 userCard.dataset.userId = user.id;
@@ -561,35 +556,60 @@
         }
 
         async function sendMessage(receiverId, content) {
-            try {
-                showSendLoading();
-                
-                const { data: message, error } = await supabaseClient
-                    .from('messages')
-                    .insert([{
-                        sender_id: currentUserId,
-                        receiver_id: receiverId,
-                        content: content
-                    }])
-                    .select()
-                    .single();
-                
-                if (error) throw error;
-                
-                addMessageToChat(content, true, new Date().toISOString());
-                
-                await supabaseClient
-                    .from('users')
-                    .update({ lastonline: new Date().toISOString() })
-                    .eq('id', currentUserId);
-                
-            } catch (error) {
-                console.error('Failed to send message:', error);
-                showError('chat-messages', 'Failed to send message: ' + error.message);
-            } finally {
-                hideSendLoading();
-            }
+    try {
+        // === NEW SESSION CHECK ===
+        console.log('Current UID:', currentUserId);
+        const { data: { user: currentUser }, error: authError } = 
+            await supabaseClient.auth.getUser();
+        
+        if (!currentUser || currentUser.id !== currentUserId) {
+            console.error('Session mismatch - forcing logout');
+            window.location.href = 'login.html';
+            return;
         }
+
+        // === NEW RECEIVER VALIDATION ===
+        console.log('Validating receiver:', receiverId);
+        const { data: receiver, error: receiverError } = await supabaseClient
+            .from('users')
+            .select('id')
+            .eq('id', receiverId)
+            .neq('id', currentUserId)
+            .single();
+
+        if (receiverError || !receiver) {
+            throw new Error('Recipient does not exist or is invalid');
+        }
+
+        // === ORIGINAL CODE ===
+        showSendLoading();
+        
+        const { data: message, error } = await supabaseClient
+            .from('messages')
+            .insert([{
+                sender_id: currentUserId,
+                receiver_id: receiverId,
+                content: content
+            }])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        addMessageToChat(content, true, new Date().toISOString());
+        
+        await supabaseClient
+            .from('users')
+            .update({ lastonline: new Date().toISOString() })
+            .eq('id', currentUserId);
+        
+    } catch (error) {
+        console.error('Failed to send message:', error);
+        showError('chat-messages', 'Failed to send message: ' + error.message);
+    } finally {
+        hideSendLoading();
+    }
+}
 
         function addMessageToChat(content, isSent, timestamp) {
             const messagesContainer = document.querySelector('.chat-messages');
