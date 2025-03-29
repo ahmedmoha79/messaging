@@ -489,7 +489,7 @@
     </style>
 </head>
 <body>
-    <div class="session-check">
+    <div class="session-check" style="display: none;">
         <h2>Checking your session...</h2>
         <div class="loading-spinner"></div>
     </div>
@@ -540,181 +540,92 @@
         let isTyping = false;
         let lastTypingTime = 0;
 
-        // Initialize app
-        // Initialize app - NEW VERSION
-// Initialize app - FIXED VERSION
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // 1. Initialize Supabase with proper storage handling
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: {
-                persistSession: true,
-                autoRefreshToken: true,
-                detectSessionInUrl: false,
-                flowType: 'pkce',
-                storage: {
-                    getItem: (key) => {
-                        return localStorage.getItem(key) || 
-                               localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                               localStorage.getItem('session');
-                    },
-                    setItem: (key, value) => localStorage.setItem(key, value),
-                    removeItem: (key) => localStorage.removeItem(key)
-                }
-            }
-        });
-        // ======== MOBILE VIEWPORT FIX ======== //
-        const setViewportHeight = () => {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        };
-        setViewportHeight();
-        window.addEventListener('resize', setViewportHeight);
-        // ======== END MOBILE FIX ======== //
-
-        // 2. Check for existing session
-        const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-        session = currentSession;
-
-        // 3. Try to recover session from storage if needed
-        if (!session) {
-            const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                               localStorage.getItem('session');
-            if (sessionData) {
-                try {
-                    const parsedSession = JSON.parse(sessionData);
-                    if (parsedSession?.access_token) {
-                        await supabaseClient.auth.setSession({
-                            access_token: parsedSession.access_token,
-                            refresh_token: parsedSession.refresh_token
-                        });
-                        const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                        session = recoveredSession;
+        // Initialize app - FINAL WORKING VERSION
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Show loading state immediately
+                document.querySelector('.session-check').style.display = 'flex';
+                
+                // Initialize Supabase with proper session handling
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: false,
+                        flowType: 'pkce',
+                        storage: {
+                            getItem: (key) => {
+                                return localStorage.getItem(key) || 
+                                       localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token');
+                            },
+                            setItem: (key, value) => localStorage.setItem(key, value),
+                            removeItem: (key) => localStorage.removeItem(key)
+                        }
                     }
-                } catch (e) {
-                    console.error("Session recovery failed:", e);
+                });
+
+                // Mobile viewport fix
+                const setViewportHeight = () => {
+                    const vh = window.innerHeight * 0.01;
+                    document.documentElement.style.setProperty('--vh', `${vh}px`);
+                };
+                setViewportHeight();
+                window.addEventListener('resize', setViewportHeight);
+
+                // Check for existing session
+                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+                
+                if (sessionError || !currentSession?.user) {
+                    window.location.href = 'login.html';
+                    return;
                 }
-            }
-        }
 
-        // 4. Redirect if no valid session
-        if (!session?.user) {
-            window.location.href = 'login.html';
-            return;
-        }
+                session = currentSession;
+                currentUserId = session.user.id;
 
-        currentUserId = session.user.id;
+                // Verify user with server
+                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                if (userError || !user) {
+                    window.location.href = 'login.html';
+                    return;
+                }
 
-        // 5. Verify user with server
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-        if (userError || !user) {
-            await supabaseClient.auth.signOut();
-            window.location.href = 'login.html';
-            return;
-        }
+                // Show the app interface
+                document.querySelector('.session-check').style.display = 'none';
+                document.querySelector('.messaging-container').style.display = 'flex';
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendButton').disabled = false;
 
-        // 6. Show the app interface
-        document.querySelector('.session-check').style.display = 'none';
-        document.querySelector('.messaging-container').style.display = 'flex';
-        document.getElementById('messageInput').disabled = false;
-        document.getElementById('sendButton').disabled = false;
+                // Load data and setup realtime
+                await loadUsers();
+                setupEventListeners();
+                initializeRealtime();
 
-        // 7. Load data and setup realtime
-        await loadUsers();
-        setupEventListeners();
-        initializeRealtime();
+                // Handle auth state changes
+                supabaseClient.auth.onAuthStateChange((event) => {
+                    if (event === 'SIGNED_OUT') {
+                        localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
+                        window.location.href = 'login.html';
+                    }
+                });
 
-    } catch (error) {
-        console.error("Initialization error:", error);
-        window.location.href = 'login.html';
-    }
-});
-        // 3. Handle automatic token refreshes
-               supabaseClient.auth.onAuthStateChange(async (event) => {
-            if (event === 'SIGNED_OUT') {
-                // Clear all possible session storage keys
-                localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
-                localStorage.removeItem('session');
-                window.location.href = 'login.html';
+            } catch (error) {
+                console.error("Initialization error:", error);
+                document.querySelector('.session-check').innerHTML = `
+                    <h2>Session Error</h2>
+                    <p style="color: #ff4444; margin: 20px 0;">${error.message || "Failed to initialize app"}</p>
+                    <button onclick="window.location.href='login.html'" 
+                            style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                        Go to Login
+                    </button>
+                `;
             }
         });
-
-        // 4. Check if user is logged in
-        const { data: { session }, error } = await supabaseClient.auth.getSession();
-        
-        if (error || !session?.user) {
-            await supabaseClient.auth.signOut();
-            window.location.href = 'login.html';
-            return;
-        }
-
-        // 5. Double-check with server that user is valid
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-        
-        if (userError || !user) {
-            await supabaseClient.auth.signOut();
-            window.location.href = 'login.html';
-            return;
-        }
-
-        currentUserId = user.id;
-        
-                // Show the app (same as before)
-        document.querySelector('.session-check').style.display = 'none';
-        document.querySelector('.messaging-container').style.display = 'flex';
-        document.getElementById('messageInput').disabled = false;
-        document.getElementById('sendButton').disabled = false;
-
-        // Load initial data (same as before)
-        await loadUsers();
-        setupEventListeners();
-        initializeRealtime();
-        
-        } catch (error) {
-        console.error("Initialization error:", error);
-        document.querySelector('.session-check').innerHTML = `
-            <h2>Session Error</h2>
-            <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-            <button onclick="window.location.href='login.html'" 
-                    style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                Go to Login
-            </button>
-        `;
-    }
-});
 
         // Helper functions
         function setViewportHeight() {
             const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-            
-            window.addEventListener('resize', () => {
-                const vh = window.innerHeight * 0.01;
-                document.documentElement.style.setProperty('--vh', `${vh}px`);
-            });
-        }
-
-        function redirectToLogin() {
-            // Clear any existing session data
-            localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
-            window.location.href = 'login.html';
-        }
-
-        function showSessionError(message) {
-            document.querySelector('.session-check').innerHTML = `
-                <h2>Session Error</h2>
-                <p style="color: #ff4444; margin: 20px 0;">${message}</p>
-                <button onclick="window.location.href='login.html'" 
-                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                    Go to Login
-                </button>
-            `;
-        }
-
-        function updateConnectionStatus(message, isError = false) {
-            const status = document.querySelector('.connection-status');
-            status.textContent = message;
-            status.classList.toggle('connected', !isError);
+            document.documentElement.style.setProperty('--vh', `${vh}px');
         }
 
         function vibrate() {
@@ -851,7 +762,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
                 
-                // Only show last 50 messages for performance
                 messages.slice(-50).forEach(msg => {
                     addMessageToChat(
                         msg.content, 
@@ -1121,6 +1031,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
+        }
+
+        function updateConnectionStatus(message, isError = false) {
+            const status = document.querySelector('.connection-status');
+            status.textContent = message;
+            status.classList.toggle('connected', !isError);
         }
 
         // Event listeners
