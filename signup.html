@@ -195,16 +195,7 @@
             text-align: center;
         }
 
-        .debug-info {
-            display: none;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-            font-size: 12px;
-            color: #aaa;
-        }
-    </style>
+           </style>
 </head>
 <body>
     <div class="signup-container">
@@ -238,7 +229,6 @@
         </form>
         <div id="errorMessage" class="error-message"></div>
         <div id="successMessage" class="success-message"></div>
-        <div id="debugInfo" class="debug-info"></div>
         <div class="login-link">
             Already have an account? <a href="login.html">Login here</a>
         </div>
@@ -249,7 +239,6 @@
 
     <script>
         // Debug mode - shows technical error details
-        const DEBUG_MODE = true;
         
         // DOM Elements
         const signupForm = document.getElementById('signupForm');
@@ -263,7 +252,6 @@
         const strengthMeter = document.getElementById('strengthMeter');
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const debugInfo = document.getElementById('debugInfo');
 
         // Initialize Supabase with error handling
         let supabase;
@@ -284,12 +272,6 @@
             } catch (error) {
     console.error('Supabase initialization failed:', error);
     showError('Failed to initialize database connection. Please refresh the page.');
-    
-    if (DEBUG_MODE) {
-        logDebugError('Initialization failed - technical details:', {
-            toString: () => error.stack || error.toString()
-        });
-    }
     return false;
 }
         }
@@ -359,19 +341,6 @@
             successElement.style.display = 'block';
             errorElement.style.display = 'none';
         }
-
-        // Log debug info
-        function logDebugError(title, error) {
-    if (!DEBUG_MODE) return;
-    
-    debugInfo.style.display = 'block';
-    debugInfo.innerHTML = `
-        <strong>Technical Details:</strong><br>
-        ${error.toString()}<br>
-        <small>${new Date().toLocaleString()}</small>
-    `;
-    console.error(title, error);
-}
 
         // Form submission
         signupForm.addEventListener('submit', async (e) => {
@@ -488,15 +457,8 @@
                 }, 5000);
 
             } catch (error) {
-    console.error('Registration error:', error);
-    const userMessage = error.message || 'Registration failed. Please try again.';
-    showError(userMessage);
-    
-    if (DEBUG_MODE) {
-        logDebugError('Registration failed - technical details:', {
-            toString: () => error.stack || error.toString()
-        });
-    }
+    console.error('Registration error:', error); // This keeps the error in console for developers
+    showError(error.message || 'Registration failed. Please try again.');
 } finally {
                 submitBtn.disabled = false;
                 spinner.style.display = 'none';
