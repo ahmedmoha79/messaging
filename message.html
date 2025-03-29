@@ -378,7 +378,7 @@
             document.querySelector('.messaging-container').style.display = 'flex';
             document.querySelector('.message-input').disabled = false;
             document.querySelector('.send-button').disabled = false;
-            startHeartbeat();
+
             await loadUsers();
             setupEventListeners();
             initializeRealtime();
@@ -406,27 +406,17 @@
                 supabaseClient.removeChannel(presenceChannel);
             }
 
-            // Generate a unique session ID for each tab
-const sessionId = Math.random().toString(36).substring(2, 15) + 
-                 Math.random().toString(36).substring(2, 15);
-
-presenceChannel = supabaseClient.channel('presence-channel', {
-    config: { 
-        presence: { 
-            key: sessionId,  // Use session ID instead of user ID
-            user_id: currentUserId  // Add user ID as additional data
-        } 
-    }
-})
+            presenceChannel = supabaseClient.channel('presence-channel', {
+                config: { 
+                    presence: { 
+                        key: currentUserId
+                    } 
+                }
+            })
             .on('presence', { event: 'sync' }, () => {
-    const state = presenceChannel.presenceState();
-    
-    const onlineUserIds = [...new Set(
-        Object.values(state)
-            .flatMap(entries => entries.map(e => e.user_id))
-    )].filter(Boolean);
-    updateOnlineStatus(onlineUserIds);
-})
+                const state = presenceChannel.presenceState();
+                updateOnlineStatus(Object.keys(state));
+            })
             .on('broadcast', { event: 'typing' }, ({ payload }) => {
                 if (payload.partnerId === currentUserId) {
                     showTypingIndicator(payload.userId);
@@ -434,10 +424,7 @@ presenceChannel = supabaseClient.channel('presence-channel', {
             })
             .subscribe(async (status, error) => {
                 if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({ 
-    online_at: new Date().toISOString(),
-    user_id: currentUserId  // Include user ID in track data
-});
+                    await presenceChannel.track({ online_at: new Date().toISOString() });
                     updateConnectionStatus("Connected");
                 }
                 if (error) {
@@ -714,25 +701,6 @@ presenceChannel = supabaseClient.channel('presence-channel', {
                 typingTimeout = setTimeout(() => indicator.style.opacity = '0', 2000);
             }
         }
-        // Add regular heartbeat to update last online status
-function startHeartbeat() {
-    // Update immediately
-    updateLastOnline();
-    
-    // Then update every 30 seconds
-    setInterval(updateLastOnline, 30000);
-}
-
-async function updateLastOnline() {
-    try {
-        await supabaseClient
-            .from('users')
-            .update({ lastonline: new Date().toISOString() })
-            .eq('id', currentUserId);
-    } catch (error) {
-        console.error('Failed to update last online:', error);
-    }
-}
 
         function showLoading() {
             document.querySelector('.user-list').innerHTML = `
