@@ -2,21 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a0a">
     <title>Logistics Secure Messaging</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
         body {
             background: #0a0a0a;
             background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%) fixed;
             color: #ffffff;
             height: 100vh;
+            height: var(--viewport-height, 100vh);
             overflow: hidden;
+            touch-action: manipulation;
         }
         .connection-status {
             position: fixed;
@@ -28,6 +34,7 @@
             z-index: 1000;
             background: #ff444455;
             color: #ff4444;
+            backdrop-filter: blur(10px);
         }
         .connection-status.connected {
             background: #00ff8855;
@@ -35,20 +42,38 @@
         }
         .messaging-container {
             display: flex;
+            flex-direction: column;
             height: 100vh;
+            height: var(--viewport-height, 100vh);
             max-width: 1400px;
             margin: 0 auto;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(10px);
-            border-radius: 20px;
+            border-radius: 0;
             overflow: hidden;
             box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
         }
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            padding: 10px;
+            position: absolute;
+            left: 10px;
+            top: 15px;
+            z-index: 10;
+        }
         .user-list {
-            width: 350px;
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            max-height: 40vh;
+            border-right: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 20px;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            transition: transform 0.3s ease;
         }
         .search-bar {
             position: relative;
@@ -61,7 +86,7 @@
             border: none;
             border-radius: 8px;
             color: white;
-            font-size: 14px;
+            font-size: 16px;
         }
         .search-input:focus {
             outline: none;
@@ -70,7 +95,7 @@
         .user-card {
             display: flex;
             align-items: center;
-            padding: 15px;
+            padding: 18px 15px;
             margin: 8px 0;
             border-radius: 10px;
             cursor: pointer;
@@ -85,8 +110,8 @@
             border-left: 4px solid #00ff88;
         }
         .user-avatar {
-            width: 40px;
-            height: 40px;
+            width: 45px;
+            height: 45px;
             border-radius: 50%;
             margin-right: 15px;
             object-fit: cover;
@@ -95,16 +120,24 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            max-height: 60vh;
         }
         .chat-header {
             padding: 20px;
+            padding-left: 60px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
         }
         .chat-messages {
             flex: 1;
             padding: 20px;
             overflow-y: auto;
             scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .chat-messages::-webkit-scrollbar {
+            display: none;
         }
         .message {
             display: flex;
@@ -116,10 +149,12 @@
             to { opacity: 1; transform: translateY(0); }
         }
         .message-content {
-            max-width: 70%;
-            padding: 12px 18px;
+            max-width: 85%;
+            padding: 12px 15px;
             border-radius: 15px;
             position: relative;
+            word-break: break-word;
+            line-height: 1.4;
         }
         .message.sent {
             justify-content: flex-end;
@@ -127,16 +162,20 @@
         .message.sent .message-content {
             background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
             color: #000;
+            border-bottom-right-radius: 5px;
         }
         .message.received .message-content {
             background: rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 5px;
         }
         .message-input-container {
-            padding: 20px;
+            padding: 15px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             gap: 10px;
             align-items: flex-end;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
         }
         .message-input {
             flex: 1;
@@ -146,17 +185,19 @@
             border-radius: 8px;
             color: white;
             resize: none;
-            min-height: 50px;
+            min-height: 60px;
+            font-size: 16px;
         }
         .send-button {
             background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
             border: none;
             border-radius: 8px;
             color: #000;
-            padding: 15px 25px;
+            padding: 15px;
             font-weight: bold;
             cursor: pointer;
-            min-height: 50px;
+            min-height: 60px;
+            min-width: 80px;
         }
         .status-indicator {
             width: 10px;
@@ -174,6 +215,15 @@
             color: #00ff88;
             opacity: 0;
             transition: opacity 0.3s ease;
+        }
+        .typing-indicator::after {
+            content: '...';
+            animation: typingDots 1.5s infinite;
+        }
+        @keyframes typingDots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
         }
         .loading-state {
             display: flex;
@@ -219,6 +269,10 @@
             text-align: right;
             margin-top: 5px;
         }
+        .read-status {
+            font-size: 0.6em;
+            margin-left: 5px;
+        }
         .session-check {
             position: fixed;
             top: 0;
@@ -235,6 +289,42 @@
         .session-check h2 {
             margin-bottom: 20px;
         }
+
+        /* Desktop styles */
+        @media (min-width: 769px) {
+            .messaging-container {
+                flex-direction: row;
+                border-radius: 20px;
+            }
+            .mobile-menu-btn {
+                display: none;
+            }
+            .user-list {
+                width: 350px;
+                max-height: none;
+                border-right: 1px solid rgba(255, 255, 255, 0.1);
+                border-bottom: none;
+            }
+            .chat-container {
+                max-height: none;
+            }
+            .chat-header {
+                padding-left: 20px;
+            }
+            .message-content {
+                max-width: 70%;
+            }
+        }
+
+        /* iOS specific fixes */
+        @supports (-webkit-touch-callout: none) {
+            .message-input-container {
+                padding-bottom: calc(15px + env(safe-area-inset-bottom));
+            }
+            body {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
     </style>
 </head>
 <body>
@@ -245,7 +335,8 @@
 
     <div class="connection-status">Connecting...</div>
     <div class="messaging-container" style="display: none;">
-        <div class="user-list">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+        <div class="user-list" id="userList">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
             </div>
@@ -262,7 +353,7 @@
                     <span id="partnerName"></span> is typing...
                 </div>
             </div>
-            <div class="chat-messages"></div>
+            <div class="chat-messages" id="chatMessages"></div>
             <div class="message-input-container">
                 <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
                 <button class="send-button" disabled>Send</button>
@@ -272,177 +363,179 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-    // Configuration and global variables remain the same
-    const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-    let supabaseClient, presenceChannel, typingTimeout;
-    let selectedUser = null, currentUserId = null, session = null;
+        // Configuration
+        const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
 
-    document.addEventListener('DOMContentLoaded', async () => {
-        try {
-            // Supabase client initialization remains the same
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: false,
-                    storage: {
-                        getItem: (key) => {
-                            return localStorage.getItem(key) || 
-                                   localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                        },
-                        setItem: (key, value) => localStorage.setItem(key, value),
-                        removeItem: (key) => localStorage.removeItem(key)
+        // Global variables
+        let supabaseClient, presenceChannel, typingTimeout;
+        let selectedUser = null, currentUserId = null, session = null;
+        let touchStartX = 0, touchEndX = 0;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Initialize Supabase client
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: true
                     }
-                }
-            });
-
-            // Session handling remains the same
-            const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-            if (sessionError) throw sessionError;
-            session = currentSession;
-
-            if (!session) {
-                const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                if (sessionData) {
-                    try {
-                        const parsedSession = JSON.parse(sessionData);
-                        if (parsedSession && parsedSession.access_token) {
-                            await supabaseClient.auth.setSession({
-                                access_token: parsedSession.access_token,
-                                refresh_token: parsedSession.refresh_token
-                            });
-                            const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                            session = recoveredSession;
-                        }
-                    } catch (e) {
-                        console.error("Failed to parse session data:", e);
-                    }
-                }
-            }
-
-            if (!session) {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            currentUserId = session.user.id;
-
-            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-            if (authError) throw authError;
-            if (!user) throw new Error("User verification failed");
-
-            document.querySelector('.session-check').style.display = 'none';
-            document.querySelector('.messaging-container').style.display = 'flex';
-            document.querySelector('.message-input').disabled = false;
-            document.querySelector('.send-button').disabled = false;
-
-            await loadUsers();
-            setupEventListeners();
-            initializeRealtime();
-
-        } catch (error) {
-            console.error("Initialization error:", error);
-            document.querySelector('.session-check').innerHTML = `
-                <h2>Session verification failed</h2>
-                <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                <button onclick="window.location.href='login.html'" 
-                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                    Go to Login
-                </button>
-            `;
-        }
-    });
-
-    // FIXED REALTIME INITIALIZATION
-    async function initializeRealtime() {
-        updateConnectionStatus("Connecting to real-time service...");
-        
-        try {
-            // Remove existing channels if they exist
-            if (presenceChannel) {
-                supabaseClient.removeChannel(presenceChannel);
-            }
-
-            presenceChannel = supabaseClient.channel('presence-channel', {
-                config: { 
-                    presence: { 
-                        key: currentUserId
-                    } 
-                }
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = presenceChannel.presenceState();
-                updateOnlineStatus(Object.keys(state));
-            })
-            .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                if (payload.partnerId === currentUserId) {
-                    showTypingIndicator(payload.userId);
-                }
-            })
-            .subscribe(async (status, error) => {
-                if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({ online_at: new Date().toISOString() });
-                    updateConnectionStatus("Connected");
-                }
-                if (error) {
-                    console.error('Presence channel error:', error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                }
-            });
-
-            // Handle channel connection events
-            presenceChannel
-                .on('CLOSE', () => {
-                    updateConnectionStatus("Reconnecting...", true);
-                    setTimeout(initializeRealtime, 3000);
-                })
-                .on('ERROR', (error) => {
-                    console.error("Realtime error:", error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
                 });
 
-            const messagesChannel = supabaseClient.channel('messages-channel')
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
-                }, (payload) => {
-                    if (selectedUser && 
-                        (payload.new.sender_id === selectedUser.id || 
-                         payload.new.receiver_id === selectedUser.id)) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
-                    } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
+                // Check for existing session
+                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+                if (sessionError) throw sessionError;
+                session = currentSession;
+
+                // If no session found, redirect to login
+                if (!session) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                currentUserId = session.user.id;
+
+                // Verify user session
+                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+                if (authError) throw authError;
+                if (!user) throw new Error("User verification failed");
+
+                // Show app interface
+                document.querySelector('.session-check').style.display = 'none';
+                document.querySelector('.messaging-container').style.display = 'flex';
+                document.querySelector('.message-input').disabled = false;
+                document.querySelector('.send-button').disabled = false;
+
+                // Load initial data
+                await loadUsers();
+                setupEventListeners();
+                initializeRealtime();
+
+                // Mobile viewport adjustment
+                adjustForKeyboard();
+
+            } catch (error) {
+                console.error("Initialization error:", error);
+                document.querySelector('.session-check').innerHTML = `
+                    <h2>Session verification failed</h2>
+                    <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
+                    <button onclick="window.location.href='login.html'" 
+                            style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                        Go to Login
+                    </button>
+                `;
+            }
+        });
+
+        // Mobile-specific functions
+        function adjustForKeyboard() {
+            if (window.visualViewport) {
+                const viewportHeight = window.visualViewport.height;
+                document.documentElement.style.setProperty('--viewport-height', `${viewportHeight}px`);
+                
+                if (viewportHeight < window.innerHeight * 0.7) {
+                    setTimeout(() => {
+                        document.querySelector('.chat-messages').scrollTop = 
+                            document.querySelector('.chat-messages').scrollHeight;
+                    }, 300);
+                }
+            }
+        }
+
+        function vibrate() {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(50);
+            }
+        }
+
+        // Realtime functionality
+        async function initializeRealtime() {
+            updateConnectionStatus("Connecting to real-time service...");
+            
+            try {
+                if (presenceChannel) {
+                    supabaseClient.removeChannel(presenceChannel);
+                }
+
+                presenceChannel = supabaseClient.channel('presence-channel', {
+                    config: { 
+                        presence: { 
+                            key: currentUserId
+                        } 
                     }
                 })
-                .subscribe((status, error) => {
+                .on('presence', { event: 'sync' }, () => {
+                    const state = presenceChannel.presenceState();
+                    updateOnlineStatus(Object.keys(state));
+                })
+                .on('broadcast', { event: 'typing' }, ({ payload }) => {
+                    if (payload.partnerId === currentUserId) {
+                        showTypingIndicator(payload.userId);
+                    }
+                })
+                .subscribe(async (status, error) => {
+                    if (status === 'SUBSCRIBED') {
+                        await presenceChannel.track({ online_at: new Date().toISOString() });
+                        updateConnectionStatus("Connected");
+                    }
                     if (error) {
-                        console.error('Messages channel error:', error);
+                        console.error('Presence channel error:', error);
+                        updateConnectionStatus("Error: " + error.message, true);
                         setTimeout(initializeRealtime, 5000);
                     }
                 });
 
-        } catch (error) {
-            console.error("Realtime connection error:", error);
-            updateConnectionStatus("Realtime failed: " + error.message, true);
-            setTimeout(initializeRealtime, 5000);
-        }
-    }
+                presenceChannel
+                    .on('CLOSE', () => {
+                        updateConnectionStatus("Reconnecting...", true);
+                        setTimeout(initializeRealtime, 3000);
+                    })
+                    .on('ERROR', (error) => {
+                        console.error("Realtime error:", error);
+                        updateConnectionStatus("Error: " + error.message, true);
+                        setTimeout(initializeRealtime, 5000);
+                    });
 
+                const messagesChannel = supabaseClient.channel('messages-channel')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'messages',
+                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                    }, (payload) => {
+                        if (selectedUser && 
+                            (payload.new.sender_id === selectedUser.id || 
+                             payload.new.receiver_id === selectedUser.id)) {
+                            addMessageToChat(
+                                payload.new.content, 
+                                payload.new.sender_id === currentUserId,
+                                payload.new.created_at,
+                                payload.new.read
+                            );
+                        } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
+                            addMessageToChat(
+                                payload.new.content, 
+                                payload.new.sender_id === currentUserId,
+                                payload.new.created_at,
+                                payload.new.read
+                            );
+                        }
+                    })
+                    .subscribe((status, error) => {
+                        if (error) {
+                            console.error('Messages channel error:', error);
+                            setTimeout(initializeRealtime, 5000);
+                        }
+                    });
+
+            } catch (error) {
+                console.error("Realtime connection error:", error);
+                updateConnectionStatus("Realtime failed: " + error.message, true);
+                setTimeout(initializeRealtime, 5000);
+            }
+        }
 
         // User management
         async function loadUsers() {
@@ -503,7 +596,10 @@
                     </div>
                     <div class="status-indicator ${isOnline ? 'online' : 'offline'}"></div>
                 `;
-                userCard.addEventListener('click', () => selectUser(user));
+                userCard.addEventListener('click', () => {
+                    vibrate();
+                    selectUser(user);
+                });
                 userList.appendChild(userCard);
             });
 
@@ -527,6 +623,11 @@
             selectedUser = { id: user.id, name: user.name };
             document.querySelector('.chat-header h2').textContent = user.name;
             await loadMessages(user.id);
+            
+            // On mobile, hide user list after selection
+            if (window.innerWidth <= 768) {
+                document.querySelector('.user-list').style.display = 'none';
+            }
         }
 
         async function loadMessages(userId) {
@@ -548,11 +649,20 @@
                     return;
                 }
                 
-                messages.forEach(msg => {
-                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at);
+                // Only show last 50 messages for performance
+                messages.slice(-50).forEach(msg => {
+                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at, msg.read);
                 });
                 
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Mark messages as read
+                await supabaseClient
+                    .from('messages')
+                    .update({ read: true })
+                    .eq('receiver_id', currentUserId)
+                    .eq('sender_id', userId)
+                    .eq('read', false);
                 
             } catch (error) {
                 console.error('Failed to load messages:', error);
@@ -562,26 +672,37 @@
 
         async function sendMessage(receiverId, content) {
             try {
+                if (!content || content.trim().length === 0) {
+                    showError('chat-messages', 'Message cannot be empty');
+                    return;
+                }
+
                 showSendLoading();
+                vibrate();
                 
                 const { data: message, error } = await supabaseClient
                     .from('messages')
                     .insert([{
                         sender_id: currentUserId,
                         receiver_id: receiverId,
-                        content: content
+                        content: content.trim(),
+                        read: false
                     }])
                     .select()
                     .single();
                 
                 if (error) throw error;
                 
-                addMessageToChat(content, true, new Date().toISOString());
+                addMessageToChat(content.trim(), true, new Date().toISOString(), false);
                 
                 await supabaseClient
                     .from('users')
                     .update({ lastonline: new Date().toISOString() })
                     .eq('id', currentUserId);
+                
+                // Clear input and focus
+                document.querySelector('.message-input').value = '';
+                document.querySelector('.message-input').focus();
                 
             } catch (error) {
                 console.error('Failed to send message:', error);
@@ -591,7 +712,7 @@
             }
         }
 
-        function addMessageToChat(content, isSent, timestamp) {
+        function addMessageToChat(content, isSent, timestamp, isRead) {
             const messagesContainer = document.querySelector('.chat-messages');
             
             if (messagesContainer.querySelector('.loading-state')) {
@@ -602,19 +723,30 @@
             messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
             messageDiv.innerHTML = `
                 <div class="message-content">
-                    <p>${content}</p>
+                    <p>${sanitize(content)}</p>
                     <span class="message-time">${
-                        new Date(timestamp || new Date()).toLocaleString([], {
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            month: 'short',
-                            day: 'numeric'
-                        })
-                    }</span>
+                        formatTime(timestamp)} ${
+                        isSent ? `<span class="read-status">${isRead ? '✓✓' : '✓'}</span>` : ''}
+                    </span>
                 </div>
             `;
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function sanitize(input) {
+            const div = document.createElement('div');
+            div.textContent = input;
+            return div.innerHTML;
+        }
+
+        function formatTime(timestamp) {
+            return new Date(timestamp || new Date()).toLocaleString([], {
+                hour: '2-digit', 
+                minute: '2-digit',
+                month: 'short',
+                day: 'numeric'
+            });
         }
 
         function updateConnectionStatus(message, isError = false) {
@@ -696,22 +828,18 @@
         }
 
         function setupEventListeners() {
+            // Send message button
             document.querySelector('.send-button').addEventListener('click', async () => {
                 const input = document.querySelector('.message-input');
                 const content = input.value.trim();
                 if (!selectedUser) {
-                    alert('Please select a user first');
-                    return;
-                }
-                if (!content) {
-                    alert('Message cannot be empty');
+                    showError('chat-messages', 'Please select a user first');
                     return;
                 }
                 await sendMessage(selectedUser.id, content);
-                input.value = '';
-                input.focus();
             });
 
+            // Enter key to send
             document.querySelector('.message-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -719,36 +847,49 @@
                 }
             });
 
-            let isTyping = false;
-            let lastTypingTime = 0;
-            
+            // Typing indicator with debounce
+            let typingTimer;
             document.querySelector('.message-input').addEventListener('input', () => {
                 if (!selectedUser) return;
                 
-                const now = Date.now();
-                if (!isTyping) {
-                    isTyping = true;
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
                     presenceChannel.send({
                         type: 'broadcast',
                         event: 'typing',
                         payload: { userId: currentUserId, partnerId: selectedUser.id }
                     });
-                }
-                
-                lastTypingTime = now;
-                
-                setTimeout(() => {
-                    if (now - lastTypingTime > 1000 && isTyping) {
-                        isTyping = false;
-                        presenceChannel.send({
-                            type: 'broadcast',
-                            event: 'stopped-typing',
-                            payload: { userId: currentUserId }
-                        });
-                    }
-                }, 1000);
+                }, 300);
             });
 
+            // Mobile menu toggle
+            document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                const userList = document.getElementById('userList');
+                userList.style.display = userList.style.display === 'none' ? 'block' : 'none';
+                vibrate();
+            });
+
+            // Swipe gestures
+            document.querySelector('.messaging-container').addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, false);
+
+            document.querySelector('.messaging-container').addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                if (touchEndX < touchStartX - 100) {
+                    // Swipe left - hide user list
+                    document.querySelector('.user-list').style.display = 'none';
+                }
+                if (touchEndX > touchStartX + 100) {
+                    // Swipe right - show user list
+                    document.querySelector('.user-list').style.display = 'block';
+                }
+            }, false);
+
+            // Keyboard adjustments
+            window.visualViewport.addEventListener('resize', adjustForKeyboard);
+            
+            // Network status
             window.addEventListener('online', () => {
                 updateConnectionStatus("Reconnecting...");
                 initializeRealtime();
