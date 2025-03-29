@@ -2,28 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0a0a0a">
     <title>Logistics Secure Messaging</title>
     <style>
+        :root {
+            --primary: #00ff88;
+            --secondary: #00ccff;
+            --dark: #0a0a0a;
+            --darker: #1a1a1a;
+            --light: #ffffff;
+            --gray: #666666;
+        }
+        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
+        
         body {
-            background: #0a0a0a;
-            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%) fixed;
-            color: #ffffff;
+            background: var(--dark);
+            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%) fixed;
+            color: var(--light);
             height: 100vh;
-            height: var(--viewport-height, 100vh);
+            height: calc(var(--vh, 1vh) * 100);
             overflow: hidden;
             touch-action: manipulation;
         }
+        
+        /* Connection Status */
         .connection-status {
             position: fixed;
             top: 10px;
@@ -32,19 +43,23 @@
             border-radius: 20px;
             font-size: 0.9em;
             z-index: 1000;
-            background: #ff444455;
+            background: rgba(255, 68, 68, 0.3);
             color: #ff4444;
             backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
         }
+        
         .connection-status.connected {
-            background: #00ff8855;
-            color: #00ff88;
+            background: rgba(0, 255, 136, 0.3);
+            color: var(--primary);
         }
+        
+        /* Main Container */
         .messaging-container {
             display: flex;
             flex-direction: column;
             height: 100vh;
-            height: var(--viewport-height, 100vh);
+            height: calc(var(--vh, 1vh) * 100);
             max-width: 1400px;
             margin: 0 auto;
             background: rgba(0, 0, 0, 0.7);
@@ -53,11 +68,23 @@
             overflow: hidden;
             box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
         }
+        
+        @media (min-width: 769px) {
+            .messaging-container {
+                flex-direction: row;
+                border-radius: 20px;
+                margin: 20px auto;
+                height: calc(100vh - 40px);
+                height: calc((var(--vh, 1vh) * 100) - 40px);
+            }
+        }
+        
+        /* Mobile Menu Button */
         .mobile-menu-btn {
             display: none;
             background: none;
             border: none;
-            color: white;
+            color: var(--light);
             font-size: 24px;
             padding: 10px;
             position: absolute;
@@ -65,6 +92,14 @@
             top: 15px;
             z-index: 10;
         }
+        
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: block;
+            }
+        }
+        
+        /* User List */
         .user-list {
             width: 100%;
             max-height: 40vh;
@@ -73,61 +108,186 @@
             padding: 20px;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
             transition: transform 0.3s ease;
+            background: rgba(0, 0, 0, 0.5);
         }
+        
+        .user-list::-webkit-scrollbar {
+            display: none;
+        }
+        
+        @media (min-width: 769px) {
+            .user-list {
+                width: 350px;
+                max-height: none;
+                border-right: 1px solid rgba(255, 255, 255, 0.1);
+                border-bottom: none;
+            }
+        }
+        
+        /* Search Bar */
         .search-bar {
             position: relative;
             margin-bottom: 20px;
         }
+        
         .search-input {
             width: 100%;
             padding: 12px 40px 12px 20px;
             background: rgba(255, 255, 255, 0.05);
             border: none;
             border-radius: 8px;
-            color: white;
+            color: var(--light);
             font-size: 16px;
+            transition: all 0.3s ease;
         }
+        
         .search-input:focus {
             outline: none;
             background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 2px var(--primary);
         }
+        
+        /* User Cards */
         .user-card {
             display: flex;
             align-items: center;
-            padding: 18px 15px;
+            padding: 15px;
             margin: 8px 0;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
             background: rgba(255, 255, 255, 0.02);
         }
+        
         .user-card:hover {
             background: rgba(255, 255, 255, 0.05);
         }
+        
         .user-card.active {
             background: linear-gradient(90deg, #2a2a2a 0%, #1a1a1a 100%);
-            border-left: 4px solid #00ff88;
+            border-left: 4px solid var(--primary);
         }
+        
         .user-avatar {
             width: 45px;
             height: 45px;
             border-radius: 50%;
             margin-right: 15px;
             object-fit: cover;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--dark);
+            font-weight: bold;
+            font-size: 18px;
         }
+        
+        .user-info {
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .user-info h4 {
+            font-size: 16px;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .user-info p {
+            font-size: 14px;
+            opacity: 0.7;
+            display: flex;
+            align-items: center;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+            position: relative;
+        }
+        
+        .status-indicator.online {
+            background: var(--primary);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+        
+        .status-indicator.offline {
+            background: var(--gray);
+        }
+        
+        /* Chat Container */
         .chat-container {
             flex: 1;
             display: flex;
             flex-direction: column;
             max-height: 60vh;
         }
+        
+        @media (min-width: 769px) {
+            .chat-container {
+                max-height: none;
+            }
+        }
+        
+        /* Chat Header */
         .chat-header {
             padding: 20px;
             padding-left: 60px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             position: relative;
+            background: rgba(0, 0, 0, 0.5);
         }
+        
+        @media (min-width: 769px) {
+            .chat-header {
+                padding-left: 20px;
+            }
+        }
+        
+        .chat-header h2 {
+            font-size: 18px;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        #onlineCount {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        .typing-indicator {
+            position: absolute;
+            top: -25px;
+            left: 20px;
+            font-size: 0.9em;
+            color: var(--primary);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+        
+        .typing-indicator::after {
+            content: '...';
+            animation: typingDots 1.5s infinite;
+        }
+        
+        @keyframes typingDots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        /* Chat Messages */
         .chat-messages {
             flex: 1;
             padding: 20px;
@@ -135,19 +295,25 @@
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
+            background: rgba(0, 0, 0, 0.3);
         }
+        
         .chat-messages::-webkit-scrollbar {
             display: none;
         }
+        
+        /* Message Styles */
         .message {
             display: flex;
             margin-bottom: 20px;
             animation: messageAppear 0.4s ease forwards;
         }
+        
         @keyframes messageAppear {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
         .message-content {
             max-width: 85%;
             padding: 12px 15px;
@@ -156,18 +322,36 @@
             word-break: break-word;
             line-height: 1.4;
         }
+        
         .message.sent {
             justify-content: flex-end;
         }
+        
         .message.sent .message-content {
-            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
-            color: #000;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--dark);
             border-bottom-right-radius: 5px;
         }
+        
         .message.received .message-content {
             background: rgba(255, 255, 255, 0.1);
             border-bottom-left-radius: 5px;
         }
+        
+        .message-time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            display: block;
+            text-align: right;
+            margin-top: 5px;
+        }
+        
+        .read-status {
+            font-size: 0.6em;
+            margin-left: 5px;
+        }
+        
+        /* Message Input */
         .message-input-container {
             padding: 15px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -177,74 +361,82 @@
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(10px);
         }
+        
+        @supports (-webkit-touch-callout: none) {
+            .message-input-container {
+                padding-bottom: calc(15px + env(safe-area-inset-bottom));
+            }
+        }
+        
         .message-input {
             flex: 1;
             padding: 15px 20px;
             background: rgba(255, 255, 255, 0.05);
             border: none;
             border-radius: 8px;
-            color: white;
+            color: var(--light);
             resize: none;
             min-height: 60px;
             font-size: 16px;
+            transition: all 0.3s ease;
         }
+        
+        .message-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
         .send-button {
-            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             border: none;
             border-radius: 8px;
-            color: #000;
+            color: var(--dark);
             padding: 15px;
             font-weight: bold;
             cursor: pointer;
             min-height: 60px;
             min-width: 80px;
+            transition: all 0.3s ease;
         }
-        .status-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-left: auto;
+        
+        .send-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
         }
-        .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
-        .offline { background: #666; }
-        .typing-indicator {
-            position: absolute;
-            top: -25px;
-            left: 20px;
-            font-size: 0.9em;
-            color: #00ff88;
-            opacity: 0;
-            transition: opacity 0.3s ease;
+        
+        .send-button:disabled {
+            opacity: 0.7;
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
         }
-        .typing-indicator::after {
-            content: '...';
-            animation: typingDots 1.5s infinite;
-        }
-        @keyframes typingDots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60%, 100% { content: '...'; }
-        }
+        
+        /* Loading States */
         .loading-state {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            color: #ffffff;
+            color: var(--light);
         }
+        
         .loading-spinner {
             width: 40px;
             height: 40px;
             border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #00ff88;
+            border-left-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 10px;
         }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        /* Error States */
         .error-state {
             display: flex;
             flex-direction: column;
@@ -253,26 +445,19 @@
             padding: 20px;
             color: #ff4444;
         }
+        
         .error-state button {
             margin-top: 10px;
             padding: 8px 16px;
-            background: #00ff88;
+            background: var(--primary);
             border: none;
             border-radius: 4px;
-            color: #000;
+            color: var(--dark);
             font-weight: bold;
+            cursor: pointer;
         }
-        .message-time {
-            font-size: 0.7em;
-            opacity: 0.7;
-            display: block;
-            text-align: right;
-            margin-top: 5px;
-        }
-        .read-status {
-            font-size: 0.6em;
-            margin-left: 5px;
-        }
+        
+        /* Session Check */
         .session-check {
             position: fixed;
             top: 0;
@@ -286,44 +471,20 @@
             justify-content: center;
             z-index: 2000;
         }
+        
         .session-check h2 {
             margin-bottom: 20px;
+            color: var(--light);
         }
-
-        /* Desktop styles */
-        @media (min-width: 769px) {
-            .messaging-container {
-                flex-direction: row;
-                border-radius: 20px;
-            }
-            .mobile-menu-btn {
-                display: none;
-            }
-            .user-list {
-                width: 350px;
-                max-height: none;
-                border-right: 1px solid rgba(255, 255, 255, 0.1);
-                border-bottom: none;
-            }
-            .chat-container {
-                max-height: none;
-            }
-            .chat-header {
-                padding-left: 20px;
-            }
-            .message-content {
-                max-width: 70%;
-            }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
-
-        /* iOS specific fixes */
-        @supports (-webkit-touch-callout: none) {
-            .message-input-container {
-                padding-bottom: calc(15px + env(safe-area-inset-bottom));
-            }
-            body {
-                padding-bottom: env(safe-area-inset-bottom);
-            }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease forwards;
         }
     </style>
 </head>
@@ -338,7 +499,7 @@
         <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
         <div class="user-list" id="userList">
             <div class="search-bar">
-                <input type="text" class="search-input" placeholder="Search team members...">
+                <input type="text" class="search-input" placeholder="Search team members..." id="searchInput">
             </div>
             <div class="loading-state">
                 <div class="loading-spinner"></div>
@@ -347,16 +508,16 @@
         </div>
         <div class="chat-container">
             <div class="chat-header">
-                <h2>Select a user to start chatting</h2>
+                <h2 id="chatPartnerName">Select a user to start chatting</h2>
                 <p id="onlineCount">Loading...</p>
                 <div class="typing-indicator" id="typingIndicator">
-                    <span id="partnerName"></span> is typing...
+                    <span id="typingPartnerName"></span> is typing...
                 </div>
             </div>
             <div class="chat-messages" id="chatMessages"></div>
             <div class="message-input-container">
-                <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
-                <button class="send-button" disabled>Send</button>
+                <textarea class="message-input" placeholder="Type your message..." id="messageInput" disabled></textarea>
+                <button class="send-button" id="sendButton" disabled>Send</button>
             </div>
         </div>
     </div>
@@ -368,185 +529,115 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
 
         // Global variables
-        let supabaseClient, presenceChannel, typingTimeout;
-        let selectedUser = null, currentUserId = null, session = null;
-        let touchStartX = 0, touchEndX = 0;
+        let supabaseClient;
+        let presenceChannel;
+        let typingTimeout;
+        let selectedUser = null;
+        let currentUserId = null;
+        let session = null;
+        let touchStartX = 0;
+        let touchEndX = 0;
+        let isTyping = false;
+        let lastTypingTime = 0;
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                // Set viewport height for mobile
+                setViewportHeight();
+                
                 // Initialize Supabase client
-                // Simple bulletproof initialization
-supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storage: {
-            getItem: () => null, // Disable all local storage
-            setItem: () => null,
-            removeItem: () => null
-        }
-    }
-});
-
-// Force fresh login every time
-await supabaseClient.auth.signOut();
-window.location.href = 'login.html';
-return;
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: true,
+                        flowType: 'pkce'
+                    }
+                });
 
                 // Check for existing session
                 const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-                if (sessionError) throw sessionError;
+                
+                if (sessionError) {
+                    console.error("Session error:", sessionError);
+                    throw sessionError;
+                }
+
                 session = currentSession;
 
                 // If no session found, redirect to login
                 if (!session?.user) {
-    // Clear any existing session data
-    localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
-    await supabaseClient.auth.signOut();
-    window.location.href = 'login.html';
-    return;
-}
+                    redirectToLogin();
+                    return;
+                }
+
                 currentUserId = session.user.id;
 
-                // Verify user session
-                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-                if (authError) throw authError;
-                if (!user) throw new Error("User verification failed");
+                // Verify the user session is still valid
+                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                
+                if (userError || !user) {
+                    console.error("User verification failed:", userError);
+                    await supabaseClient.auth.signOut();
+                    redirectToLogin();
+                    return;
+                }
 
                 // Show app interface
                 document.querySelector('.session-check').style.display = 'none';
                 document.querySelector('.messaging-container').style.display = 'flex';
-                document.querySelector('.message-input').disabled = false;
-                document.querySelector('.send-button').disabled = false;
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendButton').disabled = false;
 
                 // Load initial data
                 await loadUsers();
                 setupEventListeners();
                 initializeRealtime();
 
-                // Mobile viewport adjustment
-                adjustForKeyboard();
-
             } catch (error) {
                 console.error("Initialization error:", error);
-                document.querySelector('.session-check').innerHTML = `
-                    <h2>Session verification failed</h2>
-                    <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                    <button onclick="window.location.href='login.html'" 
-                            style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                        Go to Login
-                    </button>
-                `;
+                showSessionError(error.message || "Session verification failed");
             }
         });
 
-        // Mobile-specific functions
-        function adjustForKeyboard() {
-            if (window.visualViewport) {
-                const viewportHeight = window.visualViewport.height;
-                document.documentElement.style.setProperty('--viewport-height', `${viewportHeight}px`);
-                
-                if (viewportHeight < window.innerHeight * 0.7) {
-                    setTimeout(() => {
-                        document.querySelector('.chat-messages').scrollTop = 
-                            document.querySelector('.chat-messages').scrollHeight;
-                    }, 300);
-                }
-            }
+        // Helper functions
+        function setViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+            
+            window.addEventListener('resize', () => {
+                const vh = window.innerHeight * 0.01;
+                document.documentElement.style.setProperty('--vh', `${vh}px`);
+            });
+        }
+
+        function redirectToLogin() {
+            // Clear any existing session data
+            localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
+            window.location.href = 'login.html';
+        }
+
+        function showSessionError(message) {
+            document.querySelector('.session-check').innerHTML = `
+                <h2>Session Error</h2>
+                <p style="color: #ff4444; margin: 20px 0;">${message}</p>
+                <button onclick="window.location.href='login.html'" 
+                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                    Go to Login
+                </button>
+            `;
+        }
+
+        function updateConnectionStatus(message, isError = false) {
+            const status = document.querySelector('.connection-status');
+            status.textContent = message;
+            status.classList.toggle('connected', !isError);
         }
 
         function vibrate() {
             if ('vibrate' in navigator) {
                 navigator.vibrate(50);
-            }
-        }
-
-        // Realtime functionality
-        async function initializeRealtime() {
-            updateConnectionStatus("Connecting to real-time service...");
-            
-            try {
-                if (presenceChannel) {
-                    supabaseClient.removeChannel(presenceChannel);
-                }
-
-                presenceChannel = supabaseClient.channel('presence-channel', {
-                    config: { 
-                        presence: { 
-                            key: currentUserId
-                        } 
-                    }
-                })
-                .on('presence', { event: 'sync' }, () => {
-                    const state = presenceChannel.presenceState();
-                    updateOnlineStatus(Object.keys(state));
-                })
-                .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                    if (payload.partnerId === currentUserId) {
-                        showTypingIndicator(payload.userId);
-                    }
-                })
-                .subscribe(async (status, error) => {
-                    if (status === 'SUBSCRIBED') {
-                        await presenceChannel.track({ online_at: new Date().toISOString() });
-                        updateConnectionStatus("Connected");
-                    }
-                    if (error) {
-                        console.error('Presence channel error:', error);
-                        updateConnectionStatus("Error: " + error.message, true);
-                        setTimeout(initializeRealtime, 5000);
-                    }
-                });
-
-                presenceChannel
-                    .on('CLOSE', () => {
-                        updateConnectionStatus("Reconnecting...", true);
-                        setTimeout(initializeRealtime, 3000);
-                    })
-                    .on('ERROR', (error) => {
-                        console.error("Realtime error:", error);
-                        updateConnectionStatus("Error: " + error.message, true);
-                        setTimeout(initializeRealtime, 5000);
-                    });
-
-                const messagesChannel = supabaseClient.channel('messages-channel')
-                    .on('postgres_changes', {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'messages',
-                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
-                    }, (payload) => {
-                        if (selectedUser && 
-                            (payload.new.sender_id === selectedUser.id || 
-                             payload.new.receiver_id === selectedUser.id)) {
-                            addMessageToChat(
-                                payload.new.content, 
-                                payload.new.sender_id === currentUserId,
-                                payload.new.created_at,
-                                payload.new.read
-                            );
-                        } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
-                            addMessageToChat(
-                                payload.new.content, 
-                                payload.new.sender_id === currentUserId,
-                                payload.new.created_at,
-                                payload.new.read
-                            );
-                        }
-                    })
-                    .subscribe((status, error) => {
-                        if (error) {
-                            console.error('Messages channel error:', error);
-                            setTimeout(initializeRealtime, 5000);
-                        }
-                    });
-
-            } catch (error) {
-                console.error("Realtime connection error:", error);
-                updateConnectionStatus("Realtime failed: " + error.message, true);
-                setTimeout(initializeRealtime, 5000);
             }
         }
 
@@ -572,10 +663,10 @@ return;
         }
 
         function renderUserList(users) {
-            const userList = document.querySelector('.user-list');
+            const userList = document.getElementById('userList');
             userList.innerHTML = `
                 <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
+                    <input type="text" class="search-input" placeholder="Search team members..." id="searchInput">
                 </div>
             `;
 
@@ -586,41 +677,54 @@ return;
 
             users.forEach(user => {
                 const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                let statusText = 'Offline';
-                let isOnline = false;
-                
-                if (lastOnline) {
-                    const minutesSinceLastOnline = (Date.now() - lastOnline) / 60000;
-                    isOnline = minutesSinceLastOnline < 5;
-                    statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                }
+                const isOnline = isUserOnline(lastOnline);
+                const statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
                 userCard.dataset.userId = user.id;
+                
+                // Get initials for avatar
+                const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                
                 userCard.innerHTML = `
-                    <img src="https://ui-avatars.com/api/?name=${
-                        encodeURIComponent(user.name.split(' ')[0])}+${
-                        encodeURIComponent(user.name.split(' ')[1] || '')}&background=random&length=2" 
-                        class="user-avatar" alt="${user.name}">
+                    <div class="user-avatar">${initials}</div>
                     <div class="user-info">
-                        <h4>${user.name}</h4>
-                        <p>${statusText}</p>
+                        <h4>${sanitizeHTML(user.name)}</h4>
+                        <p>${statusText} <span class="status-indicator ${isOnline ? 'online' : 'offline'}"></span></p>
                     </div>
-                    <div class="status-indicator ${isOnline ? 'online' : 'offline'}"></div>
                 `;
+                
                 userCard.addEventListener('click', () => {
                     vibrate();
                     selectUser(user);
                 });
+                
                 userList.appendChild(userCard);
             });
 
             setupSearch();
         }
 
+        function isUserOnline(lastOnline) {
+            if (!lastOnline) return false;
+            const minutesSinceLastOnline = (Date.now() - lastOnline) / 60000;
+            return minutesSinceLastOnline < 5;
+        }
+
+        function formatLastOnline(date) {
+            if (!date) return 'Offline';
+            
+            const diff = (Date.now() - new Date(date)) / 60000;
+            if (diff < 1) return 'Just now';
+            if (diff < 60) return `${Math.floor(diff)}m ago`;
+            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
+            return `${Math.floor(diff/1440)}d ago`;
+        }
+
         function setupSearch() {
-            document.querySelector('.search-input').addEventListener('input', (e) => {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 document.querySelectorAll('.user-card').forEach(card => {
                     const name = card.querySelector('h4').textContent.toLowerCase();
@@ -634,18 +738,20 @@ return;
             document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
             
             selectedUser = { id: user.id, name: user.name };
-            document.querySelector('.chat-header h2').textContent = user.name;
-            await loadMessages(user.id);
+            document.getElementById('chatPartnerName').textContent = user.name;
             
             // On mobile, hide user list after selection
             if (window.innerWidth <= 768) {
-                document.querySelector('.user-list').style.display = 'none';
+                document.getElementById('userList').style.display = 'none';
             }
+            
+            await loadMessages(user.id);
         }
 
+        // Message handling
         async function loadMessages(userId) {
             try {
-                const messagesContainer = document.querySelector('.chat-messages');
+                const messagesContainer = document.getElementById('chatMessages');
                 messagesContainer.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading messages...</p></div>';
                 
                 const { data: messages, error } = await supabaseClient
@@ -657,6 +763,7 @@ return;
                 if (error) throw error;
                 
                 messagesContainer.innerHTML = '';
+                
                 if (messages.length === 0) {
                     messagesContainer.innerHTML = '<div class="loading-state"><p>No messages yet. Start the conversation!</p></div>';
                     return;
@@ -664,10 +771,15 @@ return;
                 
                 // Only show last 50 messages for performance
                 messages.slice(-50).forEach(msg => {
-                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at, msg.read);
+                    addMessageToChat(
+                        msg.content, 
+                        msg.sender_id === currentUserId,
+                        msg.created_at,
+                        msg.read
+                    );
                 });
                 
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                scrollToBottom();
                 
                 // Mark messages as read
                 await supabaseClient
@@ -708,14 +820,16 @@ return;
                 
                 addMessageToChat(content.trim(), true, new Date().toISOString(), false);
                 
+                // Update last online status
                 await supabaseClient
                     .from('users')
                     .update({ lastonline: new Date().toISOString() })
                     .eq('id', currentUserId);
                 
                 // Clear input and focus
-                document.querySelector('.message-input').value = '';
-                document.querySelector('.message-input').focus();
+                const messageInput = document.getElementById('messageInput');
+                messageInput.value = '';
+                messageInput.focus();
                 
             } catch (error) {
                 console.error('Failed to send message:', error);
@@ -726,31 +840,27 @@ return;
         }
 
         function addMessageToChat(content, isSent, timestamp, isRead) {
-            const messagesContainer = document.querySelector('.chat-messages');
+            const messagesContainer = document.getElementById('chatMessages');
             
             if (messagesContainer.querySelector('.loading-state')) {
                 messagesContainer.innerHTML = '';
             }
             
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'} fade-in`;
+            
+            const formattedTime = formatTime(timestamp);
+            const readStatus = isSent ? `<span class="read-status">${isRead ? '✓✓' : '✓'}</span>` : '';
+            
             messageDiv.innerHTML = `
                 <div class="message-content">
-                    <p>${sanitize(content)}</p>
-                    <span class="message-time">${
-                        formatTime(timestamp)} ${
-                        isSent ? `<span class="read-status">${isRead ? '✓✓' : '✓'}</span>` : ''}
-                    </span>
+                    <p>${sanitizeHTML(content)}</p>
+                    <span class="message-time">${formattedTime} ${readStatus}</span>
                 </div>
             `;
+            
             messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function sanitize(input) {
-            const div = document.createElement('div');
-            div.textContent = input;
-            return div.innerHTML;
+            scrollToBottom();
         }
 
         function formatTime(timestamp) {
@@ -762,10 +872,93 @@ return;
             });
         }
 
-        function updateConnectionStatus(message, isError = false) {
-            const status = document.querySelector('.connection-status');
-            status.textContent = message;
-            status.classList.toggle('connected', !isError);
+        function scrollToBottom() {
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Realtime functionality
+        async function initializeRealtime() {
+            updateConnectionStatus("Connecting to real-time service...");
+            
+            try {
+                // Remove existing channel if it exists
+                if (presenceChannel) {
+                    supabaseClient.removeChannel(presenceChannel);
+                }
+
+                // Presence channel for online status
+                presenceChannel = supabaseClient.channel('presence-channel', {
+                    config: { 
+                        presence: { 
+                            key: currentUserId
+                        } 
+                    }
+                })
+                .on('presence', { event: 'sync' }, () => {
+                    const state = presenceChannel.presenceState();
+                    updateOnlineStatus(Object.keys(state));
+                })
+                .on('broadcast', { event: 'typing' }, ({ payload }) => {
+                    if (payload.partnerId === currentUserId) {
+                        showTypingIndicator(payload.userId);
+                    }
+                })
+                .subscribe(async (status, error) => {
+                    if (status === 'SUBSCRIBED') {
+                        await presenceChannel.track({ online_at: new Date().toISOString() });
+                        updateConnectionStatus("Connected");
+                    }
+                    if (error) {
+                        console.error('Presence channel error:', error);
+                        updateConnectionStatus("Error: " + error.message, true);
+                        setTimeout(initializeRealtime, 5000);
+                    }
+                });
+
+                // Handle channel connection events
+                presenceChannel
+                    .on('CLOSE', () => {
+                        updateConnectionStatus("Reconnecting...", true);
+                        setTimeout(initializeRealtime, 3000);
+                    })
+                    .on('ERROR', (error) => {
+                        console.error("Realtime error:", error);
+                        updateConnectionStatus("Error: " + error.message, true);
+                        setTimeout(initializeRealtime, 5000);
+                    });
+
+                // Messages channel
+                const messagesChannel = supabaseClient.channel('messages-channel')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'messages',
+                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                    }, (payload) => {
+                        if (selectedUser && 
+                            (payload.new.sender_id === selectedUser.id || 
+                             payload.new.receiver_id === selectedUser.id)) {
+                            addMessageToChat(
+                                payload.new.content, 
+                                payload.new.sender_id === currentUserId,
+                                payload.new.created_at,
+                                payload.new.read
+                            );
+                        }
+                    })
+                    .subscribe((status, error) => {
+                        if (error) {
+                            console.error('Messages channel error:', error);
+                            setTimeout(initializeRealtime, 5000);
+                        }
+                    });
+
+            } catch (error) {
+                console.error("Realtime connection error:", error);
+                updateConnectionStatus("Realtime failed: " + error.message, true);
+                setTimeout(initializeRealtime, 5000);
+            }
         }
 
         function updateOnlineStatus(onlineUserIds) {
@@ -773,44 +966,46 @@ return;
                 const userId = card.dataset.userId;
                 const isOnline = onlineUserIds.includes(userId);
                 const indicator = card.querySelector('.status-indicator');
+                
                 if (indicator) {
                     indicator.classList.toggle('online', isOnline);
                     indicator.classList.toggle('offline', !isOnline);
                     
                     const statusText = card.querySelector('p');
                     if (statusText) {
-                        statusText.textContent = isOnline ? 'Online' : 'Offline';
+                        const lastOnline = statusText.textContent.includes('ago') ? 
+                            statusText.textContent.replace('Online', '').replace('Offline', '').trim() : '';
+                        statusText.innerHTML = isOnline ? 
+                            'Online <span class="status-indicator online"></span>' : 
+                            `${lastOnline || 'Offline'} <span class="status-indicator offline"></span>`;
                     }
                 }
             });
+            
             document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
         }
 
-        function formatLastOnline(date) {
-            if (!date) return 'Offline';
-            
-            const diff = (Date.now() - new Date(date)) / 60000;
-            if (diff < 1) return 'Just now';
-            if (diff < 60) return `${Math.floor(diff)}m ago`;
-            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
-            return `${Math.floor(diff/1440)}d ago`;
-        }
-
         function showTypingIndicator(userId) {
-            const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
-            if (partner) {
-                document.getElementById('partnerName').textContent = partner.textContent;
+            const partnerCard = document.querySelector(`[data-user-id="${userId}"]`);
+            if (partnerCard) {
+                const partnerName = partnerCard.querySelector('h4').textContent;
+                document.getElementById('typingPartnerName').textContent = partnerName;
+                
                 const indicator = document.getElementById('typingIndicator');
                 indicator.style.opacity = '1';
+                
                 clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => indicator.style.opacity = '0', 2000);
+                typingTimeout = setTimeout(() => {
+                    indicator.style.opacity = '0';
+                }, 2000);
             }
         }
 
+        // UI Helpers
         function showLoading() {
-            document.querySelector('.user-list').innerHTML = `
+            document.getElementById('userList').innerHTML = `
                 <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
+                    <input type="text" class="search-input" placeholder="Search team members..." id="searchInput">
                 </div>
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
@@ -829,50 +1024,73 @@ return;
         }
 
         function showSendLoading() {
-            const btn = document.querySelector('.send-button');
+            const btn = document.getElementById('sendButton');
             btn.disabled = true;
             btn.textContent = 'Sending...';
         }
 
         function hideSendLoading() {
-            const btn = document.querySelector('.send-button');
+            const btn = document.getElementById('sendButton');
             btn.disabled = false;
             btn.textContent = 'Send';
         }
 
+        function sanitizeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Event listeners
         function setupEventListeners() {
             // Send message button
-            document.querySelector('.send-button').addEventListener('click', async () => {
-                const input = document.querySelector('.message-input');
+            document.getElementById('sendButton').addEventListener('click', async () => {
+                const input = document.getElementById('messageInput');
                 const content = input.value.trim();
+                
                 if (!selectedUser) {
                     showError('chat-messages', 'Please select a user first');
                     return;
                 }
+                
+                if (!content) {
+                    showError('chat-messages', 'Message cannot be empty');
+                    return;
+                }
+                
                 await sendMessage(selectedUser.id, content);
             });
 
-            // Enter key to send
-            document.querySelector('.message-input').addEventListener('keypress', (e) => {
+            // Enter key to send (but allow Shift+Enter for new lines)
+            document.getElementById('messageInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    document.querySelector('.send-button').click();
+                    document.getElementById('sendButton').click();
                 }
             });
 
-            // Typing indicator with debounce
-            let typingTimer;
-            document.querySelector('.message-input').addEventListener('input', () => {
+            // Typing indicator
+            document.getElementById('messageInput').addEventListener('input', () => {
                 if (!selectedUser) return;
                 
-                clearTimeout(typingTimer);
-                typingTimer = setTimeout(() => {
+                const now = Date.now();
+                
+                if (!isTyping) {
+                    isTyping = true;
                     presenceChannel.send({
                         type: 'broadcast',
                         event: 'typing',
                         payload: { userId: currentUserId, partnerId: selectedUser.id }
                     });
-                }, 300);
+                }
+                
+                lastTypingTime = now;
+                
+                setTimeout(() => {
+                    if (now - lastTypingTime > 1000 && isTyping) {
+                        isTyping = false;
+                    }
+                }, 1000);
             });
 
             // Mobile menu toggle
@@ -882,25 +1100,29 @@ return;
                 vibrate();
             });
 
-            // Swipe gestures
+            // Swipe gestures for mobile
             document.querySelector('.messaging-container').addEventListener('touchstart', (e) => {
                 touchStartX = e.changedTouches[0].screenX;
             }, false);
 
             document.querySelector('.messaging-container').addEventListener('touchend', (e) => {
                 touchEndX = e.changedTouches[0].screenX;
-                if (touchEndX < touchStartX - 100) {
-                    // Swipe left - hide user list
-                    document.querySelector('.user-list').style.display = 'none';
-                }
-                if (touchEndX > touchStartX + 100) {
-                    // Swipe right - show user list
-                    document.querySelector('.user-list').style.display = 'block';
+                
+                if (window.innerWidth <= 768) {
+                    if (touchEndX < touchStartX - 100) {
+                        // Swipe left - hide user list
+                        document.getElementById('userList').style.display = 'none';
+                    }
+                    if (touchEndX > touchStartX + 100) {
+                        // Swipe right - show user list
+                        document.getElementById('userList').style.display = 'block';
+                    }
                 }
             }, false);
 
-            // Keyboard adjustments
-            window.visualViewport.addEventListener('resize', adjustForKeyboard);
+            // Keyboard adjustments for mobile
+            window.addEventListener('resize', adjustForKeyboard);
+            window.addEventListener('orientationchange', adjustForKeyboard);
             
             // Network status
             window.addEventListener('online', () => {
@@ -911,6 +1133,17 @@ return;
             window.addEventListener('offline', () => {
                 updateConnectionStatus("Offline - No connection", true);
             });
+        }
+
+        function adjustForKeyboard() {
+            if (window.visualViewport) {
+                const viewportHeight = window.visualViewport.height;
+                document.documentElement.style.setProperty('--vh', `${viewportHeight * 0.01}px`);
+                
+                if (viewportHeight < window.innerHeight * 0.7) {
+                    setTimeout(scrollToBottom, 300);
+                }
+            }
         }
     </script>
 </body>
