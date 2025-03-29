@@ -420,16 +420,13 @@ presenceChannel = supabaseClient.channel('presence-channel', {
 })
             .on('presence', { event: 'sync' }, () => {
     const state = presenceChannel.presenceState();
-    // Extract unique user IDs from presence state
+    
     const onlineUserIds = [...new Set(
         Object.values(state)
-            .flatMap(entries => entries.map(e => e.user_id || e.key))
-    )];
+            .flatMap(entries => entries.map(e => e.user_id))
+    )].filter(Boolean);
     updateOnlineStatus(onlineUserIds);
 })
-                const state = presenceChannel.presenceState();
-                updateOnlineStatus(Object.keys(state));
-            })
             .on('broadcast', { event: 'typing' }, ({ payload }) => {
                 if (payload.partnerId === currentUserId) {
                     showTypingIndicator(payload.userId);
