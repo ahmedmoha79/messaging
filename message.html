@@ -542,34 +542,99 @@
 
         // Initialize app
         // Initialize app - NEW VERSION
+// Initialize app - FIXED VERSION
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // 1. Clear any old login sessions first
-        localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
-        await supabaseClient?.auth.signOut();
-
-        // 2. Set up new connection with extra security
+        // 1. Initialize Supabase with proper storage handling
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             auth: {
                 persistSession: true,
                 autoRefreshToken: true,
-                detectSessionInUrl: false, // More secure - won't check URLs
+                detectSessionInUrl: false,
                 flowType: 'pkce',
                 storage: {
-                    getItem: (key) => localStorage.getItem(key),
+                    getItem: (key) => {
+                        return localStorage.getItem(key) || 
+                               localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                               localStorage.getItem('session');
+                    },
                     setItem: (key, value) => localStorage.setItem(key, value),
                     removeItem: (key) => localStorage.removeItem(key)
                 }
             }
         });
+        // ======== MOBILE VIEWPORT FIX ======== //
+        const setViewportHeight = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+        setViewportHeight();
+        window.addEventListener('resize', setViewportHeight);
+        // ======== END MOBILE FIX ======== //
 
-        // 3. Handle automatic token refreshes
-        supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'TOKEN_REFRESHED') {
-                console.log('Token refreshed successfully');
+        // 2. Check for existing session
+        const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+        session = currentSession;
+
+        // 3. Try to recover session from storage if needed
+        if (!session) {
+            const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                               localStorage.getItem('session');
+            if (sessionData) {
+                try {
+                    const parsedSession = JSON.parse(sessionData);
+                    if (parsedSession?.access_token) {
+                        await supabaseClient.auth.setSession({
+                            access_token: parsedSession.access_token,
+                            refresh_token: parsedSession.refresh_token
+                        });
+                        const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
+                        session = recoveredSession;
+                    }
+                } catch (e) {
+                    console.error("Session recovery failed:", e);
+                }
             }
-            if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        }
+
+        // 4. Redirect if no valid session
+        if (!session?.user) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        currentUserId = session.user.id;
+
+        // 5. Verify user with server
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (userError || !user) {
+            await supabaseClient.auth.signOut();
+            window.location.href = 'login.html';
+            return;
+        }
+
+        // 6. Show the app interface
+        document.querySelector('.session-check').style.display = 'none';
+        document.querySelector('.messaging-container').style.display = 'flex';
+        document.getElementById('messageInput').disabled = false;
+        document.getElementById('sendButton').disabled = false;
+
+        // 7. Load data and setup realtime
+        await loadUsers();
+        setupEventListeners();
+        initializeRealtime();
+
+    } catch (error) {
+        console.error("Initialization error:", error);
+        window.location.href = 'login.html';
+    }
+});
+        // 3. Handle automatic token refreshes
+               supabaseClient.auth.onAuthStateChange(async (event) => {
+            if (event === 'SIGNED_OUT') {
+                // Clear all possible session storage keys
                 localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
+                localStorage.removeItem('session');
                 window.location.href = 'login.html';
             }
         });
@@ -594,15 +659,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         currentUserId = user.id;
         
-        // 6. Keep checking session every 5 seconds
-        setInterval(async () => {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session?.user) {
-                window.location.href = 'login.html';
-            }
-        }, 5000);
-
-        // Show the app (same as before)
+                // Show the app (same as before)
         document.querySelector('.session-check').style.display = 'none';
         document.querySelector('.messaging-container').style.display = 'flex';
         document.getElementById('messageInput').disabled = false;
@@ -613,10 +670,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupEventListeners();
         initializeRealtime();
         
-    } catch (error) {
-        console.error("Auth error:", error);
-        localStorage.removeItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
-        window.location.href = 'login.html';
+        } catch (error) {
+        console.error("Initialization error:", error);
+        document.querySelector('.session-check').innerHTML = `
+            <h2>Session Error</h2>
+            <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
+            <button onclick="window.location.href='login.html'" 
+                    style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                Go to Login
+            </button>
+        `;
     }
 });
 
