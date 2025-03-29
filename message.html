@@ -29,6 +29,47 @@
             background: #ff444455;
             color: #ff4444;
         }
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.5);
+    border: none;
+    color: white;
+    font-size: 24px;
+    z-index: 1001;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+@media (max-width: 768px) {
+    .messaging-container {
+        flex-direction: column;
+        border-radius: 0;
+        margin: 0;
+    }
+    
+    .user-list {
+        width: 100%;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        display: none;
+    }
+    
+    .user-list.show {
+        display: block;
+    }
+    
+    .chat-container {
+        max-height: 60vh;
+    }
+    
+    .mobile-menu-btn {
+        display: block;
+    }
+}
         .connection-status.connected {
             background: #00ff8855;
             color: #00ff88;
@@ -245,6 +286,7 @@
 
     <div class="connection-status">Connecting...</div>
     <div class="messaging-container" style="display: none;">
+    <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
         <div class="user-list">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
@@ -696,7 +738,96 @@
         }
 
         function setupEventListeners() {
-            document.querySelector('.send-button').addEventListener('click', async () => {
+    // Mobile menu toggle
+    document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+        document.querySelector('.user-list').classList.toggle('show');
+    });
+
+    // Close user list when selecting a user on mobile
+    document.querySelectorAll('.user-card').forEach(card => {
+        card.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                document.querySelector('.user-list').classList.remove('show');
+            }
+        });
+    });
+
+    // Swipe gestures
+    let touchStartX = 0;
+    let touchEndX = 0;
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, false);
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        if (window.innerWidth <= 768) {
+            if (touchEndX < touchStartX - 50) {
+                document.querySelector('.user-list').classList.remove('show');
+            }
+            if (touchEndX > touchStartX + 50) {
+                document.querySelector('.user-list').classList.add('show');
+            }
+        }
+    }, false);
+
+    // Message sending
+    document.querySelector('.send-button').addEventListener('click', async () => {
+        const input = document.querySelector('.message-input');
+        const content = input.value.trim();
+        if (!selectedUser) {
+            alert('Please select a user first');
+            return;
+        }
+        if (!content) {
+            alert('Message cannot be empty');
+            return;
+        }
+        await sendMessage(selectedUser.id, content);
+        input.value = '';
+        input.focus();
+    });
+
+    document.querySelector('.message-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.querySelector('.send-button').click();
+        }
+    });
+
+    let isTyping = false;
+    let lastTypingTime = 0;
+    
+    document.querySelector('.message-input').addEventListener('input', () => {
+        if (!selectedUser) return;
+        
+        const now = Date.now();
+        if (!isTyping) {
+            isTyping = true;
+            presenceChannel.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: { userId: currentUserId, partnerId: selectedUser.id }
+            });
+        }
+        
+        lastTypingTime = now;
+        
+        setTimeout(() => {
+            if (now - lastTypingTime > 1000 && isTyping) {
+                isTyping = false;
+            }
+        }, 1000);
+    });
+
+    window.addEventListener('online', () => {
+        updateConnectionStatus("Reconnecting...");
+        initializeRealtime();
+    });
+    
+    window.addEventListener('offline', () => {
+        updateConnectionStatus("Offline - No connection", true);
+    });
+}
                 const input = document.querySelector('.message-input');
                 const content = input.value.trim();
                 if (!selectedUser) {
