@@ -15,10 +15,11 @@
         body {
             background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
             color: #ffffff;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
         }
 
         .signup-container {
@@ -29,6 +30,12 @@
             width: 100%;
             max-width: 400px;
             box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         h1 {
@@ -45,22 +52,25 @@
             display: block;
             margin-bottom: 8px;
             color: #ffffff;
+            font-weight: 500;
         }
 
         input {
             width: 100%;
             padding: 12px;
             background: rgba(255, 255, 255, 0.05);
-            border: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             color: white;
             font-size: 14px;
+            transition: all 0.3s ease;
         }
 
         input:focus {
             outline: none;
+            border-color: #00ff88;
             background: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.2);
         }
 
         button {
@@ -74,16 +84,23 @@
             cursor: pointer;
             transition: all 0.3s ease;
             position: relative;
+            margin-top: 10px;
+            font-size: 16px;
         }
 
         button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.3);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
         }
 
         button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
+            background: #666;
         }
 
         .spinner {
@@ -104,30 +121,45 @@
 
         .error-message {
             color: #ff4444;
-            margin-top: 10px;
+            margin-top: 15px;
             text-align: center;
             display: none;
+            padding: 10px;
+            background: rgba(255, 68, 68, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid #ff4444;
         }
 
         .success-message {
             color: #00ff88;
-            margin-top: 10px;
+            margin-top: 15px;
             text-align: center;
             display: none;
+            padding: 10px;
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid #00ff88;
         }
 
         .login-link {
             text-align: center;
-            margin-top: 20px;
+            margin-top: 25px;
+            color: #aaa;
         }
 
         .login-link a {
             color: #00ff88;
             text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
         }
 
         .password-strength {
-            margin-top: 5px;
+            margin-top: 8px;
             height: 4px;
             background: #333;
             border-radius: 2px;
@@ -137,13 +169,38 @@
         .strength-meter {
             height: 100%;
             width: 0%;
-            transition: width 0.3s;
+            transition: width 0.3s, background 0.3s;
         }
 
         .password-hint {
             font-size: 12px;
             color: #666;
-            margin-top: 4px;
+            margin-top: 6px;
+            display: block;
+        }
+
+        .form-footer {
+            margin-top: 25px;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .signup-container {
+                padding: 30px 20px;
+                border-radius: 15px;
+            }
+            
+            h1 {
+                font-size: 24px;
+                margin-bottom: 20px;
+            }
+            
+            input, button {
+                padding: 10px;
+            }
         }
     </style>
 </head>
@@ -153,19 +210,19 @@
         <form id="signupForm">
             <div class="form-group">
                 <label for="name">Full Name</label>
-                <input type="text" id="name" required>
+                <input type="text" id="name" required autocomplete="name">
             </div>
             <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" id="email" required>
+                <input type="email" id="email" required autocomplete="email">
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" required minlength="8">
+                <input type="password" id="password" required minlength="8" autocomplete="new-password">
                 <div class="password-strength">
                     <div class="strength-meter" id="strengthMeter"></div>
                 </div>
-                <div class="password-hint">Minimum 8 characters with at least one number</div>
+                <span class="password-hint">Minimum 8 characters with at least one number and special character</span>
             </div>
             <button type="submit" id="submitBtn">
                 Sign Up
@@ -176,6 +233,9 @@
         <div id="successMessage" class="success-message"></div>
         <div class="login-link">
             Already have an account? <a href="login.html">Login here</a>
+        </div>
+        <div class="form-footer">
+            By signing up, you agree to our Terms of Service and Privacy Policy
         </div>
     </div>
 
@@ -190,16 +250,43 @@
         document.getElementById('password').addEventListener('input', function(e) {
             const password = e.target.value;
             const meter = document.getElementById('strengthMeter');
+            
+            // Reset if empty
+            if (!password) {
+                meter.style.width = '0%';
+                return;
+            }
+            
+            // Calculate strength
             let strength = 0;
             
-            if (password.length >= 8) strength += 30;
-            if (password.match(/[A-Z]/)) strength += 20;
-            if (password.match(/[0-9]/)) strength += 20;
-            if (password.match(/[^A-Za-z0-9]/)) strength += 30;
+            // Length check
+            if (password.length >= 8) strength += 20;
+            if (password.length >= 12) strength += 20;
             
-            meter.style.width = Math.min(strength, 100) + '%';
-            meter.style.background = strength < 40 ? '#ff4444' : 
-                                    strength < 70 ? '#ffcc00' : '#00ff88';
+            // Character type checks
+            if (/[A-Z]/.test(password)) strength += 15;
+            if (/[0-9]/.test(password)) strength += 15;
+            if (/[^A-Za-z0-9]/.test(password)) strength += 20;
+            
+            // Common pattern penalty
+            if (/(.)\1{2,}/.test(password)) strength -= 10; // Repeated characters
+            if (/123|abc|qwerty/i.test(password)) strength -= 15; // Common sequences
+            
+            // Ensure strength is between 0 and 100
+            strength = Math.max(0, Math.min(100, strength));
+            
+            // Update meter
+            meter.style.width = strength + '%';
+            
+            // Set color based on strength
+            if (strength < 40) {
+                meter.style.backgroundColor = '#ff4444'; // Weak
+            } else if (strength < 70) {
+                meter.style.backgroundColor = '#ffcc00'; // Medium
+            } else {
+                meter.style.backgroundColor = '#00ff88'; // Strong
+            }
         });
 
         // Form submission
@@ -228,6 +315,14 @@
                     throw new Error('All fields are required');
                 }
                 
+                if (name.length < 2) {
+                    throw new Error('Please enter a valid name');
+                }
+                
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    throw new Error('Please enter a valid email address');
+                }
+                
                 if (password.length < 8) {
                     throw new Error('Password must be at least 8 characters');
                 }
@@ -236,9 +331,12 @@
                     throw new Error('Password must contain at least one number');
                 }
                 
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    throw new Error('Please enter a valid email');
+                if (!/[^A-Za-z0-9]/.test(password)) {
+                    throw new Error('Password must contain at least one special character');
                 }
+
+                // Show loading state
+                submitBtn.textContent = 'Creating account...';
 
                 // Create user in Auth
                 const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -247,13 +345,16 @@
                     options: {
                         data: {
                             name: name,
-                            lastonline: new Date().toISOString()
+                            last_online: new Date().toISOString()
                         },
                         emailRedirectTo: window.location.origin + '/login.html'
                     }
                 });
 
-                if (authError) throw authError;
+                if (authError) {
+                    console.error('Auth error:', authError);
+                    throw authError;
+                }
 
                 // Add to public.users table
                 const { error: dbError } = await supabase
@@ -262,36 +363,59 @@
                         id: authData.user.id,
                         email: email,
                         name: name,
-                        lastonline: new Date().toISOString()
+                        last_online: new Date().toISOString(),
+                        created_at: new Date().toISOString()
                     }]);
 
                 if (dbError) {
-                    // Rollback auth if DB fails
-                    await supabase.auth.admin.deleteUser(authData.user.id);
-                    throw new Error('Failed to create user profile');
+                    console.error('DB error:', dbError);
+                    // Attempt to rollback auth if DB fails
+                    try {
+                        await supabase.auth.admin.deleteUser(authData.user.id);
+                    } catch (rollbackError) {
+                        console.error('Rollback error:', rollbackError);
+                    }
+                    throw new Error('Failed to create user profile. Please try again.');
                 }
 
                 // Success
-                successElement.textContent = 'Registration successful! Please check your email to verify your account.';
+                successElement.textContent = 'Account created successfully! Please check your email to verify your account.';
                 successElement.style.display = 'block';
                 
                 // Clear form
                 document.getElementById('signupForm').reset();
                 document.getElementById('strengthMeter').style.width = '0%';
                 
-                // Auto-redirect after 3 seconds
+                // Update button text
+                submitBtn.textContent = 'Sign Up';
+                
+                // Auto-redirect after 5 seconds
                 setTimeout(() => {
                     window.location.href = 'login.html';
-                }, 3000);
+                }, 5000);
 
             } catch (error) {
                 console.error('Signup error:', error);
                 errorElement.textContent = error.message || 'Registration failed. Please try again.';
                 errorElement.style.display = 'block';
+                
+                // Reset button text
+                submitBtn.textContent = 'Sign Up';
             } finally {
                 submitBtn.disabled = false;
                 spinner.style.display = 'none';
             }
+        });
+
+        // Add some interactive effects
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.querySelector('label').style.color = '#00ff88';
+            });
+            
+            input.addEventListener('blur', () => {
+                input.parentElement.querySelector('label').style.color = '#ffffff';
+            });
         });
     </script>
 </body>
