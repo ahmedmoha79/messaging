@@ -497,20 +497,6 @@
                         encodeURIComponent(user.name.split(' ')[0])}+${
                         encodeURIComponent(user.name.split(' ')[1] || '')}&background=random&length=2" 
                         class="user-avatar" alt="${user.name}">
-{% extends 'base.html' %}
-{% block content %}
-
-<div class="container-fluid">
-    <div class="row">
-        <!-- Left sidebar with user list -->
-        <div class="col-md-3 sidebar">
-            <div class="users-container">
-                <h3>Users</h3>
-                <div class="user-list" id="user-list">
-                    {% for user in users %}
-                        <div class="user-item {% if user.id == selected_user.id %}active{% endif %}"
-                             data-user-id="{{ user.id }}"
-                             onclick="selectUser({{ user.id }})">
                     <div class="user-info">
                         <h4>${user.name}</h4>
                         <p>${statusText}</p>
@@ -625,14 +611,6 @@
                             day: 'numeric'
                         })
                     }</span>
-                                <span class="user-name">{{ user.username }}</span>
-                                <span class="status-indicator" id="status-{{ user.id }}"></span>
-                            </div>
-                            <span class="unread-badge" id="unread-{{ user.id }}"></span>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
                 </div>
             `;
             messagesContainer.appendChild(messageDiv);
@@ -688,24 +666,10 @@
             document.querySelector('.user-list').innerHTML = `
                 <div class="search-bar">
                     <input type="text" class="search-input" placeholder="Search team members...">
-
-        <!-- Chat area -->
-        <div class="col-md-9 chat-container">
-            <div class="chat-header">
-                <h3>Chatting with: <span id="selected-user-name">{{ selected_user.username }}</span></h3>
-                <div class="online-info">
-                    <span id="online-count">0</span> users online
-                </div>
                 </div>
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
                     <p>Loading users...</p>
-
-            <div class="message-container" id="message-container">
-                {% for message in messages %}
-                    <div class="message {% if message.sender.id == request.user.id %}sent{% else %}received{% endif %}">
-                        <div class="message-content">{{ message.content }}</div>
-                        <div class="message-time">{{ message.timestamp|date:"M d, H:i" }}</div>
                 </div>
             `;
         }
@@ -715,28 +679,8 @@
                 <div class="error-state">
                     <p>${message}</p>
                     <button onclick="window.location.reload()">Retry</button>
-                {% endfor %}
-            </div>
-
-            <div class="message-input">
-                <textarea id="message-text" placeholder="Type your message..."></textarea>
-                <button id="send-button" onclick="sendMessage()">Send</button>
                 </div>
             `;
-        </div>
-    </div>
-</div>
-
-<script>
-    const currentUserId = {{ request.user.id }};
-    let selectedUserId = {{ selected_user.id }};
-    let socket = null;
-    let onlineUsers = new Set();
-    const MESSAGE_FETCH_INTERVAL = 5000;
-
-    function connectWebSocket() {
-        if (socket) {
-            socket.close();
         }
 
         function showSendLoading() {
@@ -744,25 +688,80 @@
             btn.disabled = true;
             btn.textContent = 'Sending...';
         }
-        socket = new WebSocket(`ws://${window.location.host}/ws/status/`);
-
-        socket.onopen = function(e) {
-            console.log("WebSocket connected");
-        };
 
         function hideSendLoading() {
             const btn = document.querySelector('.send-button');
             btn.disabled = false;
             btn.textContent = 'Send';
-        socket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-
-            if (data.type === 'status_update') {
-                updateOnlineStatus(data.online_users);
-            } else if (data.type === 'new_message') {
-                handleNewMessage(data);
         }
-        };
+
+        function setupEventListeners() {
+            document.querySelector('.send-button').addEventListener('click', async () => {
+                const input = document.querySelector('.message-input');
+                const content = input.value.trim();
+                if (!selectedUser) {
+                    alert('Please select a user first');
+                    return;
+                }
+                if (!content) {
+                    alert('Message cannot be empty');
+                    return;
+                }
+                await sendMessage(selectedUser.id, content);
+                input.value = '';
+                input.focus();
+            });
+
+            document.querySelector('.message-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.querySelector('.send-button').click();
+                }
+            });
+
+            let isTyping = false;
+            let lastTypingTime = 0;
+            
+            document.querySelector('.message-input').addEventListener('input', () => {
+                if (!selectedUser) return;
+                
+                const now = Date.now();
+                if (!isTyping) {
+                    isTyping = true;
+                    presenceChannel.send({
+                        type: 'broadcast',
+                        event: 'typing',
+                        payload: { userId: currentUserId, partnerId: selectedUser.id }
+                    });
+                }
+                
+                lastTypingTime = now;
+                
+                setTimeout(() => {
+                    if (now - lastTypingTime > 1000 && isTyping) {
+                        isTyping = false;
+                        presenceChannel.send({
+                            type: 'broadcast',
+                            event: 'stopped-typing',
+                            payload: { userId: currentUserId }
+                        });
+                    }
+                }, 1000);
+            });
+
+            window.addEventListener('online', () => {
+                updateConnectionStatus("Reconnecting...");
+                initializeRealtime();
+            });
+            
+            window.addEventListener('offline', () => {
+                updateConnectionStatus("Offline - No connection", true);
+            });
+        }
+    </script>
+</body>
+</html>
+        }
 
         function setupEventListeners() {
             document.querySelector('.send-button').addEventListener('click', async () => {
@@ -1048,289 +1047,5 @@
 
 {% csrf_token %}
 {% endblock %}
-        }
 
-        function setupEventListeners() {
-            document.querySelector('.send-button').addEventListener('click', async () => {
-                const input = document.querySelector('.message-input');
-                const content = input.value.trim();
-                if (!selectedUser) {
-                    alert('Please select a user first');
-                    return;
-        socket.onclose = function(e) {
-            console.log("WebSocket disconnected, reconnecting in 2 seconds...");
-            setTimeout(connectWebSocket, 2000);
-        };
-    }
-
-    function updateOnlineStatus(onlineUserIds) {
-        onlineUsers = new Set(onlineUserIds);
-
-        document.getElementById('online-count').textContent = onlineUsers.size;
-
-        document.querySelectorAll('.user-item').forEach(userItem => {
-            const userId = parseInt(userItem.getAttribute('data-user-id'));
-            const statusIndicator = document.getElementById(`status-${userId}`);
-
-            if (onlineUsers.has(userId)) {
-                statusIndicator.classList.add('online');
-                statusIndicator.classList.remove('offline');
-            } else {
-                statusIndicator.classList.add('offline');
-                statusIndicator.classList.remove('online');
-            }
-        });
-    }
-
-    function handleNewMessage(data) {
-        if (data.sender_id !== currentUserId) {
-            const unreadBadge = document.getElementById(`unread-${data.sender_id}`);
-
-            if (data.sender_id === selectedUserId) {
-                appendMessage(data.message, false, data.timestamp);
-                unreadBadge.textContent = '';
-                unreadBadge.style.display = 'none';
-            } else {
-                let count = parseInt(unreadBadge.textContent) || 0;
-                unreadBadge.textContent = count + 1;
-                unreadBadge.style.display = 'block';
-
-                showBrowserNotification(data.sender_name, data.message);
-            }
-        }
-    }
-
-    function showBrowserNotification(sender, message) {
-        if (Notification.permission === "granted") {
-            const notification = new Notification(`New message from ${sender}`, {
-                body: message,
-                icon: '/static/notification-icon.png'
-            });
-
-            notification.onclick = function() {
-                window.focus();
-                const senderId = Array.from(document.querySelectorAll('.user-item'))
-                    .find(el => el.querySelector('.user-name').textContent === sender)
-                    ?.getAttribute('data-user-id');
-
-                if (senderId) {
-                    selectUser(parseInt(senderId));
-                }
-            };
-        } else if (Notification.permission !== "denied") {
-            Notification.requestPermission();
-        }
-    }
-    function selectUser(userId) {
-        selectedUserId = userId;
-
-        document.querySelectorAll('.user-item').forEach(item => {
-            item.classList.remove('active');
-        });
-
-        const selectedElement = document.querySelector(`.user-item[data-user-id="${userId}"]`);
-        selectedElement.classList.add('active');
-
-        document.getElementById('selected-user-name').textContent =
-            selectedElement.querySelector('.user-name').textContent;
-
-        const unreadBadge = document.getElementById(`unread-${userId}`);
-        unreadBadge.textContent = '';
-        unreadBadge.style.display = 'none';
-
-        loadMessages(userId);
-    }
-
-    function loadMessages(userId) {
-        fetch(`/api/messages/${userId}/`)
-            .then(response => response.json())
-            .then(data => {
-                const messageContainer = document.getElementById('message-container');
-                messageContainer.innerHTML = '';
-
-                data.messages.forEach(msg => {
-                    const isSent = msg.sender_id === currentUserId;
-                    appendMessage(msg.content, isSent, msg.timestamp);
-                });
-
-                messageContainer.scrollTop = messageContainer.scrollHeight;
-            })
-            .catch(error => console.error('Error loading messages:', error));
-                }
-                if (!content) {
-                    alert('Message cannot be empty');
-                    return;
-
-    function appendMessage(content, isSent, timestamp) {
-        const messageContainer = document.getElementById('message-container');
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.textContent = content;
-
-        const timeDiv = document.createElement('div');
-        timeDiv.className = 'message-time';
-
-        const date = new Date(timestamp);
-        timeDiv.textContent = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
-
-        messageDiv.appendChild(contentDiv);
-        messageDiv.appendChild(timeDiv);
-        messageContainer.appendChild(messageDiv);
-
-        messageContainer.scrollTop = messageContainer.scrollHeight;
-                }
-                await sendMessage(selectedUser.id, content);
-                input.value = '';
-                input.focus();
-            });
-
-    function sendMessage() {
-        const messageText = document.getElementById('message-text').value.trim();
-
-        if (messageText && selectedUserId) {
-            const data = {
-                recipient_id: selectedUserId,
-                content: messageText
-            };
-
-            document.querySelector('.message-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    document.querySelector('.send-button').click();
-                }
-            });
-            fetch('/api/send-message/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('message-text').value = '';
-                    appendMessage(messageText, true, new Date().toISOString());
-                }
-            })
-            .catch(error => console.error('Error sending message:', error));
-        }
-    }
-
-    function getCsrfToken() {
-        return document.querySelector('[name=csrfmiddlewaretoken]').value;
-    }
-
-    function pollForNewMessages() {
-        if (selectedUserId) {
-            fetch(`/api/check-new-messages/${selectedUserId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.has_new) {
-                        loadMessages(selectedUserId);
-                    }
-                })
-                .catch(error => console.error('Error checking for new messages:', error));
-        }
-    }
-
-    function sendHeartbeat() {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                type: 'heartbeat',
-                user_id: currentUserId
-            }));
-        }
-    }
-
-            let isTyping = false;
-            let lastTypingTime = 0;
-            
-            document.querySelector('.message-input').addEventListener('input', () => {
-                if (!selectedUser) return;
-                
-                const now = Date.now();
-                if (!isTyping) {
-                    isTyping = true;
-                    presenceChannel.send({
-                        type: 'broadcast',
-                        event: 'typing',
-                        payload: { userId: currentUserId, partnerId: selectedUser.id }
-                    });
-                }
-                
-                lastTypingTime = now;
-                
-                setTimeout(() => {
-                    if (now - lastTypingTime > 1000 && isTyping) {
-                        isTyping = false;
-                        presenceChannel.send({
-                            type: 'broadcast',
-                            event: 'stopped-typing',
-                            payload: { userId: currentUserId }
-                        });
-                    }
-                }, 1000);
-            });
-
-            window.addEventListener('online', () => {
-                updateConnectionStatus("Reconnecting...");
-                initializeRealtime();
-            });
-            
-            window.addEventListener('offline', () => {
-                updateConnectionStatus("Offline - No connection", true);
-            });
-        }
-    document.addEventListener('DOMContentLoaded', function() {
-        if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-            Notification.requestPermission();
-        }
-
-        connectWebSocket();
-
-        document.getElementById('message-text').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        setInterval(pollForNewMessages, MESSAGE_FETCH_INTERVAL);
-        setInterval(sendHeartbeat, 30000);
-
-        if (selectedUserId) {
-            loadMessages(selectedUserId);
-        }
-    });
-
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible') {
-            if (selectedUserId) {
-                loadMessages(selectedUserId);
-            }
-
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                connectWebSocket();
-            }
-        }
-    });
-
-    window.addEventListener('beforeunload', function() {
-        if (socket) {
-            socket.send(JSON.stringify({
-                type: 'logout',
-                user_id: currentUserId
-            }));
-        }
-    });
-    </script>
-</body>
-</html>
-
-{% csrf_token %}
-{% endblock %}
+[The entire file contents as specified in the provided suggestion, replacing the previous implementation]
