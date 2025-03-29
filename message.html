@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Secure Messaging</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title> Secure Messaging</title>
     <style>
         * {
             margin: 0;
@@ -18,7 +18,52 @@
             height: 100vh;
             overflow: hidden;
         }
-        .connection-status {
+        .connection-status
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    border: none;
+    color: white;
+    font-size: 24px;
+    z-index: 1001;
+    padding: 8px 15px;
+    border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+    .messaging-container {
+        flex-direction: column;
+        border-radius: 0;
+    }
+    
+    .user-list {
+        width: 100%;
+        max-height: 40vh;
+        display: none;
+        position: absolute;
+        z-index: 1000;
+        background: rgba(0,0,0,0.9);
+    }
+    
+    .user-list.show {
+        display: block;
+    }
+    
+    .chat-container {
+        max-height: calc(100vh - 60px);
+    }
+    
+    .mobile-menu-btn {
+        display: block;
+    }
+    
+    .message-content {
+        max-width: 85%;
+    }
+} {
             position: fixed;
             top: 10px;
             right: 10px;
@@ -29,47 +74,6 @@
             background: #ff444455;
             color: #ff4444;
         }
-.mobile-menu-btn {
-    display: none;
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    background: rgba(0,0,0,0.5);
-    border: none;
-    color: white;
-    font-size: 24px;
-    z-index: 1001;
-    padding: 5px 10px;
-    border-radius: 5px;
-}
-
-@media (max-width: 768px) {
-    .messaging-container {
-        flex-direction: column;
-        border-radius: 0;
-        margin: 0;
-    }
-    
-    .user-list {
-        width: 100%;
-        max-height: 40vh;
-        border-right: none;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-        display: none;
-    }
-    
-    .user-list.show {
-        display: block;
-    }
-    
-    .chat-container {
-        max-height: 60vh;
-    }
-    
-    .mobile-menu-btn {
-        display: block;
-    }
-}
         .connection-status.connected {
             background: #00ff8855;
             color: #00ff88;
@@ -341,56 +345,29 @@
             });
 
             // Session handling remains the same
-            console.log("Checking for existing session...");
-const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-console.log("Session check result:", { currentSession, sessionError });
+            const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError) throw sessionError;
+            session = currentSession;
 
-if (sessionError) {
-    console.error("Session error:", sessionError);
-    throw sessionError;
-}
-
-session = currentSession;
-
-if (!session) {
-    console.log("No active session found, checking localStorage...");
-    const storageKey = 'sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token';
-    const sessionData = localStorage.getItem(storageKey) || localStorage.getItem('session');
-    console.log("LocalStorage session data:", sessionData);
-
-    if (sessionData) {
-        try {
-            const parsedSession = JSON.parse(sessionData);
-            console.log("Parsed session:", parsedSession);
-            
-            if (parsedSession?.access_token) {
-                console.log("Attempting to set session from localStorage...");
-                const { data: { session: recoveredSession }, error: recoveryError } = await supabaseClient.auth.setSession({
-                    access_token: parsedSession.access_token,
-                    refresh_token: parsedSession.refresh_token
-                });
-                
-                if (recoveryError) {
-                    console.error("Session recovery error:", recoveryError);
-                    throw recoveryError;
+            if (!session) {
+                const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                   localStorage.getItem('session');
+                if (sessionData) {
+                    try {
+                        const parsedSession = JSON.parse(sessionData);
+                        if (parsedSession && parsedSession.access_token) {
+                            await supabaseClient.auth.setSession({
+                                access_token: parsedSession.access_token,
+                                refresh_token: parsedSession.refresh_token
+                            });
+                            const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
+                            session = recoveredSession;
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse session data:", e);
+                    }
                 }
-                
-                console.log("Session recovered successfully:", recoveredSession);
-                session = recoveredSession;
             }
-        } catch (e) {
-            console.error("Failed to parse session data:", e);
-            localStorage.removeItem(storageKey);
-            localStorage.removeItem('session');
-        }
-    }
-}
-
-if (!session) {
-    console.log("No valid session found, redirecting to login...");
-    window.location.href = 'login.html';
-    return;
-}
 
             if (!session) {
                 window.location.href = 'login.html';
@@ -764,97 +741,38 @@ if (!session) {
             btn.textContent = 'Send';
         }
 
-        function setupEventListeners() {
-    // Mobile menu toggle
-    document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-        document.querySelector('.user-list').classList.toggle('show');
-    });
+        function setupEventListeners()
+// Mobile menu toggle
+document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+    document.querySelector('.user-list').classList.toggle('show');
+});
 
-    // Close user list when selecting a user on mobile
-    document.querySelectorAll('.user-card').forEach(card => {
-        card.addEventListener('click', () => {
-            if (window.innerWidth <= 768) {
-                document.querySelector('.user-list').classList.remove('show');
-            }
-        });
-    });
-
-    // Swipe gestures
-    let touchStartX = 0;
-    let touchEndX = 0;
-    document.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, false);
-    document.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
+// Auto-hide user list when selecting on mobile
+document.querySelectorAll('.user-card').forEach(card => {
+    card.addEventListener('click', () => {
         if (window.innerWidth <= 768) {
-            if (touchEndX < touchStartX - 50) {
-                document.querySelector('.user-list').classList.remove('show');
-            }
-            if (touchEndX > touchStartX + 50) {
-                document.querySelector('.user-list').classList.add('show');
-            }
+            document.querySelector('.user-list').classList.remove('show');
         }
-    }, false);
+    });
+});
 
-    // Message sending
-    document.querySelector('.send-button').addEventListener('click', async () => {
-        const input = document.querySelector('.message-input');
-        const content = input.value.trim();
-        if (!selectedUser) {
-            alert('Please select a user first');
-            return;
-        }
-        if (!content) {
-            alert('Message cannot be empty');
-            return;
-        }
-        await sendMessage(selectedUser.id, content);
-        input.value = '';
-        input.focus();
-    });
+// Swipe gestures
+let touchStartX = 0;
+document.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+}, { passive: true });
 
-    document.querySelector('.message-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            document.querySelector('.send-button').click();
+document.addEventListener('touchend', (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    if (window.innerWidth <= 768) {
+        if (touchEndX < touchStartX - 50) { // Swipe left to hide
+            document.querySelector('.user-list').classList.remove('show');
+        } else if (touchEndX > touchStartX + 50) { // Swipe right to show
+            document.querySelector('.user-list').classList.add('show');
         }
-    });
-
-    let isTyping = false;
-    let lastTypingTime = 0;
-    
-    document.querySelector('.message-input').addEventListener('input', () => {
-        if (!selectedUser) return;
-        
-        const now = Date.now();
-        if (!isTyping) {
-            isTyping = true;
-            presenceChannel.send({
-                type: 'broadcast',
-                event: 'typing',
-                payload: { userId: currentUserId, partnerId: selectedUser.id }
-            });
-        }
-        
-        lastTypingTime = now;
-        
-        setTimeout(() => {
-            if (now - lastTypingTime > 1000 && isTyping) {
-                isTyping = false;
-            }
-        }, 1000);
-    });
-
-    window.addEventListener('online', () => {
-        updateConnectionStatus("Reconnecting...");
-        initializeRealtime();
-    });
-    
-    window.addEventListener('offline', () => {
-        updateConnectionStatus("Offline - No connection", true);
-    });
-}
+    }
+}, { passive: true }); {
+            document.querySelector('.send-button').addEventListener('click', async () => {
                 const input = document.querySelector('.message-input');
                 const content = input.value.trim();
                 if (!selectedUser) {
