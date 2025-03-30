@@ -5,19 +5,332 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logistics Secure Messaging</title>
     <style>
-        /* [Your existing CSS remains exactly the same] */
+        /* Your beautiful UI styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .session-check {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            background-color: #ffffff;
+        }
+        
+        .messaging-container {
+            display: none;
+            height: 100vh;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-list {
+            width: 300px;
+            border-right: 1px solid #e0e0e0;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #fefefe;
+        }
+        
+        .chat-input {
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+            background-color: #f5f5f5;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+        
+        .sent {
+            background-color: #dcf8c6;
+            margin-left: auto;
+        }
+        
+        .received {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            margin-right: auto;
+        }
+        
+        .message-time {
+            font-size: 0.8em;
+            color: #666;
+            display: block;
+            text-align: right;
+            margin-top: 5px;
+        }
+        
+        .message-status {
+            margin-left: 5px;
+            color: #666;
+        }
+        
+        .user-card {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .user-card:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .user-card.active {
+            background-color: #e0e0e0;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 12px;
+            object-fit: cover;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-info h4 {
+            margin: 0 0 4px 0;
+            font-size: 1em;
+        }
+        
+        .status-text {
+            margin: 0;
+            font-size: 0.8em;
+            color: #666;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+        
+        .online {
+            background-color: #00ff88;
+        }
+        
+        .offline {
+            background-color: #ccc;
+        }
+        
+        .unread-badge {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            background-color: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+        
+        .search-bar {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+        
+        .message-input {
+            width: calc(100% - 100px);
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            resize: none;
+            height: 40px;
+        }
+        
+        .send-button {
+            width: 80px;
+            padding: 10px;
+            margin-left: 10px;
+            background-color: #00ff88;
+            border: none;
+            border-radius: 20px;
+            color: #333;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .send-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .connection-status {
+            font-size: 0.8em;
+            color: #666;
+            padding: 5px 10px;
+            border-radius: 10px;
+            background-color: #f0f0f0;
+        }
+        
+        .connected {
+            background-color: #dcf8c6;
+        }
+        
+        .typing-indicator {
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.8em;
+            color: #666;
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin-left: 10px;
+        }
+        
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #00ff88;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-state {
+            padding: 20px;
+            text-align: center;
+            color: #ff4444;
+        }
+        
+        .error-state button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background-color: #00ff88;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .empty-conversation {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <!-- [Your existing HTML structure remains exactly the same] -->
+    <!-- Session Check Container (shown initially) -->
+    <div class="session-check">
+        <div class="loading-spinner"></div>
+        <p>Checking session...</p>
+    </div>
+
+    <!-- Main Messaging Container (hidden initially) -->
+    <div class="messaging-container">
+        <div class="user-list">
+            <!-- User list will be populated dynamically -->
+        </div>
+        
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2>Select a conversation</h2>
+                <div class="connection-status">Connecting...</div>
+            </div>
+            
+            <div class="chat-messages">
+                <!-- Messages will appear here -->
+            </div>
+            
+            <div class="chat-input">
+                <textarea class="message-input" placeholder="Type your message here..." disabled></textarea>
+                <button class="send-button" disabled>Send</button>
+                <div class="typing-indicator" id="typingIndicator">
+                    <span id="partnerName"></span> is typing...
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Configuration
-        const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-        
-        // Enhanced State Management
+        // Enhanced Configuration
+        const config = {
+            SUPABASE_URL: "https://twsqvdxhsfvdibhpfvqr.supabase.co",
+            SUPABASE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4",
+            HEARTBEAT_INTERVAL: 20000, // 20 seconds
+            TYPING_TIMEOUT: 1000, // 1 second
+            RECONNECT_DELAY: 5000 // 5 seconds
+        };
+
+        // Robust State Management
         const appState = {
             supabaseClient: null,
             presenceChannel: null,
@@ -32,12 +345,71 @@
             tabId: `tab-${Math.random().toString(36).substring(2, 10)}`,
             lastHeartbeat: 0,
             onlineUsers: new Set(),
-            userStatusCache: {}
+            userStatusCache: {},
+            retryCount: 0,
+            maxRetries: 5
         };
 
-        // Main Initialization
+        // DOM Elements Cache
+        const elements = {
+            sessionCheck: document.querySelector('.session-check'),
+            messagingContainer: document.querySelector('.messaging-container'),
+            userList: document.querySelector('.user-list'),
+            chatMessages: document.querySelector('.chat-messages'),
+            messageInput: document.querySelector('.message-input'),
+            sendButton: document.querySelector('.send-button'),
+            chatHeader: document.querySelector('.chat-header h2'),
+            connectionStatus: document.querySelector('.connection-status'),
+            typingIndicator: document.getElementById('typingIndicator'),
+            partnerName: document.getElementById('partnerName')
+        };
+
+        // Utility Functions
+        const utils = {
+            safeQuerySelector: (selector) => {
+                const element = document.querySelector(selector);
+                if (!element) {
+                    console.error(`Element not found: ${selector}`);
+                    return null;
+                }
+                return element;
+            },
+            
+            formatLastOnline: (date) => {
+                if (!date) return 'Never online';
+                
+                const diff = (Date.now() - date.getTime()) / 60000; // minutes
+                
+                if (diff < 1) return 'Just now';
+                if (diff < 60) return `${Math.floor(diff)}m ago`;
+                if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
+                return `${Math.floor(diff/1440)}d ago`;
+            },
+            
+            getStatusText: (status) => {
+                switch (status) {
+                    case 'delivered': return '✓✓';
+                    case 'read': return '✓✓✓';
+                    default: return '✓';
+                }
+            },
+            
+            debounce: (func, delay) => {
+                let timeoutId;
+                return function(...args) {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => func.apply(this, args), delay);
+                };
+            }
+        };
+
+        // Initialization
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                if (!elements.sessionCheck || !elements.messagingContainer) {
+                    throw new Error('Critical UI elements missing. Please refresh the page.');
+                }
+                
                 await initializeApplication();
             } catch (error) {
                 handleCriticalError(error);
@@ -45,62 +417,88 @@
         });
 
         async function initializeApplication() {
-            showSessionCheck();
-            await initializeSupabase();
-            await verifySession();
-            initializeUI();
-            await loadInitialData();
-            setupEventListeners();
-            await initializeRealtime();
-            startStatusMonitor();
+            try {
+                showSessionCheck();
+                await initializeSupabase();
+                await verifySession();
+                initializeUI();
+                await loadInitialData();
+                setupEventListeners();
+                await initializeRealtime();
+                startStatusMonitor();
+            } catch (error) {
+                handleCriticalError(error);
+            }
         }
 
         // Supabase Initialization
         async function initializeSupabase() {
-            appState.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: false,
-                    storage: {
-                        getItem: (key) => localStorage.getItem(key) || 
-                                localStorage.getItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`),
-                        setItem: (key, value) => localStorage.setItem(key, value),
-                        removeItem: (key) => localStorage.removeItem(key)
+            try {
+                appState.supabaseClient = supabase.createClient(config.SUPABASE_URL, config.SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: false,
+                        storage: {
+                            getItem: (key) => {
+                                const value = localStorage.getItem(key) || 
+                                    localStorage.getItem(`sb-${config.SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
+                                return value;
+                            },
+                            setItem: (key, value) => localStorage.setItem(key, value),
+                            removeItem: (key) => localStorage.removeItem(key)
+                        }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Supabase initialization error:', error);
+                throw new Error('Failed to initialize connection to server');
+            }
         }
 
         // Session Management
         async function verifySession() {
-            const { data: { session }, error } = await appState.supabaseClient.auth.getSession();
-            if (error || !session) {
-                const storedSession = localStorage.getItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
-                if (storedSession) {
-                    try {
-                        const parsed = JSON.parse(storedSession);
-                        await appState.supabaseClient.auth.setSession({
-                            access_token: parsed.access_token,
-                            refresh_token: parsed.refresh_token
-                        });
-                        const { data: { session: newSession } } = await appState.supabaseClient.auth.getSession();
-                        if (!newSession) throw new Error("Session recovery failed");
-                        appState.session = newSession;
-                    } catch (e) {
-                        console.error("Session recovery error:", e);
+            try {
+                const { data: { session }, error } = await appState.supabaseClient.auth.getSession();
+                
+                if (error || !session) {
+                    const storedSession = localStorage.getItem(`sb-${config.SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`);
+                    
+                    if (storedSession) {
+                        try {
+                            const parsed = JSON.parse(storedSession);
+                            await appState.supabaseClient.auth.setSession({
+                                access_token: parsed.access_token,
+                                refresh_token: parsed.refresh_token
+                            });
+                            
+                            const { data: { session: newSession } } = await appState.supabaseClient.auth.getSession();
+                            if (!newSession) throw new Error("Session recovery failed");
+                            
+                            appState.session = newSession;
+                        } catch (e) {
+                            console.error("Session recovery error:", e);
+                            redirectToLogin();
+                            return;
+                        }
+                    } else {
                         redirectToLogin();
+                        return;
                     }
                 } else {
-                    redirectToLogin();
+                    appState.session = session;
                 }
-            } else {
-                appState.session = session;
-            }
 
-            const { data: { user } } = await appState.supabaseClient.auth.getUser();
-            if (!user) throw new Error("User verification failed");
-            appState.currentUserId = user.id;
+                const { data: { user } } = await appState.supabaseClient.auth.getUser();
+                if (!user) {
+                    throw new Error("User verification failed");
+                }
+                
+                appState.currentUserId = user.id;
+            } catch (error) {
+                console.error('Session verification error:', error);
+                throw error;
+            }
         }
 
         function redirectToLogin() {
@@ -109,19 +507,31 @@
 
         // UI Management
         function initializeUI() {
-            document.querySelector('.session-check').style.display = 'none';
-            document.querySelector('.messaging-container').style.display = 'flex';
-            document.querySelector('.message-input').disabled = false;
-            document.querySelector('.send-button').disabled = false;
+            if (!elements.sessionCheck || !elements.messagingContainer) {
+                throw new Error('Critical UI elements missing');
+            }
+            
+            elements.sessionCheck.style.display = 'none';
+            elements.messagingContainer.style.display = 'flex';
+            
+            if (elements.messageInput) elements.messageInput.disabled = false;
+            if (elements.sendButton) elements.sendButton.disabled = false;
         }
 
         function showSessionCheck() {
-            document.querySelector('.session-check').style.display = 'flex';
+            if (elements.sessionCheck) {
+                elements.sessionCheck.style.display = 'flex';
+            }
         }
 
         // Data Loading
         async function loadInitialData() {
-            await Promise.all([loadUsers(), updateLastOnline()]);
+            try {
+                await Promise.all([loadUsers(), updateLastOnline()]);
+            } catch (error) {
+                console.error('Initial data load error:', error);
+                throw error;
+            }
         }
 
         async function loadUsers() {
@@ -140,26 +550,28 @@
             } catch (error) {
                 showError('user-list', 'Failed to load users. Please refresh.');
                 console.error('User load error:', error);
+                throw error;
             }
         }
 
         function renderUserList(users) {
-            const userList = document.querySelector('.user-list');
-            userList.innerHTML = `
+            if (!elements.userList) return;
+            
+            elements.userList.innerHTML = `
                 <div class="search-bar">
                     <input type="text" class="search-input" placeholder="Search team members...">
                 </div>
             `;
 
-            if (!users.length) {
-                userList.innerHTML += `<p class="empty-state">No other users found</p>`;
+            if (!users || !users.length) {
+                elements.userList.innerHTML += `<p class="empty-state">No other users found</p>`;
                 return;
             }
 
             users.forEach(user => {
                 const isOnline = appState.onlineUsers.has(user.id);
                 const lastSeen = user.lastonline ? new Date(user.lastonline) : null;
-                const statusText = isOnline ? 'Online' : formatLastOnline(lastSeen);
+                const statusText = isOnline ? 'Online' : utils.formatLastOnline(lastSeen);
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
@@ -175,13 +587,15 @@
                       `<div class="unread-badge">${appState.unreadMessages[user.id]}</div>` : ''}
                     <div class="status-indicator ${isOnline ? 'online' : 'offline'}"></div>
                 `;
+                
                 userCard.addEventListener('click', () => selectUser(user));
-                userList.appendChild(userCard);
+                elements.userList.appendChild(userCard);
                 
                 // Cache the status element for quick updates
                 appState.userStatusCache[user.id] = {
                     element: userCard.querySelector('.status-text'),
-                    indicator: userCard.querySelector('.status-indicator')
+                    indicator: userCard.querySelector('.status-indicator'),
+                    nameElement: userCard.querySelector('h4')
                 };
             });
 
@@ -194,9 +608,13 @@
             updateConnectionStatus("Connecting...");
             
             try {
-                // Clean up existing channels
-                if (appState.presenceChannel) appState.supabaseClient.removeChannel(appState.presenceChannel);
-                if (appState.messagesChannel) appState.supabaseClient.removeChannel(appState.messagesChannel);
+                // Clean up existing channels if they exist
+                if (appState.presenceChannel) {
+                    appState.supabaseClient.removeChannel(appState.presenceChannel);
+                }
+                if (appState.messagesChannel) {
+                    appState.supabaseClient.removeChannel(appState.messagesChannel);
+                }
 
                 // Enhanced Presence Channel
                 appState.presenceChannel = appState.supabaseClient.channel('presence-channel', {
@@ -245,20 +663,38 @@
                             tab_id: appState.tabId
                         });
                         updateConnectionStatus("Connected");
+                        appState.retryCount = 0; // Reset retry counter on successful connection
                     }
                 });
 
                 // Error handling
                 appState.presenceChannel
-                    .on('CLOSE', () => setTimeout(initializeRealtime, 3000))
+                    .on('CLOSE', () => {
+                        if (appState.retryCount < appState.maxRetries) {
+                            appState.retryCount++;
+                            setTimeout(initializeRealtime, config.RECONNECT_DELAY);
+                        } else {
+                            updateConnectionStatus("Disconnected - Please refresh", true);
+                        }
+                    })
                     .on('ERROR', (err) => {
                         console.error("Presence error:", err);
-                        setTimeout(initializeRealtime, 5000);
+                        if (appState.retryCount < appState.maxRetries) {
+                            appState.retryCount++;
+                            setTimeout(initializeRealtime, config.RECONNECT_DELAY);
+                        } else {
+                            updateConnectionStatus("Connection error - Please refresh", true);
+                        }
                     });
 
             } catch (error) {
                 console.error("Realtime init error:", error);
-                setTimeout(initializeRealtime, 5000);
+                if (appState.retryCount < appState.maxRetries) {
+                    appState.retryCount++;
+                    setTimeout(initializeRealtime, config.RECONNECT_DELAY);
+                } else {
+                    updateConnectionStatus("Connection failed - Please refresh", true);
+                }
             }
         }
 
@@ -271,16 +707,26 @@
                 const isOnline = currentUsers.has(userId);
                 const cache = appState.userStatusCache[userId];
                 
-                if (cache) {
+                if (cache && cache.element && cache.indicator) {
                     // Update status text to always show last online time
-                    const userData = appState.supabaseClient.from('users').select('lastonline').eq('id', userId).single();
-                    userData.then(({ data }) => {
-                        if (data) {
-                            const lastOnline = data.lastonline ? new Date(data.lastonline) : null;
-                            cache.element.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                            cache.indicator.className = `status-indicator ${isOnline ? 'online' : 'offline'}`;
-                        }
-                    });
+                    appState.supabaseClient.from('users')
+                        .select('lastonline')
+                        .eq('id', userId)
+                        .single()
+                        .then(({ data }) => {
+                            if (data) {
+                                const lastOnline = data.lastonline ? new Date(data.lastonline) : null;
+                                cache.element.textContent = isOnline ? 'Online' : utils.formatLastOnline(lastOnline);
+                                cache.indicator.className = `status-indicator ${isOnline ? 'online' : 'offline'}`;
+                                
+                                // Update parent card class
+                                const userCard = cache.element.closest('.user-card');
+                                if (userCard) {
+                                    userCard.classList.toggle('online', isOnline);
+                                }
+                            }
+                        })
+                        .catch(err => console.error('Status update error:', err));
                 }
             });
             
@@ -288,16 +734,20 @@
         }
 
         function handleMessageChange(payload) {
-            const message = payload.new;
-            
-            // If message belongs to current chat
-            if (appState.selectedUser && 
-                [message.sender_id, message.receiver_id].includes(appState.selectedUser.id)) {
-                processCurrentChatMessage(message);
-            } 
-            // Otherwise handle as notification
-            else if (message.receiver_id === appState.currentUserId) {
-                processNewMessageNotification(message);
+            try {
+                const message = payload.new;
+                
+                // If message belongs to current chat
+                if (appState.selectedUser && 
+                    [message.sender_id, message.receiver_id].includes(appState.selectedUser.id)) {
+                    processCurrentChatMessage(message);
+                } 
+                // Otherwise handle as notification
+                else if (message.receiver_id === appState.currentUserId) {
+                    processNewMessageNotification(message);
+                }
+            } catch (error) {
+                console.error('Message change handling error:', error);
             }
         }
 
@@ -323,36 +773,47 @@
             
             // Optional: Show desktop notification
             if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
-                const senderName = appState.userStatusCache[message.sender_id]?.element?.parentElement?.querySelector('h4')?.textContent || 'Someone';
-                new Notification(`New message from ${senderName}`, {
-                    body: message.content.length > 50 ? 
-                          `${message.content.substring(0, 50)}...` : message.content
-                });
+                const senderName = appState.userStatusCache[message.sender_id]?.nameElement?.textContent || 'Someone';
+                try {
+                    new Notification(`New message from ${senderName}`, {
+                        body: message.content.length > 50 ? 
+                              `${message.content.substring(0, 50)}...` : message.content
+                    });
+                } catch (error) {
+                    console.error('Notification error:', error);
+                }
             }
         }
 
         // Message Management
         async function selectUser(user) {
-            // Clear previous selection
-            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
-            
-            // Set new selection
-            const userCard = document.querySelector(`[data-user-id="${user.id}"]`);
-            if (userCard) userCard.classList.add('active');
-            
-            // Clear unread count
-            if (appState.unreadMessages[user.id]) {
-                delete appState.unreadMessages[user.id];
-                const badge = userCard.querySelector('.unread-badge');
-                if (badge) badge.remove();
+            try {
+                // Clear previous selection
+                document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
+                
+                // Set new selection
+                const userCard = document.querySelector(`[data-user-id="${user.id}"]`);
+                if (userCard) userCard.classList.add('active');
+                
+                // Clear unread count
+                if (appState.unreadMessages[user.id]) {
+                    delete appState.unreadMessages[user.id];
+                    const badge = userCard.querySelector('.unread-badge');
+                    if (badge) badge.remove();
+                }
+                
+                // Update UI
+                appState.selectedUser = { id: user.id, name: user.name };
+                if (elements.chatHeader) {
+                    elements.chatHeader.textContent = user.name;
+                }
+                
+                // Load messages
+                await loadMessages(user.id);
+            } catch (error) {
+                console.error('User selection error:', error);
+                showError('chat-messages', 'Failed to load conversation. Please try again.');
             }
-            
-            // Update UI
-            appState.selectedUser = { id: user.id, name: user.name };
-            document.querySelector('.chat-header h2').textContent = user.name;
-            
-            // Load messages
-            await loadMessages(user.id);
         }
 
         async function loadMessages(userId) {
@@ -385,11 +846,12 @@
         }
 
         function renderMessages(messages) {
-            const container = document.querySelector('.chat-messages');
-            container.innerHTML = '';
+            if (!elements.chatMessages) return;
             
-            if (!messages.length) {
-                container.innerHTML = '<div class="empty-conversation">Start a new conversation!</div>';
+            elements.chatMessages.innerHTML = '';
+            
+            if (!messages || !messages.length) {
+                elements.chatMessages.innerHTML = '<div class="empty-conversation">Start a new conversation!</div>';
                 return;
             }
             
@@ -403,7 +865,7 @@
                 );
             });
             
-            container.scrollTop = container.scrollHeight;
+            elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
         }
 
         async function sendMessage(receiverId, content) {
@@ -438,15 +900,17 @@
                 await updateLastOnline();
                 
                 // Notify other user
-                await appState.presenceChannel.send({
-                    type: 'broadcast',
-                    event: 'message-sent',
-                    payload: {
-                        senderId: appState.currentUserId,
-                        receiverId: receiverId,
-                        messageId: message.id
-                    }
-                });
+                if (appState.presenceChannel) {
+                    await appState.presenceChannel.send({
+                        type: 'broadcast',
+                        event: 'message-sent',
+                        payload: {
+                            senderId: appState.currentUserId,
+                            receiverId: receiverId,
+                            messageId: message.id
+                        }
+                    });
+                }
                 
             } catch (error) {
                 showError('chat-messages', 'Failed to send message. Please try again.');
@@ -457,11 +921,11 @@
         }
 
         function addMessageToChat(content, isSent, timestamp, messageId, status) {
-            const container = document.querySelector('.chat-messages');
+            if (!elements.chatMessages) return;
             
             // Clear loading state if present
-            if (container.querySelector('.loading-state')) {
-                container.innerHTML = '';
+            if (elements.chatMessages.querySelector('.loading-state')) {
+                elements.chatMessages.innerHTML = '';
             }
             
             const messageDiv = document.createElement('div');
@@ -473,13 +937,35 @@
                     <p>${content}</p>
                     <span class="message-time">
                         ${new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        ${isSent ? `<span class="message-status">${getStatusText(status)}</span>` : ''}
+                        ${isSent ? `<span class="message-status">${utils.getStatusText(status)}</span>` : ''}
                     </span>
                 </div>
             `;
             
-            container.appendChild(messageDiv);
-            container.scrollTop = container.scrollHeight;
+            elements.chatMessages.appendChild(messageDiv);
+            elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+        }
+
+        async function markMessageAsRead(messageId) {
+            try {
+                await appState.supabaseClient
+                    .from('messages')
+                    .update({ status: 'read' })
+                    .eq('id', messageId);
+            } catch (error) {
+                console.error('Mark as read error:', error);
+            }
+        }
+
+        async function markMessagesAsRead(messageIds) {
+            try {
+                await appState.supabaseClient
+                    .from('messages')
+                    .update({ status: 'read' })
+                    .in('id', messageIds);
+            } catch (error) {
+                console.error('Mark multiple as read error:', error);
+            }
         }
 
         // Status Management
@@ -502,7 +988,7 @@
                 if (document.visibilityState === 'visible') {
                     updateLastOnline();
                 }
-            }, 20000);
+            }, config.HEARTBEAT_INTERVAL);
             
             // Initial update
             updateLastOnline();
@@ -510,7 +996,9 @@
 
         // UI Helpers
         function showLoadingState() {
-            document.querySelector('.user-list').innerHTML = `
+            if (!elements.userList) return;
+            
+            elements.userList.innerHTML = `
                 <div class="search-bar">
                     <input type="text" class="search-input" placeholder="Search team members...">
                 </div>
@@ -522,7 +1010,9 @@
         }
 
         function showMessagesLoading() {
-            document.querySelector('.chat-messages').innerHTML = `
+            if (!elements.chatMessages) return;
+            
+            elements.chatMessages.innerHTML = `
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
                     <p>Loading messages...</p>
@@ -543,26 +1033,23 @@
         }
 
         function showSendLoading() {
-            const btn = document.querySelector('.send-button');
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = 'Sending...';
+            if (elements.sendButton) {
+                elements.sendButton.disabled = true;
+                elements.sendButton.textContent = 'Sending...';
             }
         }
 
         function hideSendLoading() {
-            const btn = document.querySelector('.send-button');
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Send';
+            if (elements.sendButton) {
+                elements.sendButton.disabled = false;
+                elements.sendButton.textContent = 'Send';
             }
         }
 
         function updateConnectionStatus(message, isError = false) {
-            const element = document.querySelector('.connection-status');
-            if (element) {
-                element.textContent = message;
-                element.classList.toggle('connected', !isError);
+            if (elements.connectionStatus) {
+                elements.connectionStatus.textContent = message;
+                elements.connectionStatus.classList.toggle('connected', !isError);
             }
         }
 
@@ -574,17 +1061,16 @@
         }
 
         function showTypingIndicator(userId) {
-            const partnerElement = document.querySelector(`[data-user-id="${userId}"] h4`);
-            if (partnerElement) {
-                const indicator = document.getElementById('typingIndicator');
-                const nameElement = document.getElementById('partnerName');
-                
-                nameElement.textContent = partnerElement.textContent;
-                indicator.style.opacity = '1';
+            if (!elements.typingIndicator || !elements.partnerName) return;
+            
+            const cache = appState.userStatusCache[userId];
+            if (cache && cache.nameElement) {
+                elements.partnerName.textContent = cache.nameElement.textContent;
+                elements.typingIndicator.style.opacity = '1';
                 
                 clearTimeout(appState.typingTimeout);
                 appState.typingTimeout = setTimeout(() => {
-                    indicator.style.opacity = '0';
+                    elements.typingIndicator.style.opacity = '0';
                 }, 2000);
             }
         }
@@ -604,51 +1090,59 @@
             }
         }
 
-        // Utility Functions
-        function formatLastOnline(date) {
-            if (!date) return 'Never online';
-            
-            const diff = (Date.now() - date.getTime()) / 60000; // minutes
-            
-            if (diff < 1) return 'Just now';
-            if (diff < 60) return `${Math.floor(diff)}m ago`;
-            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
-            return `${Math.floor(diff/1440)}d ago`;
-        }
-
-        function getStatusText(status) {
-            switch (status) {
-                case 'delivered': return '✓✓';
-                case 'read': return '✓✓✓';
-                default: return '✓';
-            }
-        }
-
         function setupSearch() {
             const searchInput = document.querySelector('.search-input');
             if (searchInput) {
-                searchInput.addEventListener('input', (e) => {
+                searchInput.addEventListener('input', utils.debounce((e) => {
                     const term = e.target.value.toLowerCase();
                     document.querySelectorAll('.user-card').forEach(card => {
-                        const name = card.querySelector('h4').textContent.toLowerCase();
-                        card.style.display = name.includes(term) ? 'flex' : 'none';
+                        const nameElement = card.querySelector('h4');
+                        if (nameElement) {
+                            const name = nameElement.textContent.toLowerCase();
+                            card.style.display = name.includes(term) ? 'flex' : 'none';
+                        }
                     });
-                });
+                }, 300));
             }
         }
 
         function handleCriticalError(error) {
             console.error("Critical error:", error);
-            document.querySelector('.session-check').innerHTML = `
+            
+            // Fallback error display if session-check element doesn't exist
+            if (!elements.sessionCheck) {
+                document.body.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; background: white; padding: 20px;">
+                        <h2 style="color: #ff4444;">Application Error</h2>
+                        <p style="color: #333; margin: 20px 0; max-width: 500px; text-align: center;">
+                            ${error.message || 'An unexpected error occurred'}
+                        </p>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="window.location.reload()" 
+                                    style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+                                Refresh
+                            </button>
+                            <button onclick="window.location.href='login.html'" 
+                                    style="padding: 10px 20px; background: #444; border: none; border-radius: 5px; font-weight: bold; color: white; cursor: pointer;">
+                                Go to Login
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Normal error display
+            elements.sessionCheck.innerHTML = `
                 <h2>Application Error</h2>
-                <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
+                <p style="color: #ff4444; margin: 20px 0;">${error.message || 'An unexpected error occurred'}</p>
                 <div style="display: flex; gap: 10px;">
                     <button onclick="window.location.reload()" 
-                            style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                            style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold; cursor: pointer                             style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
                         Refresh
                     </button>
                     <button onclick="window.location.href='login.html'" 
-                            style="padding: 10px 20px; background: #444; border: none; border-radius: 5px; font-weight: bold; color: white;">
+                            style="padding: 10px 20px; background: #444; border: none; border-radius: 5px; font-weight: bold; color: white; cursor: pointer;">
                         Go to Login
                     </button>
                 </div>
@@ -658,20 +1152,17 @@
         // Event Listeners
         function setupEventListeners() {
             // Message sending
-            const sendButton = document.querySelector('.send-button');
-            const messageInput = document.querySelector('.message-input');
-            
-            if (sendButton && messageInput) {
-                sendButton.addEventListener('click', handleSendMessage);
-                messageInput.addEventListener('keypress', (e) => {
+            if (elements.sendButton && elements.messageInput) {
+                elements.sendButton.addEventListener('click', handleSendMessage);
+                elements.messageInput.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleSendMessage();
                     }
                 });
                 
-                // Typing indicator
-                messageInput.addEventListener('input', handleTyping);
+                // Typing indicator with debounce
+                elements.messageInput.addEventListener('input', utils.debounce(handleTyping, 300));
             }
 
             // Network status
@@ -683,17 +1174,27 @@
             
             // Before unload
             window.addEventListener('beforeunload', cleanupBeforeUnload);
+
+            // Add click listener for attachment button if exists
+            const attachButton = document.querySelector('.attach-button');
+            if (attachButton) {
+                attachButton.addEventListener('click', handleAttachment);
+            }
         }
 
         async function handleSendMessage() {
-            const input = document.querySelector('.message-input');
-            const content = input.value.trim();
-            
-            if (!appState.selectedUser || !content) return;
-            
-            await sendMessage(appState.selectedUser.id, content);
-            input.value = '';
-            input.focus();
+            try {
+                if (!appState.selectedUser || !elements.messageInput) return;
+                
+                const content = elements.messageInput.value.trim();
+                if (!content) return;
+                
+                await sendMessage(appState.selectedUser.id, content);
+                elements.messageInput.value = '';
+                elements.messageInput.focus();
+            } catch (error) {
+                console.error('Send message handler error:', error);
+            }
         }
 
         function handleTyping() {
@@ -716,7 +1217,7 @@
             
             // Stop typing after 1 second of inactivity
             setTimeout(() => {
-                if (Date.now() - appState.lastTypingTime > 1000 && appState.isTyping) {
+                if (Date.now() - appState.lastTypingTime > config.TYPING_TIMEOUT && appState.isTyping) {
                     appState.isTyping = false;
                     appState.presenceChannel.send({
                         type: 'broadcast',
@@ -724,7 +1225,7 @@
                         payload: { userId: appState.currentUserId }
                     });
                 }
-            }, 1000);
+            }, config.TYPING_TIMEOUT);
         }
 
         function handleNetworkOnline() {
@@ -744,18 +1245,223 @@
         }
 
         function cleanupBeforeUnload() {
-            if (appState.presenceChannel) {
-                appState.supabaseClient.removeChannel(appState.presenceChannel);
+            try {
+                if (appState.presenceChannel) {
+                    appState.supabaseClient.removeChannel(appState.presenceChannel);
+                }
+                if (appState.messagesChannel) {
+                    appState.supabaseClient.removeChannel(appState.messagesChannel);
+                }
+            } catch (error) {
+                console.error('Cleanup error:', error);
             }
-            if (appState.messagesChannel) {
-                appState.supabaseClient.removeChannel(appState.messagesChannel);
+        }
+
+        async function handleAttachment() {
+            try {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*, .pdf, .doc, .docx, .xls, .xlsx';
+                
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                        showError('chat-messages', 'File size exceeds 5MB limit');
+                        return;
+                    }
+                    
+                    showSendLoading();
+                    
+                    try {
+                        // Upload file to Supabase storage
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = `${appState.currentUserId}-${Date.now()}.${fileExt}`;
+                        const filePath = `attachments/${fileName}`;
+                        
+                        const { data, error: uploadError } = await appState.supabaseClient
+                            .storage
+                            .from('message-attachments')
+                            .upload(filePath, file);
+                        
+                        if (uploadError) throw uploadError;
+                        
+                        // Get public URL
+                        const { data: { publicUrl } } = appState.supabaseClient
+                            .storage
+                            .from('message-attachments')
+                            .getPublicUrl(filePath);
+                        
+                        // Send message with attachment
+                        const content = `[Attachment] ${file.name}`;
+                        const attachmentData = {
+                            url: publicUrl,
+                            name: file.name,
+                            type: file.type,
+                            size: file.size
+                        };
+                        
+                        const { data: message, error: messageError } = await appState.supabaseClient
+                            .from('messages')
+                            .insert([{
+                                sender_id: appState.currentUserId,
+                                receiver_id: appState.selectedUser.id,
+                                content: content,
+                                status: 'sent',
+                                attachment: attachmentData
+                            }])
+                            .select()
+                            .single();
+                        
+                        if (messageError) throw messageError;
+                        
+                        // Add to UI
+                        addMessageToChat(
+                            content,
+                            true,
+                            new Date().toISOString(),
+                            message.id,
+                            'sent',
+                            attachmentData
+                        );
+                        
+                    } catch (error) {
+                        console.error('Attachment error:', error);
+                        showError('chat-messages', 'Failed to send attachment. Please try again.');
+                    } finally {
+                        hideSendLoading();
+                    }
+                };
+                
+                input.click();
+            } catch (error) {
+                console.error('Attachment handler error:', error);
             }
+        }
+
+        // Enhanced Message Rendering with Attachments
+        function addMessageToChat(content, isSent, timestamp, messageId, status, attachment = null) {
+            if (!elements.chatMessages) return;
+            
+            // Clear loading state if present
+            if (elements.chatMessages.querySelector('.loading-state')) {
+                elements.chatMessages.innerHTML = '';
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            if (messageId) messageDiv.dataset.messageId = messageId;
+            
+            let attachmentHtml = '';
+            if (attachment) {
+                if (attachment.type.startsWith('image/')) {
+                    attachmentHtml = `
+                        <div class="attachment-preview">
+                            <img src="${attachment.url}" alt="${attachment.name}" class="attachment-image">
+                            <a href="${attachment.url}" target="_blank" class="attachment-link">View Full Image</a>
+                        </div>
+                    `;
+                } else {
+                    attachmentHtml = `
+                        <div class="attachment-preview">
+                            <div class="attachment-icon">
+                                <svg viewBox="0 0 24 24" width="24" height="24">
+                                    <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                                </svg>
+                            </div>
+                            <div class="attachment-info">
+                                <a href="${attachment.url}" target="_blank" class="attachment-link">${attachment.name}</a>
+                                <span class="attachment-size">${formatFileSize(attachment.size)}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${attachmentHtml}
+                    <p>${content}</p>
+                    <span class="message-time">
+                        ${new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${isSent ? `<span class="message-status">${utils.getStatusText(status)}</span>` : ''}
+                    </span>
+                </div>
+            `;
+            
+            elements.chatMessages.appendChild(messageDiv);
+            elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
         }
 
         // Request notification permission
         if ('Notification' in window && Notification.permission !== 'denied') {
-            Notification.requestPermission();
+            Notification.requestPermission().catch(err => {
+                console.error('Notification permission error:', err);
+            });
         }
+
+        // Add styles for attachments
+        const style = document.createElement('style');
+        style.textContent = `
+            .attachment-preview {
+                margin-bottom: 10px;
+                border-radius: 8px;
+                overflow: hidden;
+                background-color: #f0f0f0;
+                max-width: 300px;
+            }
+            
+            .attachment-image {
+                max-width: 100%;
+                max-height: 200px;
+                display: block;
+            }
+            
+            .attachment-icon {
+                padding: 15px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background-color: #e0e0e0;
+            }
+            
+            .attachment-icon svg {
+                width: 40px;
+                height: 40px;
+                color: #666;
+            }
+            
+            .attachment-info {
+                padding: 10px;
+            }
+            
+            .attachment-link {
+                color: #0066cc;
+                text-decoration: none;
+                word-break: break-all;
+            }
+            
+            .attachment-link:hover {
+                text-decoration: underline;
+            }
+            
+            .attachment-size {
+                display: block;
+                font-size: 0.8em;
+                color: #666;
+                margin-top: 5px;
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
