@@ -12,6 +12,234 @@
     }
 
     // Global state variables
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container-fluid {
+            height: 100%;
+            padding: 15px;
+        }
+
+        .row {
+            height: 100%;
+        }
+
+        .sidebar {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 0;
+        }
+
+        .chat-header {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .online-info {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .message-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .sent {
+            align-self: flex-end;
+            background-color: #0084ff;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .received {
+            align-self: flex-start;
+            background-color: #f1f0f0;
+            color: black;
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-content {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .message-time {
+            font-size: 12px;
+            opacity: 0.7;
+            text-align: right;
+        }
+
+        .message-input {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .message-input textarea {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 10px 15px;
+            resize: none;
+            outline: none;
+        }
+
+        .message-input button {
+            margin-left: 10px;
+            border: none;
+            background-color: #0084ff;
+            color: white;
+            border-radius: 20px;
+            padding: 0 20px;
+            cursor: pointer;
+        }
+
+        .users-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .users-container h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .user-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .user-item {
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .user-item.active {
+            background-color: #e6f2ff;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+
+        .online {
+            background-color: #4CAF50;
+        }
+
+        .offline {
+            background-color: #9e9e9e;
+        }
+
+        .unread-badge {
+            background-color: #ff3b30;
+            color: white;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Left sidebar with user list -->
+            <div class="col-md-3 sidebar">
+                <div class="users-container">
+                    <h3>Users</h3>
+                    <div class="user-list" id="user-list">
+                        <!-- Users will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat area -->
+            <div class="col-md-9 chat-container">
+                <div class="chat-header">
+                    <h3>Chatting with: <span id="selected-user-name">Select a user</span></h3>
+                    <div class="online-info">
+                        <span id="online-count">0</span> users online
+                    </div>
+                </div>
+
+                <div class="message-container" id="message-container">
+                    <!-- Messages will be populated here -->
+                </div>
+
+                <div class="message-input">
+                    <textarea id="message-text" placeholder="Type your message..."></textarea>
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
     let currentUser = null;
     let selectedUserId = null;
     let authToken = null;
@@ -20,12 +248,19 @@
 
     // Authentication and initialization
     function initializeChat() {
+        let allUsers = [];
+        let refreshInterval;
+
+        // On page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is logged in
         authToken = localStorage.getItem('authToken');
         if (!authToken) {
             window.location.href = '/login.html';
             return;
         }
 
+            // Load current user
         currentUser = JSON.parse(localStorage.getItem('currentUser'));
         setupEventListeners();
         loadUsers();
@@ -33,11 +268,13 @@
     }
 
     function setupEventListeners() {
+            // Setup event listeners
         document.getElementById('send-button').addEventListener('click', sendMessage);
         document.getElementById('message-text').addEventListener('keypress', handleMessageKeyPress);
             }
 
     function handleMessageKeyPress(e) {
+            document.getElementById('message-text').addEventListener('keypress', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
@@ -46,7 +283,14 @@
 
     function setupRefreshInterval() {
         setInterval(() => {
+            });
+
+            // Initial data load
             loadUsers();
+
+            // Set up refresh intervals
+            refreshInterval = setInterval(function() {
+                loadUsers();
         if (selectedUserId) {
             loadMessages(selectedUserId);
         }
@@ -54,12 +298,18 @@
     }
 
     // User and message management
+                checkUnreadMessages(); // Check for unread messages regularly
+            }, 3000); // Refresh every 3 seconds for more responsive updates
+        });
+
+        // Load users list
     async function loadUsers() {
         try {
             const response = await fetch('/api/users', {
                 headers: {
                     'Authorization': `Bearer ${authToken}`,
                     'X-Session-ID': sessionId
+                        'Authorization': `Bearer ${authToken}`
                 }
     });
 
@@ -215,6 +465,480 @@
 
     function handleUnauthorized(response) {
         if (response.status === 401) {
+                        // Handle unauthorized
+            localStorage.removeItem('authToken');
+            window.location.href = '/login.html';
+                        return;
+        }
+                    throw new Error('Failed to load users');
+    }
+
+    // Initialize the chat application
+    initializeChat();
+                const users = await response.json();
+                allUsers = users;
+
+                // Count online users
+                const onlineUsers = users.filter(user => user.status === 'online');
+                document.getElementById('online-count').textContent = onlineUsers.length;
+
+                // Render users list
+                renderUsersList(users);
+
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Render users list
+        function renderUsersList(users) {
+            const userListContainer = document.getElementById('user-list');
+            // Store the currently selected user ID
+            const currentSelectedId = selectedUserId;
+
+            // Clear and rebuild the list
+            userListContainer.innerHTML = '';
+
+            users.forEach(user => {
+                // Skip the current user
+                if (user.id === currentUser.id) return;
+
+                const userDiv = document.createElement('div');
+                userDiv.className = `user-item ${currentSelectedId === user.id ? 'active' : ''}`;
+                userDiv.setAttribute('data-user-id', user.id);
+                userDiv.onclick = () => selectUser(user.id, user.name || user.email.split('@')[0]);
+
+                // User info with status indicator
+                const userInfo = document.createElement('div');
+                userInfo.className = 'user-info';
+
+                const userName = document.createElement('span');
+                userName.className = 'user-name';
+                userName.textContent = user.name || user.email.split('@')[0];
+
+                const statusIndicator = document.createElement('span');
+                statusIndicator.className = `status-indicator ${user.status === 'online' ? 'online' : 'offline'}`;
+                statusIndicator.id = `status-${user.id}`;
+
+                userInfo.appendChild(userName);
+                userInfo.appendChild(statusIndicator);
+
+                // Unread badge
+                const unreadBadge = document.createElement('span');
+                unreadBadge.className = 'unread-badge';
+                unreadBadge.id = `unread-${user.id}`;
+
+                userDiv.appendChild(userInfo);
+                userDiv.appendChild(unreadBadge);
+                userListContainer.appendChild(userDiv);
+});
+[The provided code represents a complete HTML file with embedded JavaScript, so I'll replace the previous snippet with the entire file as requested.]
+
+[The entire contents of the requested file, exactly as provided in the previous message]
+        }
+
+        // Select a user to chat with
+        function selectUser(userId, userName) {
+            selectedUserId = userId;
+
+            // Update UI
+            document.querySelectorAll('.user-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            const selectedItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('active');
+
+                // Clear unread badge
+                const unreadBadge = document.getElementById(`unread-${userId}`);
+                if (unreadBadge) {
+                    unreadBadge.textContent = '';
+                    unreadBadge.style.display = 'none';
+                }
+            }
+
+            // Update chat header
+            document.getElementById('selected-user-name').textContent = userName || userId;
+
+            // Load messages
+            loadMessages(userId);
+        }
+
+        // Load messages for selected user
+        async function loadMessages(partnerId) {
+            if (!partnerId) return;
+
+            try {
+                const response = await fetch(`/api/messages/${partnerId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load messages');
+                }
+
+                const messages = await response.json();
+                renderMessages(messages);
+
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        // Render messages
+        function renderMessages(messages) {
+            const messageContainer = document.getElementById('message-container');
+            messageContainer.innerHTML = '';
+
+            messages.forEach(message => {
+                // Skip messages without content
+                if (!message.content && !message.payload) return;
+
+                const messageDiv = document.createElement('div');
+
+                // Check if sender is current user
+                const isSent = message.sender_id === currentUser.id;
+                messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = message.content ||
+                    (typeof message.payload === 'object' ? JSON.stringify(message.payload) : message.payload);
+
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+
+                // Format timestamp - handle different timestamp fields
+                const timestamp = message.created_at || message.inserted_at;
+                if (timestamp) {
+                    const date = new Date(timestamp);
+                    timeDiv.textContent = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                }
+
+                messageDiv.appendChild(contentDiv);
+                messageDiv.appendChild(timeDiv);
+                messageContainer.appendChild(messageDiv);
+            });
+
+            // Scroll to bottom
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+
+function formatMessageContent(content) {
+    // Detect and convert URLs to clickable links
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    content = content.replace(urlRegex, function(url) {
+        return `<a href="${url}" target="_blank">${url}</a>`;
+    });
+
+    // Basic emoji detection and replacement
+    commonEmojis.forEach(emoji => {
+        const emojiRegex = new RegExp(emoji, 'g');
+        content = content.replace(emojiRegex, `<span class="emoji">${emoji}</span>`);
+    });
+
+    return content;
+}
+        // Send message
+        async function sendMessage() {
+            const messageText = document.getElementById('message-text').value.trim();
+            if (!messageText || !selectedUserId) return;
+
+            try {
+                // Create message object with necessary fields
+                const messageData = {
+                    receiver_id: selectedUserId,
+                    content: messageText,
+                    topic: 'chat',     // Required by your schema
+                    extension: 'text'   // Required by your schema
+                };
+
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(messageData)
+                });
+
+                // Check response status
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Message send error:', errorData);
+                    // Don't show alert to avoid disrupting UX
+    const messageText = document.getElementById('message-text');
+    const message = messageText.value.trim();
+    if (!message || !selectedUserId) {
+        showToast('Please select a user and enter a message', 'error');
+                    return;
+                }
+
+                // Clear input
+                document.getElementById('message-text').value = '';
+
+                // Add message to UI immediately for better UX
+                const now = new Date().toISOString();
+                const localMessage = {
+                    sender_id: currentUser.id,
+                    receiver_id: selectedUserId,
+                    content: messageText,
+                    created_at: now
+                };
+
+                const messageContainer = document.getElementById('message-container');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message sent';
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = messageText;
+
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                const date = new Date();
+                timeDiv.textContent = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+
+                messageDiv.appendChild(contentDiv);
+                messageDiv.appendChild(
+                    <!-- Messages will be populated here -->
+                </div>
+
+                <div class="message-input">
+                    <textarea id="message-text" placeholder="Type your message..."></textarea>
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+    let currentUser = null;
+    let selectedUserId = null;
+    let authToken = null;
+    let sessionId = localStorage.getItem('chatSessionId') || generateSessionId();
+    localStorage.setItem('chatSessionId', sessionId);
+
+    // Authentication and initialization
+    function initializeChat() {
+        let allUsers = [];
+        let refreshInterval;
+
+        // On page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is logged in
+        authToken = localStorage.getItem('authToken');
+        if (!authToken) {
+            window.location.href = '/login.html';
+            return;
+        }
+
+        currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        setupEventListeners();
+        loadUsers();
+        setupRefreshInterval();
+    }
+
+    function setupEventListeners() {
+            // Setup event listeners
+        document.getElementById('send-button').addEventListener('click', sendMessage);
+        document.getElementById('message-text').addEventListener('keypress', handleMessageKeyPress);
+            }
+
+    function handleMessageKeyPress(e) {
+            document.getElementById('message-text').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+
+    function setupRefreshInterval() {
+        setInterval(() => {
+            });
+
+            // Initial data load
+            loadUsers();
+        if (selectedUserId) {
+            loadMessages(selectedUserId);
+        }
+        }, 10000);
+    }
+
+    // User and message management
+                checkUnreadMessages(); // Check for unread messages regularly
+            }, 3000); // Refresh every 3 seconds for more responsive updates
+        });
+
+        // Load users list
+    async function loadUsers() {
+        try {
+            const response = await fetch('/api/users', {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'X-Session-ID': sessionId
+                        'Authorization': `Bearer ${authToken}`
+                }
+    });
+
+            if (!response.ok) {
+                handleUnauthorized(response);
+                return;
+            }
+
+            const users = await response.json();
+            updateUserList(users);
+        } catch (error) {
+            console.error('Error loading users:', error);
+            }
+        }
+
+    function updateUserList(users) {
+        const userList = document.getElementById('user-list');
+        userList.innerHTML = '';
+
+        users.forEach(user => {
+            if (user.id === currentUser.id) return;
+
+            const userElement = createUserElement(user);
+            userList.appendChild(userElement);
+    });
+
+        updateOnlineCount(users);
+    }
+
+    function createUserElement(user) {
+        const userDiv = document.createElement('div');
+        userDiv.className = `user-item ${selectedUserId === user.id ? 'active' : ''}`;
+        userDiv.dataset.userId = user.id;
+        userDiv.onclick = () => selectUser(user.id, user.name);
+
+        const userInfo = document.createElement('div');
+        userInfo.className = 'user-info';
+        userInfo.innerHTML = `
+            <span class="user-name">${user.name || user.email.split('@')[0]}</span>
+            <span class="status-indicator ${user.status === 'online' ? 'online' : 'offline'}"></span>
+        `;
+
+        userDiv.appendChild(userInfo);
+        return userDiv;
+    }
+
+    function updateOnlineCount(users) {
+        const onlineUsers = users.filter(user => user.status === 'online');
+        document.getElementById('online-count').textContent = onlineUsers.length;
+    }
+
+    function selectUser(userId, userName) {
+        selectedUserId = normalizeUserId(userId);
+        updateSelectedUserUI(userName);
+        loadMessages(selectedUserId);
+    }
+
+    function updateSelectedUserUI(userName) {
+        document.querySelectorAll('.user-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        const selectedItem = document.querySelector(`.user-item[data-user-id="${selectedUserId}"]`);
+        if (selectedItem) {
+            selectedItem.classList.add('active');
+        }
+
+        document.getElementById('selected-user-name').textContent = userName || selectedUserId;
+    }
+
+    async function loadMessages(partnerId) {
+        try {
+            const response = await fetch(`/api/messages/${partnerId}`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'X-Session-ID': sessionId
+                }
+    });
+
+            if (!response.ok) {
+                throw new Error(`Failed to load messages: ${response.status}`);
+            }
+
+            const messages = await response.json();
+            renderMessages(messages);
+        } catch (error) {
+            console.error('Error loading messages:', error);
+        }
+    }
+
+    function renderMessages(messages) {
+        const messageContainer = document.getElementById('message-container');
+        messageContainer.innerHTML = '';
+
+        messages.forEach(message => {
+            const messageDiv = createMessageElement(message);
+            messageContainer.appendChild(messageDiv);
+        });
+
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+
+    function createMessageElement(message) {
+        const messageDiv = document.createElement('div');
+        const isSent = message.sender_id === currentUser.id;
+
+        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+        messageDiv.innerHTML = `
+            <div class="message-content">${message.content}</div>
+            <div class="message-time">${formatMessageTime(message.created_at)}</div>
+        `;
+
+        return messageDiv;
+    }
+
+    function formatMessageTime(timestamp) {
+        const date = new Date(timestamp);
+        return `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }
+
+    async function sendMessage() {
+        const messageText = document.getElementById('message-text').value.trim();
+        if (!messageText || !selectedUserId) return;
+
+        try {
+            const messageData = {
+                sender_id: currentUser.id,
+                receiver_id: selectedUserId,
+                content: messageText,
+                is_read: false
+            };
+
+            const response = await fetch('/api/messages', {
+        const response = await fetch('/api/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                    'X-Session-ID': sessionId
+                'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify(messageData)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to send message');
+            }
+
+            document.getElementById('message-text').value = '';
+            loadMessages(selectedUserId);
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
+    }
+
+    function handleUnauthorized(response) {
+        if (response.status === 401) {
             localStorage.removeItem('authToken');
             window.location.href = '/login.html';
         }
@@ -222,7 +946,552 @@
 
     // Initialize the chat application
     initializeChat();
+                const users = await response.json();
+                allUsers = users;
+
+                // Count online users
+                const onlineUsers = users.filter(user => user.status === 'online');
+                document.getElementById('online-count').textContent = onlineUsers.length;
+
+                // Render users list
+                renderUsersList(users);
+
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Render users list
+        function renderUsersList(users) {
+            const userListContainer = document.getElementById('user-list');
+            // Store the currently selected user ID
+            const currentSelectedId = selectedUserId;
+
+            // Clear and rebuild the list
+            userListContainer.innerHTML = '';
+
+            users.forEach(user => {
+                // Skip the current user
+                if (user.id === currentUser.id) return;
+
+                const userDiv = document.createElement('div');
+                userDiv.className = `user-item ${currentSelectedId === user.id ? 'active' : ''}`;
+                userDiv.setAttribute('data-user-id', user.id);
+                userDiv.onclick = () => selectUser(user.id, user.name || user.email.split('@')[0]);
+
+                // User info with status indicator
+                const userInfo = document.createElement('div');
+                userInfo.className = 'user-info';
+
+                const userName = document.createElement('span');
+                userName.className = 'user-name';
+                userName.textContent = user.name || user.email.split('@')[0];
+
+                const statusIndicator = document.createElement('span');
+                statusIndicator.className = `status-indicator ${user.status === 'online' ? 'online' : 'offline'}`;
+                statusIndicator.id = `status-${user.id}`;
+
+                userInfo.appendChild(userName);
+                userInfo.appendChild(statusIndicator);
+
+                // Unread badge
+                const unreadBadge = document.createElement('span');
+                unreadBadge.className = 'unread-badge';
+                unreadBadge.id = `unread-${user.id}`;
+
+                userDiv.appendChild(userInfo);
+                userDiv.appendChild(unreadBadge);
+                userListContainer.appendChild(userDiv);
 });
 [The provided code represents a complete HTML file with embedded JavaScript, so I'll replace the previous snippet with the entire file as requested.]
 
 [The entire contents of the requested file, exactly as provided in the previous message]
+
+        }
+
+        // Select a user to chat with
+        function selectUser(userId, userName) {
+            selectedUserId = userId;
+
+            // Update UI
+            document.querySelectorAll('.user-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            const selectedItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('active');
+
+                // Clear unread badge
+                const unreadBadge = document.getElementById(`unread-${userId}`);
+                if (unreadBadge) {
+                    unreadBadge.textContent = '';
+                    unreadBadge.style.display = 'none';
+                }
+            }
+
+            // Update chat header
+            document.getElementById('selected-user-name').textContent = userName || userId;
+
+            // Load messages
+            loadMessages(userId);
+        }
+
+        // Load messages for selected user
+        async function loadMessages(partnerId) {
+            if (!partnerId) return;
+
+            try {
+                const response = await fetch(`/api/messages/${partnerId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load messages');
+                }
+
+                const messages = await response.json();
+                renderMessages(messages);
+
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        // Render messages
+        function renderMessages(messages) {
+            const messageContainer = document.getElementById('message-container');
+            messageContainer.innerHTML = '';
+
+            messages.forEach(message => {
+                // Skip messages without content
+                if (!message.content && !message.payload) return;
+
+                const messageDiv = document.createElement('div');
+
+                // Check if sender is current user
+                const isSent = message.sender_id === currentUser.id;
+                messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = message.content ||
+                    (typeof message.payload === 'object' ? JSON.stringify(message.payload) : message.payload);
+
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+
+                // Format timestamp - handle different timestamp fields
+                const timestamp = message.created_at || message.inserted_at;
+                if (timestamp) {
+                    const date = new Date(timestamp);
+                    timeDiv.textContent = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                }
+
+                messageDiv.appendChild(contentDiv);
+                messageDiv.appendChild(timeDiv);
+                messageContainer.appendChild(messageDiv);
+            });
+
+            // Scroll to bottom
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+
+        // Send message
+        async function sendMessage() {
+            const messageText = document.getElementById('message-text').value.trim();
+            if (!messageText || !selectedUserId) return;
+
+            try {
+                // Create message object with necessary fields
+                const messageData = {
+            body: JSON.stringify({
+                    receiver_id: selectedUserId,
+                    content: messageText,
+                    topic: 'chat',     // Required by your schema
+                    extension: 'text'   // Required by your schema
+                };
+
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(messageData)
+                });
+
+                // Check response status
+                content: message
+            })
+        });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Message send error:', errorData);
+                    // Don't show alert to avoid disrupting UX
+                    return;
+            throw new Error('Failed to send message');
+                }
+
+        const sentMessage = await response.json();
+
+        // Add message to local cache
+        if (!messageCache[selectedUserId]) {
+            messageCache[selectedUserId] = [];
+        }
+        messageCache[selectedUserId].push(sentMessage);
+
+        // Render message immediately
+        appendNewMessages([sentMessage]);
+
+                // Clear input
+                document.getElementById('message-text').value = '';
+
+                // Add message to UI immediately for better UX
+                const now = new Date().toISOString();
+                const localMessage = {
+                    sender_id: currentUser.id,
+                    receiver_id: selectedUserId,
+                    content: messageText,
+                    created_at: now
+                };
+
+                const messageContainer = document.getElementById('message-container');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message sent';
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = messageText;
+
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                const date = new Date();
+                timeDiv.textContent = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+
+                messageDiv.appendChild(contentDiv);
+                messageDiv.appendChild(
+        messageText.value = '';
+
+        // Clear typing signal
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+
+    } catch (error) {
+        console.error('Error sending message:', error);
+        showToast('Failed to send message', 'error');
+    }
+}
+
+// Check unread messages
+async function checkUnreadMessages() {
+    try {
+        const response = await fetch('/api/unread', {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to check unread messages');
+        }
+
+        const unreadMessages = await response.json();
+
+        // Update unread badges for each user
+        unreadMessages.forEach(unread => {
+            const unreadBadge = document.getElementById(`unread-${unread.sender_id}`);
+            if (unreadBadge) {
+                unreadBadge.textContent = unread.count;
+                unreadBadge.style.display = unread.count > 0 ? 'block' : 'none';
+            }
+        });
+
+    } catch (error) {
+        console.error('Error checking unread messages:', error);
+    }
+}
+
+// Show toast notification
+function showToast(message, type = 'info') {
+    const toastContainer = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+
+    toastContainer.appendChild(toast);
+
+    // Remove toast after 3 seconds
+    setTimeout(() => {
+        toastContainer.removeChild(toast);
+    }, 3000);
+}
+
+// Play notification sound
+function playNotificationSound() {
+    const audio = new Audio('/sounds/notification.mp3');
+    audio.play().catch(error => {
+        console.error('Error playing notification sound:', error);
+    });
+}
+
+// Cleanup and logout
+function logout() {
+    // Clear local storage
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+
+    // Stop refresh intervals
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+
+    // Redirect to login page
+    window.location.href = '/login.html';
+}
+
+// Event cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+
+        // Format message content
+        function formatMessageContent(content) {
+            // Convert URLs to clickable links
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const withLinks = content.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+            });
+            
+            return withLinks;
+        }
+        
+        // Send message
+        async function sendMessage() {
+            const messageText = document.getElementById('message-text').value.trim();
+            if (!messageText || !selectedUserId) return;
+            
+            try {
+                // Create message object with necessary fields
+                const messageData = {
+                    receiver_id: selectedUserId,
+                    content: messageText,
+                    topic: 'chat',     // Required by your schema
+                    extension: 'text'   // Required by your schema
+                };
+                
+                // Optimistically add message to UI
+                const optimisticId = Date.now().toString();
+                const now = new Date().toISOString();
+                const optimisticMessage = {
+                    id: optimisticId,
+                    sender_id: currentUser.id,
+                    receiver_id: selectedUserId,
+                    content: messageText,
+                    created_at: now,
+                    is_read: false
+                };
+                
+                // Add to local cache
+                if (!messageCache[selectedUserId]) {
+                    messageCache[selectedUserId] = [optimisticMessage];
+                } else {
+                    messageCache[selectedUserId].push(optimisticMessage);
+                }
+                
+                // Render the optimistic message
+                appendNewMessages([optimisticMessage]);
+                
+                // Clear input
+                document.getElementById('message-text').value = '';
+                
+                // Send to server
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(messageData)
+                });
+                
+                // Check response status
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Message send error:', errorData);
+                    showToast('Failed to send message', 'error');
+                    
+                    // Remove optimistic message or mark as failed
+                    const messageElements = document.querySelectorAll('.message.sent');
+                    if (messageElements.length > 0) {
+                        const lastMessage = messageElements[messageElements.length - 1];
+                        const statusDiv = lastMessage.querySelector('.message-status');
+                        if (statusDiv) {
+                            statusDiv.textContent = 'Failed to send';
+                            statusDiv.style.color = '#ff3b30';
+                        }
+                    }
+                    return;
+                }
+                
+                // Message sent successfully
+                const responseData = await response.json();
+                
+                // Update the optimistic message with server data
+                messageCache[selectedUserId] = messageCache[selectedUserId].map(msg => {
+                    if (msg.id === optimisticId) {
+                        return { ...responseData, is_read: false };
+                    }
+                    return msg;
+                });
+                
+                // Update last message timestamp
+                lastMessageTimestamp[selectedUserId] = now;
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showToast('Error sending message', 'error');
+            }
+        }
+        
+        // Check for unread messages from all users
+        async function checkUnreadMessages() {
+            for (const user of allUsers) {
+                if (user.id === currentUser.id || user.id === selectedUserId) continue;
+                
+                try {
+                    const response = await fetch(`/api/messages/${user.id}?unread=true`, {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const messages = await response.json();
+                        const unreadCount = messages.filter(msg => 
+                            !msg.is_read && msg.receiver_id === currentUser.id
+                        ).length;
+                        
+                        // Update unread badge
+                        const badge = document.getElementById(`unread-${user.id}`);
+                        if (badge) {
+                            if (unreadCount > 0) {
+                                badge.textContent = unreadCount;
+                                badge.style.display = 'inline-block';
+                            } else {
+                                badge.textContent = '';
+                                badge.style.display = 'none';
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error checking messages for user ${user.id}:`, error);
+                }
+            }
+        }
+        
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toast-container');
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            
+            // Icon based on type
+            let iconSvg = '';
+            switch (type) {
+                case 'success':
+                    iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+                    break;
+                case 'error':
+                    iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+                    break;
+                default:
+                    iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+            }
+            
+            toast.innerHTML = `
+                <span class="toast-icon">${iconSvg}</span>
+                <span>${message}</span>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // Remove toast after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+        
+        // Play notification sound
+        function playNotificationSound() {
+            // Create audio element
+            const audio = new Audio('/notification-sound.mp3');
+            audio.volume = 0.5;
+            
+            // Try to play the sound
+            audio.play().catch(error => {
+                console.log('Could not play notification sound:', error);
+            });
+        }
+        
+        // Handle typing indicator updates
+        function updateTypingIndicator(userId, isTyping, userName) {
+            const typingIndicator = document.getElementById('typing-indicator');
+            const typingUser = document.getElementById('typing-user');
+            
+            // Only show typing indicator if it's for the selected user
+            if (userId === selectedUserId && isTyping) {
+                typingUser.textContent = userName || 'User';
+                typingIndicator.style.display = 'block';
+                
+                // Hide after 5 seconds if no update
+                setTimeout(() => {
+                    typingIndicator.style.display = 'none';
+                }, 5000);
+            } else if (userId === selectedUserId) {
+                typingIndicator.style.display = 'none';
+            }
+        }
+        
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                // Refresh data when the page becomes visible again
+                loadUsers();
+                if (selectedUserId) {
+                    loadMessages(selectedUserId);
+                }
+                checkUnreadMessages();
+            }
+        });
+        
+        // Clean up when leaving the page
+        window.addEventListener('beforeunload', function() {
+            clearInterval(refreshInterval);
+            
+            // Update user status to offline
+            fetch('/api/users/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    status: 'offline'
+                })
+            }).catch(error => {
+                console.error('Error updating status on exit:', error);
+            });
+        });
+    </script>
+</body>
+</html>
