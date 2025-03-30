@@ -14,7 +14,6 @@
         }
         body {
             background: #0a0a0a;
-            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%) fixed;
             color: #ffffff;
             height: 100vh;
             overflow: hidden;
@@ -38,21 +37,44 @@
             display: flex;
             height: 100vh;
             width: 100vw;
+            position: relative;
         }
+        
+        /* Map Styles */
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            background: #1a1a1a;
+        }
+        
+        /* User List Styles */
         .user-list-container {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 350px;
-            background: rgba(0, 0, 0, 0.7);
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
             overflow-y: auto;
-            z-index: 10;
+        }
+        .user-list-container.active {
+            transform: translateX(0);
         }
         .search-bar {
             position: sticky;
             top: 0;
             padding: 15px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             z-index: 20;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         .search-input {
             width: 100%;
@@ -100,22 +122,34 @@
         .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
         .offline { background: #666; }
         
+        /* Chat Styles */
         .chat-container {
+            position: absolute;
+            top: 0;
+            right: 0;
             width: 400px;
-            background: rgba(0, 0, 0, 0.7);
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
             display: flex;
             flex-direction: column;
-            z-index: 10;
+        }
+        .chat-container.active {
+            transform: translateX(0);
         }
         .chat-header {
             padding: 20px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             position: sticky;
             top: 0;
             z-index: 20;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .chat-messages {
             flex: 1;
@@ -154,7 +188,7 @@
             display: flex;
             gap: 10px;
             align-items: flex-end;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             position: sticky;
             bottom: 0;
         }
@@ -195,35 +229,45 @@
             margin-top: 5px;
         }
         
-        /* Map Styles */
-        .map-container {
-            flex: 1;
-            position: relative;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-            background: #1a1a1a;
-        }
-        .map-toggle {
+        /* Control Buttons */
+        .control-buttons {
             position: absolute;
             top: 20px;
             left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        .control-button {
             background: rgba(0, 0, 0, 0.7);
             color: white;
             border: none;
-            padding: 8px 15px;
+            padding: 10px 15px;
             border-radius: 20px;
             cursor: pointer;
-            z-index: 1000;
             display: flex;
             align-items: center;
             gap: 8px;
+            font-weight: 500;
         }
-        .emoji-marker {
-            font-size: 32px;
-            text-shadow: 0 0 8px white, 0 0 8px white;
-            filter: drop-shadow(0 0 4px black);
+        .logout-button {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            z-index: 1000;
+        }
+        .logout-button:hover {
+            background: rgba(255, 0, 0, 0.3);
         }
         
         /* Loading and Error States */
@@ -280,21 +324,11 @@
             z-index: 2000;
         }
         
-        /* Responsive Adjustments */
-        @media (max-width: 1200px) {
-            .user-list-container, .chat-container {
-                position: absolute;
-                height: 100%;
-                z-index: 100;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-            }
-            .user-list-container.active {
-                transform: translateX(0);
-            }
-            .chat-container.active {
-                transform: translateX(0);
-            }
+        /* Map Marker */
+        .emoji-marker {
+            font-size: 32px;
+            text-shadow: 0 0 8px white, 0 0 8px white;
+            filter: drop-shadow(0 0 4px black);
         }
     </style>
 </head>
@@ -307,6 +341,23 @@
     <div class="connection-status">Connecting...</div>
     
     <div class="app-container">
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <div class="control-buttons">
+                <button class="control-button" id="usersButton">
+                    👥 Users
+                </button>
+                <button class="control-button" id="chatButton" style="display: none;">
+                    💬 Chat
+                </button>
+            </div>
+            
+            <button class="logout-button" id="logoutButton">
+                ⬅️ Logout
+            </button>
+        </div>
+        
         <div class="user-list-container" id="userListContainer">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="Search team members...">
@@ -320,23 +371,15 @@
         <div class="chat-container" id="chatContainer">
             <div class="chat-header">
                 <h2>Select a user to start chatting</h2>
-                <p id="onlineCount">Loading...</p>
-                <div class="typing-indicator" id="typingIndicator">
-                    <span id="partnerName"></span> is typing...
-                </div>
+                <button class="control-button" id="closeChatButton">
+                    ✖️ Close
+                </button>
             </div>
             <div class="chat-messages"></div>
             <div class="message-input-container">
                 <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
                 <button class="send-button" disabled>Send</button>
             </div>
-        </div>
-        
-        <div class="map-container">
-            <div id="map"></div>
-            <button class="map-toggle" id="mapToggle">
-                <span>Show Chat</span>
-            </button>
         </div>
     </div>
 
@@ -350,6 +393,7 @@
         let supabaseClient, presenceChannel, typingTimeout;
         let selectedUser = null, currentUserId = null, session = null;
         let map, marker, lastPosition = null;
+        let onlineUsers = {};
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -498,6 +542,13 @@
                     }]);
                 
                 if (error) throw error;
+                
+                // Update user's last online time
+                await supabaseClient
+                    .from('users')
+                    .update({ lastonline: new Date().toISOString() })
+                    .eq('id', currentUserId);
+                
             } catch (error) {
                 console.error('Failed to save location:', error);
             }
@@ -549,14 +600,8 @@
 
             users.forEach(user => {
                 const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                let statusText = 'Offline';
-                let isOnline = false;
-                
-                if (lastOnline) {
-                    const minutesSinceLastOnline = (Date.now() - lastOnline) / 60000;
-                    isOnline = minutesSinceLastOnline < 5;
-                    statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                }
+                let isOnline = onlineUsers[user.id] || false;
+                let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
@@ -597,11 +642,10 @@
             document.querySelector('.chat-header h2').textContent = user.name;
             await loadMessages(user.id);
             
-            // Show chat container when user is selected on mobile
-            if (window.innerWidth <= 1200) {
-                document.getElementById('chatContainer').classList.add('active');
-                document.getElementById('userListContainer').classList.remove('active');
-            }
+            // Show chat container
+            document.getElementById('chatContainer').classList.add('active');
+            document.getElementById('userListContainer').classList.remove('active');
+            document.getElementById('chatButton').style.display = 'block';
         }
 
         async function loadMessages(userId) {
@@ -698,10 +742,17 @@
             status.classList.toggle('connected', !isError);
         }
 
-        function updateOnlineStatus(onlineUserIds) {
+        function updateOnlineStatus(userStates) {
+            // Update our online users tracking
+            onlineUsers = {};
+            Object.keys(userStates).forEach(userId => {
+                onlineUsers[userId] = true;
+            });
+            
+            // Update UI
             document.querySelectorAll('.user-card').forEach(card => {
                 const userId = card.dataset.userId;
-                const isOnline = onlineUserIds.includes(userId);
+                const isOnline = onlineUsers[userId] || false;
                 const indicator = card.querySelector('.status-indicator');
                 if (indicator) {
                     indicator.classList.toggle('online', isOnline);
@@ -713,7 +764,6 @@
                     }
                 }
             });
-            document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
         }
 
         function formatLastOnline(date) {
@@ -838,19 +888,33 @@
                 updateConnectionStatus("Offline - No connection", true);
             });
 
-            // Map toggle
-            document.getElementById('mapToggle').addEventListener('click', () => {
-                const chatContainer = document.getElementById('chatContainer');
-                const userListContainer = document.getElementById('userListContainer');
-                
-                if (chatContainer.classList.contains('active')) {
-                    chatContainer.classList.remove('active');
-                    userListContainer.classList.add('active');
-                    document.getElementById('mapToggle').querySelector('span').textContent = 'Show Chat';
-                } else {
-                    chatContainer.classList.add('active');
-                    userListContainer.classList.remove('active');
-                    document.getElementById('mapToggle').querySelector('span').textContent = 'Show Users';
+            // User list toggle
+            document.getElementById('usersButton').addEventListener('click', () => {
+                document.getElementById('userListContainer').classList.toggle('active');
+            });
+
+            // Chat toggle
+            document.getElementById('chatButton').addEventListener('click', () => {
+                document.getElementById('chatContainer').classList.toggle('active');
+            });
+
+            // Close chat button
+            document.getElementById('closeChatButton').addEventListener('click', () => {
+                document.getElementById('chatContainer').classList.remove('active');
+            });
+
+            // Logout button
+            document.getElementById('logoutButton').addEventListener('click', async () => {
+                try {
+                    if (presenceChannel) {
+                        await supabaseClient.removeChannel(presenceChannel);
+                    }
+                    
+                    await supabaseClient.auth.signOut();
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                } catch (error) {
+                    console.error('Logout error:', error);
                 }
             });
         }
@@ -874,7 +938,7 @@
                 })
                 .on('presence', { event: 'sync' }, () => {
                     const state = presenceChannel.presenceState();
-                    updateOnlineStatus(Object.keys(state));
+                    updateOnlineStatus(state);
                 })
                 .on('broadcast', { event: 'typing' }, ({ payload }) => {
                     if (payload.partnerId === currentUserId) {
@@ -883,7 +947,10 @@
                 })
                 .subscribe(async (status, error) => {
                     if (status === 'SUBSCRIBED') {
-                        await presenceChannel.track({ online_at: new Date().toISOString() });
+                        await presenceChannel.track({ 
+                            online_at: new Date().toISOString(),
+                            user_id: currentUserId
+                        });
                         updateConnectionStatus("Connected");
                     }
                     if (error) {
@@ -936,25 +1003,17 @@
             }
         }
 
-        // Update last online status
-        async function updateLastOnline() {
-            try {
-                await supabaseClient
-                    .from('users')
-                    .update({ lastonline: new Date().toISOString() })
-                    .eq('id', currentUserId);
-            } catch (error) {
-                console.error('Failed to update last online:', error);
-            }
-        }
-
         // Cleanup function when window closes
         window.addEventListener('beforeunload', async () => {
             try {
                 if (presenceChannel) {
                     await supabaseClient.removeChannel(presenceChannel);
                 }
-                await updateLastOnline();
+                
+                await supabaseClient
+                    .from('users')
+                    .update({ lastonline: new Date().toISOString() })
+                    .eq('id', currentUserId);
             } catch (error) {
                 console.error('Cleanup error:', error);
             }
