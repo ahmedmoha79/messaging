@@ -290,129 +290,182 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Configuration
+        // Enhanced Configuration with Error Handling
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
         
-        // Global variables
-        let supabaseClient, presenceChannel, messagesChannel, typingTimeout;
-        let selectedUser = null, currentUserId = null, session = null;
-        let unreadMessages = {};
-        let isTyping = false;
-        let lastTypingTime = 0;
+        // Global State Management
+        const appState = {
+            supabaseClient: null,
+            presenceChannel: null,
+            messagesChannel: null,
+            typingTimeout: null,
+            selectedUser: null,
+            currentUserId: null,
+            session: null,
+            unreadMessages: {},
+            isTyping: false,
+            lastTypingTime: 0,
+            activeConnections: 0,
+            tabId: Math.random().toString(36).substring(2, 15),
+            lastOnlineUpdate: 0
+        };
 
-        // Initialize the application
+        // Initialize the application with enhanced error handling
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize Supabase client with custom storage handling
-                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: false,
-                        storage: {
-                            getItem: (key) => {
-                                return localStorage.getItem(key) || 
-                                       localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                       localStorage.getItem('session');
-                            },
-                            setItem: (key, value) => localStorage.setItem(key, value),
-                            removeItem: (key) => localStorage.removeItem(key)
-                        }
-                    }
-                });
-
-                // Check for existing session
-                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-                if (sessionError) throw sessionError;
-                session = currentSession;
-
-                // If no session found, check localStorage for legacy session
-                if (!session) {
-                    const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                       localStorage.getItem('session');
-                    if (sessionData) {
-                        try {
-                            const parsedSession = JSON.parse(sessionData);
-                            if (parsedSession && parsedSession.access_token) {
-                                await supabaseClient.auth.setSession({
-                                    access_token: parsedSession.access_token,
-                                    refresh_token: parsedSession.refresh_token
-                                });
-                                const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                                session = recoveredSession;
-                            }
-                        } catch (e) {
-                            console.error("Failed to parse session data:", e);
-                        }
-                    }
-                }
-
-                // If still no session, redirect to login
-                if (!session) {
-                    window.location.href = 'login.html';
-                    return;
-                }
-
-                // Verify user
-                currentUserId = session.user.id;
-                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-                if (authError) throw authError;
-                if (!user) throw new Error("User verification failed");
-
-                // Show the messaging interface
-                document.querySelector('.session-check').style.display = 'none';
-                document.querySelector('.messaging-container').style.display = 'flex';
-                document.querySelector('.message-input').disabled = false;
-                document.querySelector('.send-button').disabled = false;
-
-                // Load initial data and set up event listeners
-                await loadUsers();
+                initializeSessionCheck();
+                await initializeSupabaseClient();
+                await verifyUserSession();
+                initializeUI();
+                await loadInitialData();
                 setupEventListeners();
-                initializeRealtime();
-
-                // Update user's last online status
-                await updateLastOnline();
-
+                await initializeRealtime();
+                startHeartbeat();
             } catch (error) {
-                console.error("Initialization error:", error);
-                showSessionError(error);
+                handleInitializationError(error);
             }
         });
 
-        // Initialize realtime functionality
+        // Session Management
+        async function initializeSupabaseClient() {
+            appState.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: false,
+                    storage: {
+                        getItem: (key) => {
+                            return localStorage.getItem(key) || 
+                                   localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                   localStorage.getItem('session');
+                        },
+                        setItem: (key, value) => localStorage.setItem(key, value),
+                        removeItem: (key) => localStorage.removeItem(key)
+                    }
+                }
+            });
+        }
+
+        async function verifyUserSession() {
+            const { data: { session: currentSession }, error: sessionError } = 
+                await appState.supabaseClient.auth.getSession();
+            if (sessionError) throw sessionError;
+            
+            appState.session = currentSession;
+            if (!appState.session) {
+                const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                   localStorage.getItem('session');
+                if (sessionData) {
+                    try {
+                        const parsedSession = JSON.parse(sessionData);
+                        if (parsedSession?.access_token) {
+                            await appState.supabaseClient.auth.setSession({
+                                access_token: parsedSession.access_token,
+                                refresh_token: parsedSession.refresh_token
+                            });
+                            const { data: { session: recoveredSession } } = 
+                                await appState.supabaseClient.auth.getSession();
+                            appState.session = recoveredSession;
+                        }
+                    } catch (e) {
+                        console.error("Session parsing error:", e);
+                    }
+                }
+            }
+
+            if (!appState.session) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const { data: { user }, error: authError } = 
+                await appState.supabaseClient.auth.getUser();
+            if (authError) throw authError;
+            if (!user) throw new Error("User verification failed");
+
+            appState.currentUserId = user.id;
+        }
+
+        // UI Initialization
+        function initializeUI() {
+            document.querySelector('.session-check').style.display = 'none';
+            document.querySelector('.messaging-container').style.display = 'flex';
+            document.querySelector('.message-input').disabled = false;
+            document.querySelector('.send-button').disabled = false;
+        }
+
+        function initializeSessionCheck() {
+            // Set up a session checker that runs every 5 minutes
+            setInterval(async () => {
+                try {
+                    const { data: { session }, error } = 
+                        await appState.supabaseClient.auth.getSession();
+                    if (error || !session) {
+                        window.location.href = 'login.html';
+                    }
+                } catch (error) {
+                    console.error("Session check failed:", error);
+                }
+            }, 300000); // 5 minutes
+        }
+
+        // Data Loading
+        async function loadInitialData() {
+            await loadUsers();
+            await updateLastOnline();
+        }
+
+        // Realtime Communication
         async function initializeRealtime() {
             updateConnectionStatus("Connecting to real-time service...");
             
             try {
                 // Clean up existing channels if they exist
-                if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
-                if (messagesChannel) supabaseClient.removeChannel(messagesChannel);
+                if (appState.presenceChannel) appState.supabaseClient.removeChannel(appState.presenceChannel);
+                if (appState.messagesChannel) appState.supabaseClient.removeChannel(appState.messagesChannel);
 
-                // Presence channel for online status
-                presenceChannel = supabaseClient.channel('presence-channel', {
+                // Enhanced Presence Channel with Tab Tracking
+                appState.presenceChannel = appState.supabaseClient.channel('presence-channel', {
                     config: { 
                         presence: { 
-                            key: currentUserId
+                            key: `${appState.currentUserId}-${appState.tabId}`,
+                            // Send presence updates more frequently
+                            heartbeatIntervalMs: 15000,
+                            heartbeatTimeoutMs: 30000
                         } 
                     }
                 })
                 .on('presence', { event: 'sync' }, () => {
-                    const state = presenceChannel.presenceState();
-                    updateOnlineStatus(Object.keys(state));
+                    const state = appState.presenceChannel.presenceState();
+                    const uniqueUsers = new Set();
+                    
+                    // Count unique users across all tabs
+                    Object.values(state).forEach(entries => {
+                        entries.forEach(entry => {
+                            const userId = entry.user_id || entry.userId;
+                            if (userId) {
+                                uniqueUsers.add(userId);
+                            }
+                        });
+                    });
+                    
+                    updateOnlineStatus(Array.from(uniqueUsers));
                 })
                 .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                    if (payload.partnerId === currentUserId) {
+                    if (payload.partnerId === appState.currentUserId) {
                         showTypingIndicator(payload.userId);
                     }
                 })
                 .subscribe(async (status, error) => {
                     if (status === 'SUBSCRIBED') {
-                        await presenceChannel.track({ 
+                        await appState.presenceChannel.track({ 
                             online_at: new Date().toISOString(),
-                            user_id: currentUserId
+                            user_id: appState.currentUserId,
+                            tab_id: appState.tabId
                         });
                         updateConnectionStatus("Connected");
+                        appState.activeConnections++;
                     }
                     if (error) {
                         console.error('Presence channel error:', error);
@@ -420,13 +473,13 @@
                     }
                 });
 
-                // Messages channel for real-time updates
-                messagesChannel = supabaseClient.channel('messages-channel')
+                // Messages Channel with Enhanced Error Handling
+                appState.messagesChannel = appState.supabaseClient.channel('messages-channel')
                     .on('postgres_changes', {
                         event: 'INSERT',
                         schema: 'public',
                         table: 'messages',
-                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                        filter: `or(receiver_id=eq.${appState.currentUserId},sender_id=eq.${appState.currentUserId})`
                     }, (payload) => {
                         handleNewMessage(payload.new);
                     })
@@ -434,7 +487,7 @@
                         event: 'UPDATE',
                         schema: 'public',
                         table: 'messages',
-                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                        filter: `or(receiver_id=eq.${appState.currentUserId},sender_id=eq.${appState.currentUserId})`
                     }, (payload) => {
                         updateMessageStatus(payload.new);
                     })
@@ -445,8 +498,8 @@
                         }
                     });
 
-                // Handle channel connection events
-                presenceChannel
+                // Enhanced Channel Error Handling
+                appState.presenceChannel
                     .on('CLOSE', () => {
                         updateConnectionStatus("Reconnecting...", true);
                         setTimeout(initializeRealtime, 3000);
@@ -462,52 +515,31 @@
             }
         }
 
-        // Handle new incoming messages
-        function handleNewMessage(message) {
-            // If message is for current chat, display it
-            if (selectedUser && 
-                (message.sender_id === selectedUser.id || 
-                 message.receiver_id === selectedUser.id)) {
-                addMessageToChat(
-                    message.content, 
-                    message.sender_id === currentUserId,
-                    message.created_at,
-                    message.id,
-                    message.status
-                );
-                
-                // Mark as read if we're the receiver
-                if (message.receiver_id === currentUserId && message.status !== 'read') {
-                    markMessageAsRead(message.id);
+        // Heartbeat for Online Status
+        function startHeartbeat() {
+            // Update last online every 30 seconds
+            setInterval(async () => {
+                try {
+                    const now = Date.now();
+                    if (now - appState.lastOnlineUpdate > 25000) { // 25 seconds
+                        await updateLastOnline();
+                        appState.lastOnlineUpdate = now;
+                    }
+                } catch (error) {
+                    console.error("Heartbeat error:", error);
                 }
-            } 
-            // Otherwise update unread count
-            else if (message.receiver_id === currentUserId) {
-                incrementUnreadCount(message.sender_id);
-            }
+            }, 10000); // Check every 10 seconds
         }
 
-        // Update message status in UI
-        function updateMessageStatus(message) {
-            const messageElement = document.querySelector(`[data-message-id="${message.id}"]`);
-            if (messageElement) {
-                const statusElement = messageElement.querySelector('.message-status');
-                if (statusElement) {
-                    statusElement.textContent = getStatusText(message.status);
-                    statusElement.title = `Message status: ${message.status}`;
-                }
-            }
-        }
-
-        // Load users list
+        // User Management
         async function loadUsers() {
             try {
                 showLoading();
                 
-                const { data: users, error } = await supabaseClient
+                const { data: users, error } = await appState.supabaseClient
                     .from('users')
                     .select('*')
-                    .neq('id', currentUserId)
+                    .neq('id', appState.currentUserId)
                     .order('lastonline', { ascending: false });
                 
                 if (error) throw error;
@@ -520,7 +552,6 @@
             }
         }
 
-        // Render users list
         function renderUserList(users) {
             const userList = document.querySelector('.user-list');
             userList.innerHTML = `
@@ -545,7 +576,7 @@
                     statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 }
                 
-                const unreadCount = unreadMessages[user.id] || 0;
+                const unreadCount = appState.unreadMessages[user.id] || 0;
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
@@ -569,37 +600,31 @@
             setupSearch();
         }
 
-        // Select a user to chat with
         async function selectUser(user) {
-            // Update UI
             document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
             document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
             
-            // Clear unread count for this user
-            if (unreadMessages[user.id]) {
-                delete unreadMessages[user.id];
+            if (appState.unreadMessages[user.id]) {
+                delete appState.unreadMessages[user.id];
                 document.querySelector(`[data-user-id="${user.id}"] .unread-badge`)?.remove();
             }
             
-            // Set selected user and update header
-            selectedUser = { id: user.id, name: user.name };
+            appState.selectedUser = { id: user.id, name: user.name };
             document.querySelector('.chat-header h2').textContent = user.name;
             
-            // Load messages
             await loadMessages(user.id);
         }
 
-        // Load messages for a specific user
+        // Message Management
         async function loadMessages(userId) {
             try {
                 const messagesContainer = document.querySelector('.chat-messages');
                 messagesContainer.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading messages...</p></div>';
                 
-                // Get messages between current user and selected user
-                const { data: messages, error } = await supabaseClient
+                const { data: messages, error } = await appState.supabaseClient
                     .from('messages')
                     .select('*')
-                    .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`)
+                    .or(`and(sender_id.eq.${appState.currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${appState.currentUserId})`)
                     .order('created_at', { ascending: true });
                 
                 if (error) throw error;
@@ -610,23 +635,20 @@
                     return;
                 }
                 
-                // Display all messages
                 messages.forEach(msg => {
                     addMessageToChat(
                         msg.content, 
-                        msg.sender_id === currentUserId,
+                        msg.sender_id === appState.currentUserId,
                         msg.created_at,
                         msg.id,
                         msg.status
                     );
                 });
                 
-                // Scroll to bottom
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
-                // Mark any unread messages as read
                 const unreadMessages = messages.filter(msg => 
-                    msg.receiver_id === currentUserId && msg.status !== 'read'
+                    msg.receiver_id === appState.currentUserId && msg.status !== 'read'
                 );
                 
                 if (unreadMessages.length > 0) {
@@ -640,7 +662,6 @@
             }
         }
 
-        // Send a new message
         async function sendMessage(receiverId, content) {
             try {
                 if (!content.trim()) {
@@ -650,11 +671,10 @@
                 
                 showSendLoading();
                 
-                // Insert message with status 'sent'
-                const { data: message, error } = await supabaseClient
+                const { data: message, error } = await appState.supabaseClient
                     .from('messages')
                     .insert([{
-                        sender_id: currentUserId,
+                        sender_id: appState.currentUserId,
                         receiver_id: receiverId,
                         content: content.trim(),
                         status: 'sent'
@@ -664,7 +684,6 @@
                 
                 if (error) throw error;
                 
-                // Display the message immediately
                 addMessageToChat(
                     content, 
                     true, 
@@ -673,7 +692,6 @@
                     'sent'
                 );
                 
-                // Update last online status
                 await updateLastOnline();
                 
             } catch (error) {
@@ -684,16 +702,13 @@
             }
         }
 
-        // Add a message to the chat UI
         function addMessageToChat(content, isSent, timestamp, messageId, status) {
             const messagesContainer = document.querySelector('.chat-messages');
             
-            // Clear loading state if present
             if (messagesContainer.querySelector('.loading-state')) {
                 messagesContainer.innerHTML = '';
             }
             
-            // Create message element
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
             if (messageId) messageDiv.dataset.messageId = messageId;
@@ -716,10 +731,9 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // Mark messages as read
         async function markMessagesAsRead(messageIds) {
             try {
-                const { error } = await supabaseClient
+                const { error } = await appState.supabaseClient
                     .from('messages')
                     .update({ status: 'read', read_at: new Date().toISOString() })
                     .in('id', messageIds);
@@ -730,10 +744,9 @@
             }
         }
 
-        // Mark single message as read
         async function markMessageAsRead(messageId) {
             try {
-                const { error } = await supabaseClient
+                const { error } = await appState.supabaseClient
                     .from('messages')
                     .update({ status: 'read', read_at: new Date().toISOString() })
                     .eq('id', messageId);
@@ -744,26 +757,24 @@
             }
         }
 
-        // Update user's last online status
+        // Status Management
         async function updateLastOnline() {
             try {
-                await supabaseClient
+                await appState.supabaseClient
                     .from('users')
                     .update({ lastonline: new Date().toISOString() })
-                    .eq('id', currentUserId);
+                    .eq('id', appState.currentUserId);
             } catch (error) {
                 console.error('Failed to update last online:', error);
             }
         }
 
-        // Update connection status UI
         function updateConnectionStatus(message, isError = false) {
             const status = document.querySelector('.connection-status');
             status.textContent = message;
             status.classList.toggle('connected', !isError);
         }
 
-        // Update online status for users
         function updateOnlineStatus(onlineUserIds) {
             document.querySelectorAll('.user-card').forEach(card => {
                 const userId = card.dataset.userId;
@@ -782,7 +793,32 @@
             document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
         }
 
-        // Format last online time
+        function showTypingIndicator(userId) {
+            const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
+            if (partner) {
+                document.getElementById('partnerName').textContent = partner.textContent;
+                const indicator = document.getElementById('typingIndicator');
+                indicator.style.opacity = '1';
+                clearTimeout(appState.typingTimeout);
+                appState.typingTimeout = setTimeout(() => indicator.style.opacity = '0', 2000);
+            }
+        }
+
+        function incrementUnreadCount(userId) {
+            appState.unreadMessages[userId] = (appState.unreadMessages[userId] || 0) + 1;
+            const userCard = document.querySelector(`[data-user-id="${userId}"]`);
+            if (userCard) {
+                let badge = userCard.querySelector('.unread-badge');
+                if (!badge) {
+                    badge = document.createElement('div');
+                    badge.className = 'unread-badge';
+                    userCard.appendChild(badge);
+                }
+                badge.textContent = appState.unreadMessages[userId];
+            }
+        }
+
+        // Utility Functions
         function formatLastOnline(date) {
             if (!date) return 'Offline';
             
@@ -793,34 +829,6 @@
             return `${Math.floor(diff/1440)}d ago`;
         }
 
-        // Show typing indicator
-        function showTypingIndicator(userId) {
-            const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
-            if (partner) {
-                document.getElementById('partnerName').textContent = partner.textContent;
-                const indicator = document.getElementById('typingIndicator');
-                indicator.style.opacity = '1';
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => indicator.style.opacity = '0', 2000);
-            }
-        }
-
-        // Increment unread message count for a user
-        function incrementUnreadCount(userId) {
-            unreadMessages[userId] = (unreadMessages[userId] || 0) + 1;
-            const userCard = document.querySelector(`[data-user-id="${userId}"]`);
-            if (userCard) {
-                let badge = userCard.querySelector('.unread-badge');
-                if (!badge) {
-                    badge = document.createElement('div');
-                    badge.className = 'unread-badge';
-                    userCard.appendChild(badge);
-                }
-                badge.textContent = unreadMessages[userId];
-            }
-        }
-
-        // Get status text for display
         function getStatusText(status) {
             switch (status) {
                 case 'delivered': return '✓✓';
@@ -829,7 +837,28 @@
             }
         }
 
-        // Show loading state
+        function setupSearch() {
+            document.querySelector('.search-input').addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('.user-card').forEach(card => {
+                    const name = card.querySelector('h4').textContent.toLowerCase();
+                    card.style.display = name.includes(term) ? 'flex' : 'none';
+                });
+            });
+        }
+
+        // Error Handling
+        function handleInitializationError(error) {
+            console.error("Initialization error:", error);
+            showSessionError(error);
+        }
+
+        function handleRealtimeError(error) {
+            updateConnectionStatus("Error: " + error.message, true);
+            setTimeout(initializeRealtime, 5000);
+        }
+
+        // UI Helpers
         function showLoading() {
             document.querySelector('.user-list').innerHTML = `
                 <div class="search-bar">
@@ -842,7 +871,6 @@
             `;
         }
 
-        // Show error state
         function showError(container, message) {
             document.querySelector(`.${container}`).innerHTML = `
                 <div class="error-state">
@@ -852,7 +880,6 @@
             `;
         }
 
-        // Show session error
         function showSessionError(error) {
             document.querySelector('.session-check').innerHTML = `
                 <h2>Session verification failed</h2>
@@ -864,45 +891,25 @@
             `;
         }
 
-        // Show send loading state
         function showSendLoading() {
             const btn = document.querySelector('.send-button');
             btn.disabled = true;
             btn.textContent = 'Sending...';
         }
 
-        // Hide send loading state
         function hideSendLoading() {
             const btn = document.querySelector('.send-button');
             btn.disabled = false;
             btn.textContent = 'Send';
         }
 
-        // Handle realtime errors
-        function handleRealtimeError(error) {
-            updateConnectionStatus("Error: " + error.message, true);
-            setTimeout(initializeRealtime, 5000);
-        }
-
-        // Setup search functionality
-        function setupSearch() {
-            document.querySelector('.search-input').addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                document.querySelectorAll('.user-card').forEach(card => {
-                    const name = card.querySelector('h4').textContent.toLowerCase();
-                    card.style.display = name.includes(term) ? 'flex' : 'none';
-                });
-            });
-        }
-
-        // Setup event listeners
+        // Event Listeners
         function setupEventListeners() {
-            // Send message button
             document.querySelector('.send-button').addEventListener('click', async () => {
                 const input = document.querySelector('.message-input');
                 const content = input.value.trim();
                 
-                if (!selectedUser) {
+                if (!appState.selectedUser) {
                     alert('Please select a user first');
                     return;
                 }
@@ -912,12 +919,11 @@
                     return;
                 }
                 
-                await sendMessage(selectedUser.id, content);
+                await sendMessage(appState.selectedUser.id, content);
                 input.value = '';
                 input.focus();
             });
 
-            // Send message on Enter key (without Shift)
             document.querySelector('.message-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -925,35 +931,33 @@
                 }
             });
 
-            // Typing indicator
             document.querySelector('.message-input').addEventListener('input', () => {
-                if (!selectedUser) return;
+                if (!appState.selectedUser) return;
                 
                 const now = Date.now();
-                if (!isTyping) {
-                    isTyping = true;
-                    presenceChannel.send({
+                if (!appState.isTyping) {
+                    appState.isTyping = true;
+                    appState.presenceChannel.send({
                         type: 'broadcast',
                         event: 'typing',
-                        payload: { userId: currentUserId, partnerId: selectedUser.id }
+                        payload: { userId: appState.currentUserId, partnerId: appState.selectedUser.id }
                     });
                 }
                 
-                lastTypingTime = now;
+                appState.lastTypingTime = now;
                 
                 setTimeout(() => {
-                    if (now - lastTypingTime > 1000 && isTyping) {
-                        isTyping = false;
-                        presenceChannel.send({
+                    if (now - appState.lastTypingTime > 1000 && appState.isTyping) {
+                        appState.isTyping = false;
+                        appState.presenceChannel.send({
                             type: 'broadcast',
                             event: 'stopped-typing',
-                            payload: { userId: currentUserId }
+                            payload: { userId: appState.currentUserId }
                         });
                     }
                 }, 1000);
             });
 
-            // Network status monitoring
             window.addEventListener('online', () => {
                 updateConnectionStatus("Reconnecting...");
                 initializeRealtime();
@@ -961,6 +965,23 @@
             
             window.addEventListener('offline', () => {
                 updateConnectionStatus("Offline - No connection", true);
+            });
+
+            // Handle page visibility changes
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    initializeRealtime();
+                }
+            });
+
+            // Handle beforeunload to clean up
+            window.addEventListener('beforeunload', () => {
+                if (appState.presenceChannel) {
+                    appState.supabaseClient.removeChannel(appState.presenceChannel);
+                }
+                if (appState.messagesChannel) {
+                    appState.supabaseClient.removeChannel(appState.messagesChannel);
+                }
             });
         }
     </script>
