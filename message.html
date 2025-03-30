@@ -232,8 +232,26 @@
             justify-content: center;
             z-index: 2000;
         }
-        .session-check h2 {
-            margin-bottom: 20px;
+        .unread-badge {
+            background: #00ff88;
+            color: #000;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: bold;
+            margin-left: auto;
+        }
+        .message-status {
+            font-size: 0.6em;
+            margin-left: 5px;
+            color: #666;
+        }
+        .message.sent .message-status {
+            color: rgba(0, 0, 0, 0.5);
         }
     </style>
 </head>
@@ -272,179 +290,216 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-    // Configuration and global variables remain the same
-    const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-    let supabaseClient, presenceChannel, typingTimeout;
-    let selectedUser = null, currentUserId = null, session = null;
-
-    document.addEventListener('DOMContentLoaded', async () => {
-        try {
-            // Supabase client initialization remains the same
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: false,
-                    storage: {
-                        getItem: (key) => {
-                            return localStorage.getItem(key) || 
-                                   localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                        },
-                        setItem: (key, value) => localStorage.setItem(key, value),
-                        removeItem: (key) => localStorage.removeItem(key)
-                    }
-                }
-            });
-
-            // Session handling remains the same
-            const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-            if (sessionError) throw sessionError;
-            session = currentSession;
-
-            if (!session) {
-                const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                if (sessionData) {
-                    try {
-                        const parsedSession = JSON.parse(sessionData);
-                        if (parsedSession && parsedSession.access_token) {
-                            await supabaseClient.auth.setSession({
-                                access_token: parsedSession.access_token,
-                                refresh_token: parsedSession.refresh_token
-                            });
-                            const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                            session = recoveredSession;
-                        }
-                    } catch (e) {
-                        console.error("Failed to parse session data:", e);
-                    }
-                }
-            }
-
-            if (!session) {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            currentUserId = session.user.id;
-
-            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-            if (authError) throw authError;
-            if (!user) throw new Error("User verification failed");
-
-            document.querySelector('.session-check').style.display = 'none';
-            document.querySelector('.messaging-container').style.display = 'flex';
-            document.querySelector('.message-input').disabled = false;
-            document.querySelector('.send-button').disabled = false;
-
-            await loadUsers();
-            setupEventListeners();
-            initializeRealtime();
-
-        } catch (error) {
-            console.error("Initialization error:", error);
-            document.querySelector('.session-check').innerHTML = `
-                <h2>Session verification failed</h2>
-                <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                <button onclick="window.location.href='login.html'" 
-                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                    Go to Login
-                </button>
-            `;
-        }
-    });
-
-    // FIXED REALTIME INITIALIZATION
-    async function initializeRealtime() {
-        updateConnectionStatus("Connecting to real-time service...");
+        // Configuration
+        const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
         
-        try {
-            // Remove existing channels if they exist
-            if (presenceChannel) {
-                supabaseClient.removeChannel(presenceChannel);
+        // Global variables
+        let supabaseClient, presenceChannel, messagesChannel, typingTimeout;
+        let selectedUser = null, currentUserId = null, session = null;
+        let unreadMessages = {};
+        let isTyping = false;
+        let lastTypingTime = 0;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Initialize Supabase client with custom storage handling
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: false,
+                        storage: {
+                            getItem: (key) => {
+                                return localStorage.getItem(key) || 
+                                       localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                       localStorage.getItem('session');
+                            },
+                            setItem: (key, value) => localStorage.setItem(key, value),
+                            removeItem: (key) => localStorage.removeItem(key)
+                        }
+                    }
+                });
+
+                // Check for existing session
+                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+                if (sessionError) throw sessionError;
+                session = currentSession;
+
+                // If no session found, check localStorage for legacy session
+                if (!session) {
+                    const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                       localStorage.getItem('session');
+                    if (sessionData) {
+                        try {
+                            const parsedSession = JSON.parse(sessionData);
+                            if (parsedSession && parsedSession.access_token) {
+                                await supabaseClient.auth.setSession({
+                                    access_token: parsedSession.access_token,
+                                    refresh_token: parsedSession.refresh_token
+                                });
+                                const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
+                                session = recoveredSession;
+                            }
+                        } catch (e) {
+                            console.error("Failed to parse session data:", e);
+                        }
+                    }
+                }
+
+                // If still no session, redirect to login
+                if (!session) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                // Verify user
+                currentUserId = session.user.id;
+                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+                if (authError) throw authError;
+                if (!user) throw new Error("User verification failed");
+
+                // Show the messaging interface
+                document.querySelector('.session-check').style.display = 'none';
+                document.querySelector('.messaging-container').style.display = 'flex';
+                document.querySelector('.message-input').disabled = false;
+                document.querySelector('.send-button').disabled = false;
+
+                // Load initial data and set up event listeners
+                await loadUsers();
+                setupEventListeners();
+                initializeRealtime();
+
+                // Update user's last online status
+                await updateLastOnline();
+
+            } catch (error) {
+                console.error("Initialization error:", error);
+                showSessionError(error);
             }
+        });
 
-            presenceChannel = supabaseClient.channel('presence-channel', {
-                config: { 
-                    presence: { 
-                        key: currentUserId
-                    } 
-                }
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = presenceChannel.presenceState();
-                updateOnlineStatus(Object.keys(state));
-            })
-            .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                if (payload.partnerId === currentUserId) {
-                    showTypingIndicator(payload.userId);
-                }
-            })
-            .subscribe(async (status, error) => {
-                if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({ online_at: new Date().toISOString() });
-                    updateConnectionStatus("Connected");
-                }
-                if (error) {
-                    console.error('Presence channel error:', error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                }
-            });
+        // Initialize realtime functionality
+        async function initializeRealtime() {
+            updateConnectionStatus("Connecting to real-time service...");
+            
+            try {
+                // Clean up existing channels if they exist
+                if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
+                if (messagesChannel) supabaseClient.removeChannel(messagesChannel);
 
-            // Handle channel connection events
-            presenceChannel
-                .on('CLOSE', () => {
-                    updateConnectionStatus("Reconnecting...", true);
-                    setTimeout(initializeRealtime, 3000);
-                })
-                .on('ERROR', (error) => {
-                    console.error("Realtime error:", error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                });
-
-            const messagesChannel = supabaseClient.channel('messages-channel')
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
-                }, (payload) => {
-                    if (selectedUser && 
-                        (payload.new.sender_id === selectedUser.id || 
-                         payload.new.receiver_id === selectedUser.id)) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
-                    } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
+                // Presence channel for online status
+                presenceChannel = supabaseClient.channel('presence-channel', {
+                    config: { 
+                        presence: { 
+                            key: currentUserId
+                        } 
                     }
                 })
-                .subscribe((status, error) => {
+                .on('presence', { event: 'sync' }, () => {
+                    const state = presenceChannel.presenceState();
+                    updateOnlineStatus(Object.keys(state));
+                })
+                .on('broadcast', { event: 'typing' }, ({ payload }) => {
+                    if (payload.partnerId === currentUserId) {
+                        showTypingIndicator(payload.userId);
+                    }
+                })
+                .subscribe(async (status, error) => {
+                    if (status === 'SUBSCRIBED') {
+                        await presenceChannel.track({ 
+                            online_at: new Date().toISOString(),
+                            user_id: currentUserId
+                        });
+                        updateConnectionStatus("Connected");
+                    }
                     if (error) {
-                        console.error('Messages channel error:', error);
-                        setTimeout(initializeRealtime, 5000);
+                        console.error('Presence channel error:', error);
+                        handleRealtimeError(error);
                     }
                 });
 
-        } catch (error) {
-            console.error("Realtime connection error:", error);
-            updateConnectionStatus("Realtime failed: " + error.message, true);
-            setTimeout(initializeRealtime, 5000);
+                // Messages channel for real-time updates
+                messagesChannel = supabaseClient.channel('messages-channel')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'messages',
+                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                    }, (payload) => {
+                        handleNewMessage(payload.new);
+                    })
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'messages',
+                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                    }, (payload) => {
+                        updateMessageStatus(payload.new);
+                    })
+                    .subscribe((status, error) => {
+                        if (error) {
+                            console.error('Messages channel error:', error);
+                            handleRealtimeError(error);
+                        }
+                    });
+
+                // Handle channel connection events
+                presenceChannel
+                    .on('CLOSE', () => {
+                        updateConnectionStatus("Reconnecting...", true);
+                        setTimeout(initializeRealtime, 3000);
+                    })
+                    .on('ERROR', (error) => {
+                        console.error("Realtime error:", error);
+                        handleRealtimeError(error);
+                    });
+
+            } catch (error) {
+                console.error("Realtime connection error:", error);
+                handleRealtimeError(error);
+            }
         }
-    }
 
+        // Handle new incoming messages
+        function handleNewMessage(message) {
+            // If message is for current chat, display it
+            if (selectedUser && 
+                (message.sender_id === selectedUser.id || 
+                 message.receiver_id === selectedUser.id)) {
+                addMessageToChat(
+                    message.content, 
+                    message.sender_id === currentUserId,
+                    message.created_at,
+                    message.id,
+                    message.status
+                );
+                
+                // Mark as read if we're the receiver
+                if (message.receiver_id === currentUserId && message.status !== 'read') {
+                    markMessageAsRead(message.id);
+                }
+            } 
+            // Otherwise update unread count
+            else if (message.receiver_id === currentUserId) {
+                incrementUnreadCount(message.sender_id);
+            }
+        }
 
-        // User management
+        // Update message status in UI
+        function updateMessageStatus(message) {
+            const messageElement = document.querySelector(`[data-message-id="${message.id}"]`);
+            if (messageElement) {
+                const statusElement = messageElement.querySelector('.message-status');
+                if (statusElement) {
+                    statusElement.textContent = getStatusText(message.status);
+                    statusElement.title = `Message status: ${message.status}`;
+                }
+            }
+        }
+
+        // Load users list
         async function loadUsers() {
             try {
                 showLoading();
@@ -465,6 +520,7 @@
             }
         }
 
+        // Render users list
         function renderUserList(users) {
             const userList = document.querySelector('.user-list');
             userList.innerHTML = `
@@ -489,6 +545,8 @@
                     statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 }
                 
+                const unreadCount = unreadMessages[user.id] || 0;
+                
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
                 userCard.dataset.userId = user.id;
@@ -501,6 +559,7 @@
                         <h4>${user.name}</h4>
                         <p>${statusText}</p>
                     </div>
+                    ${unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : ''}
                     <div class="status-indicator ${isOnline ? 'online' : 'offline'}"></div>
                 `;
                 userCard.addEventListener('click', () => selectUser(user));
@@ -510,30 +569,33 @@
             setupSearch();
         }
 
-        function setupSearch() {
-            document.querySelector('.search-input').addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                document.querySelectorAll('.user-card').forEach(card => {
-                    const name = card.querySelector('h4').textContent.toLowerCase();
-                    card.style.display = name.includes(term) ? 'flex' : 'none';
-                });
-            });
-        }
-
+        // Select a user to chat with
         async function selectUser(user) {
+            // Update UI
             document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
             document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
             
+            // Clear unread count for this user
+            if (unreadMessages[user.id]) {
+                delete unreadMessages[user.id];
+                document.querySelector(`[data-user-id="${user.id}"] .unread-badge`)?.remove();
+            }
+            
+            // Set selected user and update header
             selectedUser = { id: user.id, name: user.name };
             document.querySelector('.chat-header h2').textContent = user.name;
+            
+            // Load messages
             await loadMessages(user.id);
         }
 
+        // Load messages for a specific user
         async function loadMessages(userId) {
             try {
                 const messagesContainer = document.querySelector('.chat-messages');
                 messagesContainer.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading messages...</p></div>';
                 
+                // Get messages between current user and selected user
                 const { data: messages, error } = await supabaseClient
                     .from('messages')
                     .select('*')
@@ -548,11 +610,29 @@
                     return;
                 }
                 
+                // Display all messages
                 messages.forEach(msg => {
-                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at);
+                    addMessageToChat(
+                        msg.content, 
+                        msg.sender_id === currentUserId,
+                        msg.created_at,
+                        msg.id,
+                        msg.status
+                    );
                 });
                 
+                // Scroll to bottom
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Mark any unread messages as read
+                const unreadMessages = messages.filter(msg => 
+                    msg.receiver_id === currentUserId && msg.status !== 'read'
+                );
+                
+                if (unreadMessages.length > 0) {
+                    const messageIds = unreadMessages.map(msg => msg.id);
+                    await markMessagesAsRead(messageIds);
+                }
                 
             } catch (error) {
                 console.error('Failed to load messages:', error);
@@ -560,28 +640,41 @@
             }
         }
 
+        // Send a new message
         async function sendMessage(receiverId, content) {
             try {
+                if (!content.trim()) {
+                    alert('Message cannot be empty');
+                    return;
+                }
+                
                 showSendLoading();
                 
+                // Insert message with status 'sent'
                 const { data: message, error } = await supabaseClient
                     .from('messages')
                     .insert([{
                         sender_id: currentUserId,
                         receiver_id: receiverId,
-                        content: content
+                        content: content.trim(),
+                        status: 'sent'
                     }])
                     .select()
                     .single();
                 
                 if (error) throw error;
                 
-                addMessageToChat(content, true, new Date().toISOString());
+                // Display the message immediately
+                addMessageToChat(
+                    content, 
+                    true, 
+                    new Date().toISOString(),
+                    message.id,
+                    'sent'
+                );
                 
-                await supabaseClient
-                    .from('users')
-                    .update({ lastonline: new Date().toISOString() })
-                    .eq('id', currentUserId);
+                // Update last online status
+                await updateLastOnline();
                 
             } catch (error) {
                 console.error('Failed to send message:', error);
@@ -591,15 +684,20 @@
             }
         }
 
-        function addMessageToChat(content, isSent, timestamp) {
+        // Add a message to the chat UI
+        function addMessageToChat(content, isSent, timestamp, messageId, status) {
             const messagesContainer = document.querySelector('.chat-messages');
             
+            // Clear loading state if present
             if (messagesContainer.querySelector('.loading-state')) {
                 messagesContainer.innerHTML = '';
             }
             
+            // Create message element
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            if (messageId) messageDiv.dataset.messageId = messageId;
+            
             messageDiv.innerHTML = `
                 <div class="message-content">
                     <p>${content}</p>
@@ -610,19 +708,62 @@
                             month: 'short',
                             day: 'numeric'
                         })
-                    }</span>
+                    }${isSent ? ` <span class="message-status" title="Message status: ${status || 'sent'}">${getStatusText(status)}</span>` : ''}</span>
                 </div>
             `;
+            
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
+        // Mark messages as read
+        async function markMessagesAsRead(messageIds) {
+            try {
+                const { error } = await supabaseClient
+                    .from('messages')
+                    .update({ status: 'read', read_at: new Date().toISOString() })
+                    .in('id', messageIds);
+                
+                if (error) throw error;
+            } catch (error) {
+                console.error('Failed to mark messages as read:', error);
+            }
+        }
+
+        // Mark single message as read
+        async function markMessageAsRead(messageId) {
+            try {
+                const { error } = await supabaseClient
+                    .from('messages')
+                    .update({ status: 'read', read_at: new Date().toISOString() })
+                    .eq('id', messageId);
+                
+                if (error) throw error;
+            } catch (error) {
+                console.error('Failed to mark message as read:', error);
+            }
+        }
+
+        // Update user's last online status
+        async function updateLastOnline() {
+            try {
+                await supabaseClient
+                    .from('users')
+                    .update({ lastonline: new Date().toISOString() })
+                    .eq('id', currentUserId);
+            } catch (error) {
+                console.error('Failed to update last online:', error);
+            }
+        }
+
+        // Update connection status UI
         function updateConnectionStatus(message, isError = false) {
             const status = document.querySelector('.connection-status');
             status.textContent = message;
             status.classList.toggle('connected', !isError);
         }
 
+        // Update online status for users
         function updateOnlineStatus(onlineUserIds) {
             document.querySelectorAll('.user-card').forEach(card => {
                 const userId = card.dataset.userId;
@@ -641,6 +782,7 @@
             document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
         }
 
+        // Format last online time
         function formatLastOnline(date) {
             if (!date) return 'Offline';
             
@@ -651,6 +793,7 @@
             return `${Math.floor(diff/1440)}d ago`;
         }
 
+        // Show typing indicator
         function showTypingIndicator(userId) {
             const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
             if (partner) {
@@ -662,6 +805,31 @@
             }
         }
 
+        // Increment unread message count for a user
+        function incrementUnreadCount(userId) {
+            unreadMessages[userId] = (unreadMessages[userId] || 0) + 1;
+            const userCard = document.querySelector(`[data-user-id="${userId}"]`);
+            if (userCard) {
+                let badge = userCard.querySelector('.unread-badge');
+                if (!badge) {
+                    badge = document.createElement('div');
+                    badge.className = 'unread-badge';
+                    userCard.appendChild(badge);
+                }
+                badge.textContent = unreadMessages[userId];
+            }
+        }
+
+        // Get status text for display
+        function getStatusText(status) {
+            switch (status) {
+                case 'delivered': return '✓✓';
+                case 'read': return '✓✓✓';
+                default: return '✓';
+            }
+        }
+
+        // Show loading state
         function showLoading() {
             document.querySelector('.user-list').innerHTML = `
                 <div class="search-bar">
@@ -674,6 +842,7 @@
             `;
         }
 
+        // Show error state
         function showError(container, message) {
             document.querySelector(`.${container}`).innerHTML = `
                 <div class="error-state">
@@ -683,35 +852,72 @@
             `;
         }
 
+        // Show session error
+        function showSessionError(error) {
+            document.querySelector('.session-check').innerHTML = `
+                <h2>Session verification failed</h2>
+                <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
+                <button onclick="window.location.href='login.html'" 
+                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                    Go to Login
+                </button>
+            `;
+        }
+
+        // Show send loading state
         function showSendLoading() {
             const btn = document.querySelector('.send-button');
             btn.disabled = true;
             btn.textContent = 'Sending...';
         }
 
+        // Hide send loading state
         function hideSendLoading() {
             const btn = document.querySelector('.send-button');
             btn.disabled = false;
             btn.textContent = 'Send';
         }
 
+        // Handle realtime errors
+        function handleRealtimeError(error) {
+            updateConnectionStatus("Error: " + error.message, true);
+            setTimeout(initializeRealtime, 5000);
+        }
+
+        // Setup search functionality
+        function setupSearch() {
+            document.querySelector('.search-input').addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('.user-card').forEach(card => {
+                    const name = card.querySelector('h4').textContent.toLowerCase();
+                    card.style.display = name.includes(term) ? 'flex' : 'none';
+                });
+            });
+        }
+
+        // Setup event listeners
         function setupEventListeners() {
+            // Send message button
             document.querySelector('.send-button').addEventListener('click', async () => {
                 const input = document.querySelector('.message-input');
                 const content = input.value.trim();
+                
                 if (!selectedUser) {
                     alert('Please select a user first');
                     return;
                 }
+                
                 if (!content) {
                     alert('Message cannot be empty');
                     return;
                 }
+                
                 await sendMessage(selectedUser.id, content);
                 input.value = '';
                 input.focus();
             });
 
+            // Send message on Enter key (without Shift)
             document.querySelector('.message-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -719,9 +925,7 @@
                 }
             });
 
-            let isTyping = false;
-            let lastTypingTime = 0;
-            
+            // Typing indicator
             document.querySelector('.message-input').addEventListener('input', () => {
                 if (!selectedUser) return;
                 
@@ -749,6 +953,7 @@
                 }, 1000);
             });
 
+            // Network status monitoring
             window.addEventListener('online', () => {
                 updateConnectionStatus("Reconnecting...");
                 initializeRealtime();
