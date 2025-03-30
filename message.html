@@ -37,37 +37,24 @@
             display: flex;
             height: 100vh;
             width: 100vw;
-            position: relative;
         }
         
-        /* Map Styles */
-        .map-container {
-            flex: 1;
-            position: relative;
+        /* Sidebar Styles */
+        .sidebar {
+            width: 350px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            transition: transform 0.3s ease;
         }
-        #map {
-            height: 100%;
-            width: 100%;
-            background: #1a1a1a;
+        .sidebar.collapsed {
+            transform: translateX(-100%);
         }
         
         /* User List Styles */
-        .user-list-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 350px;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(10px);
-            z-index: 100;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-            overflow-y: auto;
-        }
-        .user-list-container.active {
-            transform: translateX(0);
-        }
         .search-bar {
             position: sticky;
             top: 0;
@@ -89,11 +76,16 @@
             outline: none;
             background: rgba(255, 255, 255, 0.1);
         }
+        .user-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
         .user-card {
             display: flex;
             align-items: center;
             padding: 15px;
-            margin: 8px 15px;
+            margin: 0 15px 8px;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -121,6 +113,52 @@
         }
         .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
         .offline { background: #666; }
+        
+        /* Map Styles */
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            background: #1a1a1a;
+        }
+        
+        /* Control Buttons */
+        .sidebar-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .logout-button {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+        .logout-button:hover {
+            background: rgba(255, 0, 0, 0.3);
+        }
         
         /* Chat Styles */
         .chat-container {
@@ -229,47 +267,6 @@
             margin-top: 5px;
         }
         
-        /* Control Buttons */
-        .control-buttons {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 1000;
-        }
-        .control-button {
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 500;
-        }
-        .logout-button {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 0, 0, 0.2);
-            color: #ff4444;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 500;
-            z-index: 1000;
-        }
-        .logout-button:hover {
-            background: rgba(255, 0, 0, 0.3);
-        }
-        
         /* Loading and Error States */
         .loading-state {
             display: flex;
@@ -341,37 +338,32 @@
     <div class="connection-status">Connecting...</div>
     
     <div class="app-container">
+        <div class="sidebar" id="sidebar">
+            <div class="search-bar">
+                <input type="text" class="search-input" placeholder="Search team members...">
+            </div>
+            <div class="user-list" id="userList">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>Loading users...</p>
+                </div>
+            </div>
+        </div>
+        
         <div class="map-container">
             <div id="map"></div>
-            
-            <div class="control-buttons">
-                <button class="control-button" id="usersButton">
-                    👥 Users
-                </button>
-                <button class="control-button" id="chatButton" style="display: none;">
-                    💬 Chat
-                </button>
-            </div>
-            
+            <button class="sidebar-toggle" id="sidebarToggle">
+                👥 Users
+            </button>
             <button class="logout-button" id="logoutButton">
                 ⬅️ Logout
             </button>
         </div>
         
-        <div class="user-list-container" id="userListContainer">
-            <div class="search-bar">
-                <input type="text" class="search-input" placeholder="Search team members...">
-            </div>
-            <div class="loading-state">
-                <div class="loading-spinner"></div>
-                <p>Loading users...</p>
-            </div>
-        </div>
-        
         <div class="chat-container" id="chatContainer">
             <div class="chat-header">
                 <h2>Select a user to start chatting</h2>
-                <button class="control-button" id="closeChatButton">
+                <button class="sidebar-toggle" id="closeChatButton">
                     ✖️ Close
                 </button>
             </div>
@@ -586,15 +578,11 @@
         }
 
         function renderUserList(users) {
-            const userList = document.querySelector('.user-list-container');
-            userList.innerHTML = `
-                <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
-                </div>
-            `;
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
 
             if (users.length === 0) {
-                userList.innerHTML += `<p style="padding: 20px; text-align: center;">No other users found</p>`;
+                userList.innerHTML = '<p style="padding: 20px; text-align: center;">No other users found</p>';
                 return;
             }
 
@@ -644,8 +632,6 @@
             
             // Show chat container
             document.getElementById('chatContainer').classList.add('active');
-            document.getElementById('userListContainer').classList.remove('active');
-            document.getElementById('chatButton').style.display = 'block';
         }
 
         async function loadMessages(userId) {
@@ -788,10 +774,7 @@
         }
 
         function showLoading() {
-            document.querySelector('.user-list-container').innerHTML = `
-                <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
-                </div>
+            document.getElementById('userList').innerHTML = `
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
                     <p>Loading users...</p>
@@ -806,7 +789,7 @@
                 <p>${message}</p>
                 <button onclick="window.location.reload()">Retry</button>
             `;
-            document.querySelector('.user-list-container').appendChild(errorDiv);
+            document.getElementById('userList').appendChild(errorDiv);
         }
 
         function showSendLoading() {
@@ -888,14 +871,9 @@
                 updateConnectionStatus("Offline - No connection", true);
             });
 
-            // User list toggle
-            document.getElementById('usersButton').addEventListener('click', () => {
-                document.getElementById('userListContainer').classList.toggle('active');
-            });
-
-            // Chat toggle
-            document.getElementById('chatButton').addEventListener('click', () => {
-                document.getElementById('chatContainer').classList.toggle('active');
+            // Sidebar toggle
+            document.getElementById('sidebarToggle').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.toggle('collapsed');
             });
 
             // Close chat button
