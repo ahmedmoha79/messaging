@@ -1,4 +1,4 @@
-const express = require('express');
+const expressconst express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 require('dotenv').config();
@@ -14,7 +14,7 @@ app.use(cors({
 
 // Supabase Client Configuration
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // Changed to service key
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Middleware
@@ -166,11 +166,140 @@ app.post('/api/messages', authenticateUser, async (req, res) => {
   }
 });
 
+// GPS Location Endpoints
+app.post('/api/gps', authenticateUser, async (req, res) => {
+  try {
+    const { latitude, longitude, device_id } = req.body;
+    
+    if (!latitude || !longitude || !device_id) {
+      return res.status(400).json({ error: 'Missing required location data' });
+    }
+
+    const { data: location, error } = await supabase
+      .from('gps_locations')
+      .insert([{
+        user_id: req.user.id,
+        device_id,
+        latitude,
+        longitude
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json(location);
+  } catch (error) {
+    console.error('GPS save error:', error);
+    res.status(500).json({ error: 'Failed to save location' });
+  }
+});
+
+app.get('/api/gps/latest', authenticateUser, async (req, res) => {
+  try {
+    const { data: location, error } = await supabase
+      .from('gps_locations')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) throw error;
+
+    if (!location) {
+      return res.status(404).json({ error: 'No location data found' });
+    }
+
+    res.json(location);
+  } catch (error) {
+    console.error('GPS fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch location' });
+  }
+});
+
+app.get('/api/gps/history/:userId', authenticateUser, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Verify user has permission to view this data
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'Unauthorized access' });
+    }
+
+    const { data: locations, error } = await supabase
+      .from('gps_locations')
+      .select('*')
+      .eq('user_id', userId)
+      .order('timestamp', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    res.json(locations);
+  } catch (error) {
+    console.error('GPS history error:', error);
+    res.status(500).json({ error: 'Failed to fetch location history' });
+  }
+});
+
+// Route Endpoints
+app.post('/api/route', authenticateUser, async (req, res) => {
+  try {
+    const { start, end } = req.body;
+    
+    if (!start || !start.latitude || !start.longitude || 
+        !end || !end.latitude || !end.longitude) {
+      return res.status(400).json({ error: 'Invalid coordinates' });
+    }
+
+    // In a real implementation, you would call your routing API here
+    // This is a placeholder for the actual routing service integration
+    const routeData = {
+      coordinates: [
+        { latitude: start.latitude, longitude: start.longitude },
+        { latitude: end.latitude, longitude: end.longitude }
+      ],
+      distance: calculateDistance(start, end),
+      duration: calculateDuration(start, end)
+    };
+
+    res.json(routeData);
+  } catch (error) {
+    console.error('Route error:', error);
+    res.status(500).json({ error: 'Failed to calculate route' });
+  }
+});
+
 // Helper Functions
 function calculateUserStatus(lastonline) {
   const last = new Date(lastonline);
   const diff = (Date.now() - last.getTime()) / 1000;
   return diff < 300 ? 'online' : 'offline';
+}
+
+function calculateDistance(start, end) {
+  // Haversine formula implementation
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(end.latitude - start.latitude);
+  const dLon = toRad(end.longitude - start.longitude);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(toRad(start.latitude)) * Math.cos(toRad(end.latitude)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
+}
+
+function toRad(degrees) {
+  return degrees * Math.PI / 180;
+}
+
+function calculateDuration(start, end) {
+  // Simple estimation - 1 minute per km at 60km/h
+  const distance = calculateDistance(start, end);
+  return Math.round(distance * 60); // Duration in minutes
 }
 
 // Server Initialization
