@@ -460,7 +460,7 @@
                     return;
                 }
 
-                currentUserId = session.user.id;
+                currentUserId = session?.user?.id; // More defensive
 
                 // Verify user
                 const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
@@ -694,36 +694,52 @@
         }
 
         async function sendMessage(receiverId, content) {
-            try {
-                showSendLoading();
-                
-                const { data: message, error } = await supabaseClient
-                    .from('messages')
-                    .insert([{
-                        sender_id: currentUserId,
-                        receiver_id: receiverId,
-                        content: content
-                    }])
-                    .select()
-                    .single();
-                
-                if (error) throw error;
-                
-                addMessageToChat(content, true, new Date().toISOString());
-                
-                await supabaseClient
-                    .from('users')
-                    .update({ lastonline: new Date().toISOString() })
-                    .eq('id', currentUserId);
-                
-            } catch (error) {
-                console.error('Failed to send message:', error);
-                showError('Failed to send message: ' + error.message);
-            } finally {
-                hideSendLoading();
-            }
-        }
+    // 1. Add authentication check FIRST
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (!user || authError) {
+        alert("⚠️ You're not properly logged in. Please refresh the page and log in again.");
+        console.error("Auth error:", authError);
+        return;
+    }
+    console.log("Sending message as user:", user.id); // Debug log
 
+    try {
+        showSendLoading();
+        
+        // 2. Use user.id instead of currentUserId
+        const { data: message, error } = await supabaseClient
+            .from('messages')
+            .insert([{
+                sender_id: user.id,  // CHANGED FROM currentUserId
+                receiver_id: receiverId,
+                content: content
+            }])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        // 3. Update lastonline using user.id
+        addMessageToChat(content, true, new Date().toISOString());
+        
+        await supabaseClient
+            .from('users')
+            .update({ lastonline: new Date().toISOString() })
+            .eq('id', user.id);  // CHANGED FROM currentUserId
+        
+    } catch (error) {
+        console.error('Failed to send message:', error);
+        showError('Failed to send message: ' + error.message);
+        
+        // 4. Additional debug for RLS errors
+        if (error.message.includes('row-level security')) {
+            console.log("RLS Policy Violation - Current User:", user);
+            console.log("Attempted to send to:", receiverId);
+        }
+    } finally {
+        hideSendLoading();
+    }
+}
         function addMessageToChat(content, isSent, timestamp) {
             const messagesContainer = document.getElementById('chatMessages');
             
