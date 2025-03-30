@@ -118,6 +118,10 @@
         .map-container {
             flex: 1;
             position: relative;
+            display: block;
+        }
+        .map-container.hidden {
+            display: none;
         }
         #map {
             height: 100%;
@@ -125,8 +129,35 @@
             background: #1a1a1a;
         }
         
+        /* Chat View Styles */
+        .chat-view {
+            flex: 1;
+            position: relative;
+            display: none;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.85);
+        }
+        .chat-view.active {
+            display: flex;
+        }
+        
         /* Control Buttons */
         .sidebar-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .back-to-map {
             position: absolute;
             top: 20px;
             left: 20px;
@@ -162,21 +193,10 @@
         
         /* Chat Styles */
         .chat-container {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 400px;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(10px);
-            z-index: 100;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
+            flex: 1;
             display: flex;
             flex-direction: column;
-        }
-        .chat-container.active {
-            transform: translateX(0);
+            height: 100%;
         }
         .chat-header {
             padding: 20px;
@@ -350,7 +370,7 @@
             </div>
         </div>
         
-        <div class="map-container">
+        <div class="map-container" id="mapContainer">
             <div id="map"></div>
             <button class="sidebar-toggle" id="sidebarToggle">
                 👥 Users
@@ -360,17 +380,19 @@
             </button>
         </div>
         
-        <div class="chat-container" id="chatContainer">
-            <div class="chat-header">
-                <h2>Select a user to start chatting</h2>
-                <button class="sidebar-toggle" id="closeChatButton">
-                    ✖️ Close
-                </button>
-            </div>
-            <div class="chat-messages"></div>
-            <div class="message-input-container">
-                <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
-                <button class="send-button" disabled>Send</button>
+        <div class="chat-view" id="chatView">
+            <button class="back-to-map" id="backToMapButton">
+                ← Back to Map
+            </button>
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h2 id="chatPartnerName">Select a user to start chatting</h2>
+                </div>
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="message-input-container">
+                    <textarea class="message-input" id="messageInput" placeholder="Type your message..." disabled></textarea>
+                    <button class="send-button" id="sendButton" disabled>Send</button>
+                </div>
             </div>
         </div>
     </div>
@@ -447,8 +469,8 @@
 
                 // Show main interface
                 document.querySelector('.session-check').style.display = 'none';
-                document.querySelector('.message-input').disabled = false;
-                document.querySelector('.send-button').disabled = false;
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendButton').disabled = false;
 
                 // Initialize map
                 initializeMap();
@@ -627,16 +649,22 @@
             document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
             
             selectedUser = { id: user.id, name: user.name };
-            document.querySelector('.chat-header h2').textContent = user.name;
+            document.getElementById('chatPartnerName').textContent = user.name;
             await loadMessages(user.id);
             
-            // Show chat container
-            document.getElementById('chatContainer').classList.add('active');
+            // Switch to chat view
+            document.getElementById('mapContainer').classList.add('hidden');
+            document.getElementById('chatView').classList.add('active');
+        }
+
+        function showMapView() {
+            document.getElementById('mapContainer').classList.remove('hidden');
+            document.getElementById('chatView').classList.remove('active');
         }
 
         async function loadMessages(userId) {
             try {
-                const messagesContainer = document.querySelector('.chat-messages');
+                const messagesContainer = document.getElementById('chatMessages');
                 messagesContainer.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading messages...</p></div>';
                 
                 const { data: messages, error } = await supabaseClient
@@ -697,7 +725,7 @@
         }
 
         function addMessageToChat(content, isSent, timestamp) {
-            const messagesContainer = document.querySelector('.chat-messages');
+            const messagesContainer = document.getElementById('chatMessages');
             
             if (messagesContainer.querySelector('.loading-state')) {
                 messagesContainer.innerHTML = '';
@@ -765,11 +793,12 @@
         function showTypingIndicator(userId) {
             const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
             if (partner) {
-                document.getElementById('partnerName').textContent = partner.textContent;
-                const indicator = document.getElementById('typingIndicator');
-                indicator.style.opacity = '1';
+                const indicator = document.createElement('div');
+                indicator.className = 'typing-indicator';
+                indicator.textContent = `${partner.textContent} is typing...`;
+                document.getElementById('chatMessages').appendChild(indicator);
                 clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => indicator.style.opacity = '0', 2000);
+                typingTimeout = setTimeout(() => indicator.remove(), 2000);
             }
         }
 
@@ -793,21 +822,21 @@
         }
 
         function showSendLoading() {
-            const btn = document.querySelector('.send-button');
+            const btn = document.getElementById('sendButton');
             btn.disabled = true;
             btn.textContent = 'Sending...';
         }
 
         function hideSendLoading() {
-            const btn = document.querySelector('.send-button');
+            const btn = document.getElementById('sendButton');
             btn.disabled = false;
             btn.textContent = 'Send';
         }
 
         function setupEventListeners() {
             // Message sending
-            document.querySelector('.send-button').addEventListener('click', async () => {
-                const input = document.querySelector('.message-input');
+            document.getElementById('sendButton').addEventListener('click', async () => {
+                const input = document.getElementById('messageInput');
                 const content = input.value.trim();
                 if (!selectedUser) {
                     alert('Please select a user first');
@@ -823,10 +852,10 @@
             });
 
             // Enter key for sending
-            document.querySelector('.message-input').addEventListener('keypress', (e) => {
+            document.getElementById('messageInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    document.querySelector('.send-button').click();
+                    document.getElementById('sendButton').click();
                 }
             });
 
@@ -834,7 +863,7 @@
             let isTyping = false;
             let lastTypingTime = 0;
             
-            document.querySelector('.message-input').addEventListener('input', () => {
+            document.getElementById('messageInput').addEventListener('input', () => {
                 if (!selectedUser) return;
                 
                 const now = Date.now();
@@ -876,9 +905,9 @@
                 document.getElementById('sidebar').classList.toggle('collapsed');
             });
 
-            // Close chat button
-            document.getElementById('closeChatButton').addEventListener('click', () => {
-                document.getElementById('chatContainer').classList.remove('active');
+            // Back to map button
+            document.getElementById('backToMapButton').addEventListener('click', () => {
+                showMapView();
             });
 
             // Logout button
