@@ -1,1051 +1,225 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logistics Secure Messaging</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-        }
-        body {
-            background: #0a0a0a;
-            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%) fixed;
-            color: #ffffff;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .connection-status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            z-index: 1000;
-            background: #ff444455;
-            color: #ff4444;
-        }
-        .connection-status.connected {
-            background: #00ff8855;
-            color: #00ff88;
-        }
-        .messaging-container {
-            display: flex;
-            height: 100vh;
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
-        }
-        .user-list {
-            width: 350px;
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            overflow-y: auto;
-        }
-        .search-bar {
-            position: relative;
-            margin-bottom: 20px;
-        }
-        .search-input {
-            width: 100%;
-            padding: 12px 40px 12px 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-        }
-        .search-input:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.1);
-        }
-        .user-card {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            margin: 8px 0;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.02);
-        }
-        .user-card:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        .user-card.active {
-            background: linear-gradient(90deg, #2a2a2a 0%, #1a1a1a 100%);
-            border-left: 4px solid #00ff88;
-        }
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            margin-right: 15px;
-            object-fit: cover;
-        }
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .chat-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .chat-messages {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            scroll-behavior: smooth;
-        }
-        .message {
-            display: flex;
-            margin-bottom: 20px;
-            animation: messageAppear 0.4s ease forwards;
-        }
-        @keyframes messageAppear {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .message-content {
-            max-width: 70%;
-            padding: 12px 18px;
-            border-radius: 15px;
-            position: relative;
-        }
-        .message.sent {
-            justify-content: flex-end;
-        }
-        .message.sent .message-content {
-            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
-            color: #000;
-        }
-        .message.received .message-content {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        .message-input-container {
-            padding: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        .message-input {
-            flex: 1;
-            padding: 15px 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            resize: none;
-            min-height: 50px;
-        }
-        .send-button {
-            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
-            border: none;
-            border-radius: 8px;
-            color: #000;
-            padding: 15px 25px;
-            font-weight: bold;
-            cursor: pointer;
-            min-height: 50px;
-        }
-        .status-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-left: auto;
-        }
-        .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
-        .offline { background: #666; }
-        .typing-indicator {
-            position: absolute;
-            top: -25px;
-            left: 20px;
-            font-size: 0.9em;
-            color: #00ff88;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .loading-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            color: #ffffff;
-        }
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #00ff88;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 10px;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .error-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            color: #ff4444;
-        }
-        .error-state button {
-            margin-top: 10px;
-            padding: 8px 16px;
-            background: #00ff88;
-            border: none;
-            border-radius: 4px;
-            color: #000;
-            font-weight: bold;
-        }
-        .message-time {
-            font-size: 0.7em;
-            opacity: 0.7;
-            display: block;
-            text-align: right;
-            margin-top: 5px;
-        }
-        .session-check {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-        .session-check h2 {
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="session-check">
-        <h2>Checking your session...</h2>
-        <div class="loading-spinner"></div>
-    </div>
+    document.addEventListener('DOMContentLoaded', function() {
+    const supabase = createClient('https://YOUR_PROJECT.supabase.co', 'YOUR_ANON_KEY');
 
-    <div class="connection-status">Connecting...</div>
-    <div class="messaging-container" style="display: none;">
-        <div class="user-list">
-            <div class="search-bar">
-                <input type="text" class="search-input" placeholder="Search team members...">
-            </div>
-            <div class="loading-state">
-                <div class="loading-spinner"></div>
-                <p>Loading users...</p>
-            </div>
-        </div>
-        <div class="chat-container">
-            <div class="chat-header">
-                <h2>Select a user to start chatting</h2>
-                <p id="onlineCount">Loading...</p>
-                <div class="typing-indicator" id="typingIndicator">
-                    <span id="partnerName"></span> is typing...
-                </div>
-            </div>
-            <div class="chat-messages"></div>
-            <div class="message-input-container">
-                <textarea class="message-input" placeholder="Type your message..." disabled></textarea>
-                <button class="send-button" disabled>Send</button>
-            </div>
-        </div>
-    </div>
+    // Utility functions for session management
+    function generateSessionId() {
+        return Math.random().toString(36).substring(2, 15) +
+               Math.random().toString(36).substring(2, 15);
+        }
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-    // Configuration and global variables remain the same
-    const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-    let supabaseClient, presenceChannel, typingTimeout;
-    let selectedUser = null, currentUserId = null, session = null;
+    function normalizeUserId(id) {
+        return typeof id === 'string' && id.includes('-') ? id : id;
+    }
 
-    document.addEventListener('DOMContentLoaded', async () => {
+    // Global state variables
+    let currentUser = null;
+    let selectedUserId = null;
+    let authToken = null;
+    let sessionId = localStorage.getItem('chatSessionId') || generateSessionId();
+    localStorage.setItem('chatSessionId', sessionId);
+
+    // Authentication and initialization
+    function initializeChat() {
+        authToken = localStorage.getItem('authToken');
+        if (!authToken) {
+            window.location.href = '/login.html';
+            return;
+        }
+
+        currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        setupEventListeners();
+        loadUsers();
+        setupRefreshInterval();
+    }
+
+    function setupEventListeners() {
+        document.getElementById('send-button').addEventListener('click', sendMessage);
+        document.getElementById('message-text').addEventListener('keypress', handleMessageKeyPress);
+            }
+
+    function handleMessageKeyPress(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+
+    function setupRefreshInterval() {
+        setInterval(() => {
+            loadUsers();
+        if (selectedUserId) {
+            loadMessages(selectedUserId);
+        }
+        }, 10000);
+    }
+
+    // User and message management
+    async function loadUsers() {
         try {
-            // Supabase client initialization remains the same
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: false,
-                    storage: {
-                        getItem: (key) => {
-                            return localStorage.getItem(key) || 
-                                   localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                        },
-                        setItem: (key, value) => localStorage.setItem(key, value),
-                        removeItem: (key) => localStorage.removeItem(key)
-                    }
+            const response = await fetch('/api/users', {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'X-Session-ID': sessionId
                 }
-            });
-
-            // Session handling remains the same
-            const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-            if (sessionError) throw sessionError;
-            session = currentSession;
-
-            if (!session) {
-                const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                   localStorage.getItem('session');
-                if (sessionData) {
-                    try {
-                        const parsedSession = JSON.parse(sessionData);
-                        if (parsedSession && parsedSession.access_token) {
-                            await supabaseClient.auth.setSession({
-                                access_token: parsedSession.access_token,
-                                refresh_token: parsedSession.refresh_token
-                            });
-                            const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                            session = recoveredSession;
-                        }
-                    } catch (e) {
-                        console.error("Failed to parse session data:", e);
-                    }
-                }
-            }
-
-            if (!session) {
-                window.location.href = 'login.html';
-                return;
-            }
-
-            currentUserId = session.user.id;
-
-            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-            if (authError) throw authError;
-            if (!user) throw new Error("User verification failed");
-
-            document.querySelector('.session-check').style.display = 'none';
-            document.querySelector('.messaging-container').style.display = 'flex';
-            document.querySelector('.message-input').disabled = false;
-            document.querySelector('.send-button').disabled = false;
-
-            await loadUsers();
-            setupEventListeners();
-            initializeRealtime();
-
-        } catch (error) {
-            console.error("Initialization error:", error);
-            document.querySelector('.session-check').innerHTML = `
-                <h2>Session verification failed</h2>
-                <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                <button onclick="window.location.href='login.html'" 
-                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                    Go to Login
-                </button>
-            `;
-        }
     });
 
-    // FIXED REALTIME INITIALIZATION
-    async function initializeRealtime() {
-        updateConnectionStatus("Connecting to real-time service...");
-        
-        try {
-            // Remove existing channels if they exist
-            if (presenceChannel) {
-                supabaseClient.removeChannel(presenceChannel);
-            }
-
-            presenceChannel = supabaseClient.channel('presence-channel', {
-                config: { 
-                    presence: { 
-                        key: currentUserId
-                    } 
-                }
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = presenceChannel.presenceState();
-                updateOnlineStatus(Object.keys(state));
-            })
-            .on('broadcast', { event: 'typing' }, ({ payload }) => {
-                if (payload.partnerId === currentUserId) {
-                    showTypingIndicator(payload.userId);
-                }
-            })
-            .subscribe(async (status, error) => {
-                if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({ online_at: new Date().toISOString() });
-                    updateConnectionStatus("Connected");
-                }
-                if (error) {
-                    console.error('Presence channel error:', error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                }
-            });
-
-            // Handle channel connection events
-            presenceChannel
-                .on('CLOSE', () => {
-                    updateConnectionStatus("Reconnecting...", true);
-                    setTimeout(initializeRealtime, 3000);
-                })
-                .on('ERROR', (error) => {
-                    console.error("Realtime error:", error);
-                    updateConnectionStatus("Error: " + error.message, true);
-                    setTimeout(initializeRealtime, 5000);
-                });
-
-            const messagesChannel = supabaseClient.channel('messages-channel')
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'messages',
-                    filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
-                }, (payload) => {
-                    if (selectedUser && 
-                        (payload.new.sender_id === selectedUser.id || 
-                         payload.new.receiver_id === selectedUser.id)) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
-                    } else if (payload.new.sender_id === currentUserId || payload.new.receiver_id === currentUserId) {
-                        addMessageToChat(
-                            payload.new.content, 
-                            payload.new.sender_id === currentUserId,
-                            payload.new.created_at
-                        );
-                    }
-                })
-                .subscribe((status, error) => {
-                    if (error) {
-                        console.error('Messages channel error:', error);
-                        setTimeout(initializeRealtime, 5000);
-                    }
-                });
-
-        } catch (error) {
-            console.error("Realtime connection error:", error);
-            updateConnectionStatus("Realtime failed: " + error.message, true);
-            setTimeout(initializeRealtime, 5000);
-        }
-    }
-
-
-        // User management
-        async function loadUsers() {
-            try {
-                showLoading();
-                
-                const { data: users, error } = await supabaseClient
-                    .from('users')
-                    .select('*')
-                    .neq('id', currentUserId)
-                    .order('lastonline', { ascending: false });
-                
-                if (error) throw error;
-                
-                renderUserList(users);
-                
-            } catch (error) {
-                console.error('Failed to load users:', error);
-                showError('user-list', 'Failed to load users. Please try again.');
-            }
-        }
-
-        function renderUserList(users) {
-            const userList = document.querySelector('.user-list');
-            userList.innerHTML = `
-                <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
-                </div>
-            `;
-
-            if (users.length === 0) {
-                userList.innerHTML += `<p style="padding: 20px; text-align: center;">No other users found</p>`;
+            if (!response.ok) {
+                handleUnauthorized(response);
                 return;
             }
 
-            users.forEach(user => {
-                const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                let statusText = 'Offline';
-                let isOnline = false;
-                
-                if (lastOnline) {
-                    const minutesSinceLastOnline = (Date.now() - lastOnline) / 60000;
-                    isOnline = minutesSinceLastOnline < 5;
-                    statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                }
-                
-                const userCard = document.createElement('div');
-                userCard.className = `user-card ${isOnline ? 'online' : ''}`;
-                userCard.dataset.userId = user.id;
-                userCard.innerHTML = `
-                    <img src="https://ui-avatars.com/api/?name=${
-                        encodeURIComponent(user.name.split(' ')[0])}+${
-                        encodeURIComponent(user.name.split(' ')[1] || '')}&background=random&length=2" 
-                        class="user-avatar" alt="${user.name}">
-                    <div class="user-info">
-                        <h4>${user.name}</h4>
-                        <p>${statusText}</p>
-                    </div>
-                    <div class="status-indicator ${isOnline ? 'online' : 'offline'}"></div>
-                `;
-                userCard.addEventListener('click', () => selectUser(user));
-                userList.appendChild(userCard);
-            });
-
-            setupSearch();
-        }
-
-        function setupSearch() {
-            document.querySelector('.search-input').addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                document.querySelectorAll('.user-card').forEach(card => {
-                    const name = card.querySelector('h4').textContent.toLowerCase();
-                    card.style.display = name.includes(term) ? 'flex' : 'none';
-                });
-            });
-        }
-
-        async function selectUser(user) {
-            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
-            document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
-            
-            selectedUser = { id: user.id, name: user.name };
-            document.querySelector('.chat-header h2').textContent = user.name;
-            await loadMessages(user.id);
-        }
-
-        async function loadMessages(userId) {
-            try {
-                const messagesContainer = document.querySelector('.chat-messages');
-                messagesContainer.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading messages...</p></div>';
-                
-                const { data: messages, error } = await supabaseClient
-                    .from('messages')
-                    .select('*')
-                    .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`)
-                    .order('created_at', { ascending: true });
-                
-                if (error) throw error;
-                
-                messagesContainer.innerHTML = '';
-                if (messages.length === 0) {
-                    messagesContainer.innerHTML = '<div class="loading-state"><p>No messages yet. Start the conversation!</p></div>';
-                    return;
-                }
-                
-                messages.forEach(msg => {
-                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at);
-                });
-                
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                
-            } catch (error) {
-                console.error('Failed to load messages:', error);
-                showError('chat-messages', 'Failed to load messages. Please try again.');
+            const users = await response.json();
+            updateUserList(users);
+        } catch (error) {
+            console.error('Error loading users:', error);
             }
         }
 
-        async function sendMessage(receiverId, content) {
-            try {
-                showSendLoading();
-                
-                const { data: message, error } = await supabaseClient
-                    .from('messages')
-                    .insert([{
-                        sender_id: currentUserId,
-                        receiver_id: receiverId,
-                        content: content
-                    }])
-                    .select()
-                    .single();
-                
-                if (error) throw error;
-                
-                addMessageToChat(content, true, new Date().toISOString());
-                
-                await supabaseClient
-                    .from('users')
-                    .update({ lastonline: new Date().toISOString() })
-                    .eq('id', currentUserId);
-                
-            } catch (error) {
-                console.error('Failed to send message:', error);
-                showError('chat-messages', 'Failed to send message: ' + error.message);
-            } finally {
-                hideSendLoading();
-            }
-        }
+    function updateUserList(users) {
+        const userList = document.getElementById('user-list');
+        userList.innerHTML = '';
 
-        function addMessageToChat(content, isSent, timestamp) {
-            const messagesContainer = document.querySelector('.chat-messages');
-            
-            if (messagesContainer.querySelector('.loading-state')) {
-                messagesContainer.innerHTML = '';
-            }
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-            messageDiv.innerHTML = `
-                <div class="message-content">
-                    <p>${content}</p>
-                    <span class="message-time">${
-                        new Date(timestamp || new Date()).toLocaleString([], {
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            month: 'short',
-                            day: 'numeric'
-                        })
-                    }</span>
-                </div>
-            `;
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
+        users.forEach(user => {
+            if (user.id === currentUser.id) return;
 
-        function updateConnectionStatus(message, isError = false) {
-            const status = document.querySelector('.connection-status');
-            status.textContent = message;
-            status.classList.toggle('connected', !isError);
-        }
+            const userElement = createUserElement(user);
+            userList.appendChild(userElement);
+    });
 
-        function updateOnlineStatus(onlineUserIds) {
-            document.querySelectorAll('.user-card').forEach(card => {
-                const userId = card.dataset.userId;
-                const isOnline = onlineUserIds.includes(userId);
-                const indicator = card.querySelector('.status-indicator');
-                if (indicator) {
-                    indicator.classList.toggle('online', isOnline);
-                    indicator.classList.toggle('offline', !isOnline);
-                    
-                    const statusText = card.querySelector('p');
-                    if (statusText) {
-                        statusText.textContent = isOnline ? 'Online' : 'Offline';
-                    }
-                }
-            });
-            document.getElementById('onlineCount').textContent = `${onlineUserIds.length} online`;
-        }
-
-        function formatLastOnline(date) {
-            if (!date) return 'Offline';
-            
-            const diff = (Date.now() - new Date(date)) / 60000;
-            if (diff < 1) return 'Just now';
-            if (diff < 60) return `${Math.floor(diff)}m ago`;
-            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
-            return `${Math.floor(diff/1440)}d ago`;
-        }
-
-        function showTypingIndicator(userId) {
-            const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
-            if (partner) {
-                document.getElementById('partnerName').textContent = partner.textContent;
-                const indicator = document.getElementById('typingIndicator');
-                indicator.style.opacity = '1';
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => indicator.style.opacity = '0', 2000);
-            }
-        }
-
-        function showLoading() {
-            document.querySelector('.user-list').innerHTML = `
-                <div class="search-bar">
-                    <input type="text" class="search-input" placeholder="Search team members...">
-                </div>
-                <div class="loading-state">
-                    <div class="loading-spinner"></div>
-                    <p>Loading users...</p>
-                </div>
-            `;
-        }
-
-        function showError(container, message) {
-            document.querySelector(`.${container}`).innerHTML = `
-                <div class="error-state">
-                    <p>${message}</p>
-                    <button onclick="window.location.reload()">Retry</button>
-                </div>
-            `;
-        }
-
-        function showSendLoading() {
-            const btn = document.querySelector('.send-button');
-            btn.disabled = true;
-            btn.textContent = 'Sending...';
-        }
-
-        function hideSendLoading() {
-            const btn = document.querySelector('.send-button');
-            btn.disabled = false;
-            btn.textContent = 'Send';
-        }
-
-        function setupEventListeners() {
-            document.querySelector('.send-button').addEventListener('click', async () => {
-                const input = document.querySelector('.message-input');
-                const content = input.value.trim();
-                if (!selectedUser) {
-                    alert('Please select a user first');
-                    return;
-                }
-                if (!content) {
-                    alert('Message cannot be empty');
-                    return;
-                }
-                await sendMessage(selectedUser.id, content);
-                input.value = '';
-                input.focus();
-            });
-
-            document.querySelector('.message-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    document.querySelector('.send-button').click();
-                }
-            });
-
-            let isTyping = false;
-            let lastTypingTime = 0;
-            
-            document.querySelector('.message-input').addEventListener('input', () => {
-                if (!selectedUser) return;
-                
-                const now = Date.now();
-                if (!isTyping) {
-                    isTyping = true;
-                    presenceChannel.send({
-                        type: 'broadcast',
-                        event: 'typing',
-                        payload: { userId: currentUserId, partnerId: selectedUser.id }
-                    });
-                }
-                
-                lastTypingTime = now;
-                
-                setTimeout(() => {
-                    if (now - lastTypingTime > 1000 && isTyping) {
-                        isTyping = false;
-                        presenceChannel.send({
-                            type: 'broadcast',
-                            event: 'stopped-typing',
-                            payload: { userId: currentUserId }
-                        });
-                    }
-                }, 1000);
-            });
-
-            window.addEventListener('online', () => {
-                updateConnectionStatus("Reconnecting...");
-                initializeRealtime();
-            });
-            
-            window.addEventListener('offline', () => {
-                updateConnectionStatus("Offline - No connection", true);
-            });
-        }
-    </script>
-</body>
-</html>
-        }
-
-        function setupEventListeners() {
-            document.querySelector('.send-button').addEventListener('click', async () => {
-                const input = document.querySelector('.message-input');
-                const content = input.value.trim();
-                if (!selectedUser) {
-                    alert('Please select a user first');
-                    return;
-        socket.onclose = function(e) {
-            console.log("WebSocket disconnected, reconnecting in 2 seconds...");
-            setTimeout(connectWebSocket, 2000);
-        };
+        updateOnlineCount(users);
     }
 
-    function updateOnlineStatus(onlineUserIds) {
-        onlineUsers = new Set(onlineUserIds);
+    function createUserElement(user) {
+        const userDiv = document.createElement('div');
+        userDiv.className = `user-item ${selectedUserId === user.id ? 'active' : ''}`;
+        userDiv.dataset.userId = user.id;
+        userDiv.onclick = () => selectUser(user.id, user.name);
 
-        document.getElementById('online-count').textContent = onlineUsers.size;
+        const userInfo = document.createElement('div');
+        userInfo.className = 'user-info';
+        userInfo.innerHTML = `
+            <span class="user-name">${user.name || user.email.split('@')[0]}</span>
+            <span class="status-indicator ${user.status === 'online' ? 'online' : 'offline'}"></span>
+        `;
 
-        document.querySelectorAll('.user-item').forEach(userItem => {
-            const userId = parseInt(userItem.getAttribute('data-user-id'));
-            const statusIndicator = document.getElementById(`status-${userId}`);
-
-            if (onlineUsers.has(userId)) {
-                statusIndicator.classList.add('online');
-                statusIndicator.classList.remove('offline');
-            } else {
-                statusIndicator.classList.add('offline');
-                statusIndicator.classList.remove('online');
-            }
-        });
+        userDiv.appendChild(userInfo);
+        return userDiv;
     }
 
-    function handleNewMessage(data) {
-        if (data.sender_id !== currentUserId) {
-            const unreadBadge = document.getElementById(`unread-${data.sender_id}`);
-
-            if (data.sender_id === selectedUserId) {
-                appendMessage(data.message, false, data.timestamp);
-                unreadBadge.textContent = '';
-                unreadBadge.style.display = 'none';
-            } else {
-                let count = parseInt(unreadBadge.textContent) || 0;
-                unreadBadge.textContent = count + 1;
-                unreadBadge.style.display = 'block';
-
-                showBrowserNotification(data.sender_name, data.message);
-            }
-        }
+    function updateOnlineCount(users) {
+        const onlineUsers = users.filter(user => user.status === 'online');
+        document.getElementById('online-count').textContent = onlineUsers.length;
     }
 
-    function showBrowserNotification(sender, message) {
-        if (Notification.permission === "granted") {
-            const notification = new Notification(`New message from ${sender}`, {
-                body: message,
-                icon: '/static/notification-icon.png'
-            });
-
-            notification.onclick = function() {
-                window.focus();
-                const senderId = Array.from(document.querySelectorAll('.user-item'))
-                    .find(el => el.querySelector('.user-name').textContent === sender)
-                    ?.getAttribute('data-user-id');
-
-                if (senderId) {
-                    selectUser(parseInt(senderId));
-                }
-            };
-        } else if (Notification.permission !== "denied") {
-            Notification.requestPermission();
-        }
+    function selectUser(userId, userName) {
+        selectedUserId = normalizeUserId(userId);
+        updateSelectedUserUI(userName);
+        loadMessages(selectedUserId);
     }
-    function selectUser(userId) {
-        selectedUserId = userId;
 
+    function updateSelectedUserUI(userName) {
         document.querySelectorAll('.user-item').forEach(item => {
             item.classList.remove('active');
         });
 
-        const selectedElement = document.querySelector(`.user-item[data-user-id="${userId}"]`);
-        selectedElement.classList.add('active');
+        const selectedItem = document.querySelector(`.user-item[data-user-id="${selectedUserId}"]`);
+        if (selectedItem) {
+            selectedItem.classList.add('active');
+        }
 
-        document.getElementById('selected-user-name').textContent =
-            selectedElement.querySelector('.user-name').textContent;
-
-        const unreadBadge = document.getElementById(`unread-${userId}`);
-        unreadBadge.textContent = '';
-        unreadBadge.style.display = 'none';
-
-        loadMessages(userId);
+        document.getElementById('selected-user-name').textContent = userName || selectedUserId;
     }
 
-    function loadMessages(userId) {
-        fetch(`/api/messages/${userId}/`)
-            .then(response => response.json())
-            .then(data => {
-                const messageContainer = document.getElementById('message-container');
-                messageContainer.innerHTML = '';
-
-                data.messages.forEach(msg => {
-                    const isSent = msg.sender_id === currentUserId;
-                    appendMessage(msg.content, isSent, msg.timestamp);
-                });
-
-                messageContainer.scrollTop = messageContainer.scrollHeight;
-            })
-            .catch(error => console.error('Error loading messages:', error));
+    async function loadMessages(partnerId) {
+        try {
+            const response = await fetch(`/api/messages/${partnerId}`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'X-Session-ID': sessionId
                 }
-                if (!content) {
-                    alert('Message cannot be empty');
-                    return;
+    });
 
-    function appendMessage(content, isSent, timestamp) {
+            if (!response.ok) {
+                throw new Error(`Failed to load messages: ${response.status}`);
+            }
+
+            const messages = await response.json();
+            renderMessages(messages);
+        } catch (error) {
+            console.error('Error loading messages:', error);
+        }
+    }
+
+    function renderMessages(messages) {
         const messageContainer = document.getElementById('message-container');
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+        messageContainer.innerHTML = '';
 
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        contentDiv.textContent = content;
-
-        const timeDiv = document.createElement('div');
-        timeDiv.className = 'message-time';
-
-        const date = new Date(timestamp);
-        timeDiv.textContent = `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
-
-        messageDiv.appendChild(contentDiv);
-        messageDiv.appendChild(timeDiv);
-        messageContainer.appendChild(messageDiv);
+        messages.forEach(message => {
+            const messageDiv = createMessageElement(message);
+            messageContainer.appendChild(messageDiv);
+        });
 
         messageContainer.scrollTop = messageContainer.scrollHeight;
-                }
-                await sendMessage(selectedUser.id, content);
-                input.value = '';
-                input.focus();
-            });
+    }
 
-    function sendMessage() {
+    function createMessageElement(message) {
+        const messageDiv = document.createElement('div');
+        const isSent = message.sender_id === currentUser.id;
+
+        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+        messageDiv.innerHTML = `
+            <div class="message-content">${message.content}</div>
+            <div class="message-time">${formatMessageTime(message.created_at)}</div>
+        `;
+
+        return messageDiv;
+    }
+
+    function formatMessageTime(timestamp) {
+        const date = new Date(timestamp);
+        return `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}, ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }
+
+    async function sendMessage() {
         const messageText = document.getElementById('message-text').value.trim();
+        if (!messageText || !selectedUserId) return;
 
-        if (messageText && selectedUserId) {
-            const data = {
-                recipient_id: selectedUserId,
-                content: messageText
+        try {
+            const messageData = {
+                sender_id: currentUser.id,
+                receiver_id: selectedUserId,
+                content: messageText,
+                is_read: false
             };
 
-            document.querySelector('.message-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    document.querySelector('.send-button').click();
-                }
-            });
-            fetch('/api/send-message/', {
+            const response = await fetch('/api/messages', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
+                    'Authorization': `Bearer ${authToken}`,
+                    'X-Session-ID': sessionId
                 },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('message-text').value = '';
-                    appendMessage(messageText, true, new Date().toISOString());
-                }
-            })
-            .catch(error => console.error('Error sending message:', error));
-        }
-    }
-
-    function getCsrfToken() {
-        return document.querySelector('[name=csrfmiddlewaretoken]').value;
-    }
-
-    function pollForNewMessages() {
-        if (selectedUserId) {
-            fetch(`/api/check-new-messages/${selectedUserId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.has_new) {
-                        loadMessages(selectedUserId);
-                    }
-                })
-                .catch(error => console.error('Error checking for new messages:', error));
-        }
-    }
-
-    function sendHeartbeat() {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                type: 'heartbeat',
-                user_id: currentUserId
-            }));
-        }
-    }
-
-            let isTyping = false;
-            let lastTypingTime = 0;
-            
-            document.querySelector('.message-input').addEventListener('input', () => {
-                if (!selectedUser) return;
-                
-                const now = Date.now();
-                if (!isTyping) {
-                    isTyping = true;
-                    presenceChannel.send({
-                        type: 'broadcast',
-                        event: 'typing',
-                        payload: { userId: currentUserId, partnerId: selectedUser.id }
-                    });
-                }
-                
-                lastTypingTime = now;
-                
-                setTimeout(() => {
-                    if (now - lastTypingTime > 1000 && isTyping) {
-                        isTyping = false;
-                        presenceChannel.send({
-                            type: 'broadcast',
-                            event: 'stopped-typing',
-                            payload: { userId: currentUserId }
-                        });
-                    }
-                }, 1000);
+                body: JSON.stringify(messageData)
             });
 
-            window.addEventListener('online', () => {
-                updateConnectionStatus("Reconnecting...");
-                initializeRealtime();
-            });
-            
-            window.addEventListener('offline', () => {
-                updateConnectionStatus("Offline - No connection", true);
-            });
-        }
-    document.addEventListener('DOMContentLoaded', function() {
-        if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-            Notification.requestPermission();
-        }
-
-        connectWebSocket();
-
-        document.getElementById('message-text').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
+            if (!response.ok) {
+                throw new Error('Failed to send message');
             }
-        });
 
-        setInterval(pollForNewMessages, MESSAGE_FETCH_INTERVAL);
-        setInterval(sendHeartbeat, 30000);
-
-        if (selectedUserId) {
+            document.getElementById('message-text').value = '';
             loadMessages(selectedUserId);
+        } catch (error) {
+            console.error('Error sending message:', error);
         }
-    });
+    }
 
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible') {
-            if (selectedUserId) {
-                loadMessages(selectedUserId);
-            }
-
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                connectWebSocket();
-            }
+    function handleUnauthorized(response) {
+        if (response.status === 401) {
+            localStorage.removeItem('authToken');
+            window.location.href = '/login.html';
         }
-    });
+    }
 
-    window.addEventListener('beforeunload', function() {
-        if (socket) {
-            socket.send(JSON.stringify({
-                type: 'logout',
-                user_id: currentUserId
-            }));
-        }
-    });
-    </script>
-</body>
-</html>
-
-{% csrf_token %}
-{% endblock %}
-
-[The entire file contents as specified in the provided suggestion, replacing the previous implementation]
+    // Initialize the chat application
+    initializeChat();
+});
