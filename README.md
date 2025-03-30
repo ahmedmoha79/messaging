@@ -35,3 +35,9 @@ Most professional teams would require *significantly more time* to build somethi
 3. Configure your environment variables
 4. Import the database schema
 5. Deploy to your preferred hosting service
+
+## NOTE:
+
+THE UI FOR MOBILE USERS IS NOT YET GOOD, AM CURRENTLY OPTIMISING FOR MOBILE USERS, SO STAY TUNED !
+
+
