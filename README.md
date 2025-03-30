@@ -1,6 +1,6 @@
 # LOGISTICS MESSAGING AND TRACKING APP
 
-**A real-time chat application with integrated location tracking**, built in 4 days by [beyhaqi_moha](https://github.com/beyhaqi_moha) (high school graduate) using only Deepseek AI
+**A real-time chat application with integrated location tracking**, built in 4 days by [beyhaqi_moha](https://www.instagram.com/beyhaqi_moha?igsh=Nnl6NnBhNHdvbDBn) (high school graduate) using only Deepseek AI
 
 ## Key Features
 
