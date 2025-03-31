@@ -927,7 +927,7 @@
             });
 
             // Logout button
-            document.getElementById('account').addEventListener('click', async () => {
+            document.getElementById('logoutButton').addEventListener('click', async () => {
                 try {
                     if (presenceChannel) {
                         await supabaseClient.removeChannel(presenceChannel);

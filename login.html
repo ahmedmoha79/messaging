@@ -96,8 +96,7 @@
             color: #00ff88;
             text-decoration: none;
         }
-
-        </style>
+    </style>
 </head>
 <body>
     <div class="login-container">
@@ -119,7 +118,15 @@
         </div>
     </div>
 
+    <!-- Load Supabase first -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        // Initialize Supabase client with proper variable declaration
+        const supabaseClient = supabase.createClient(
+            "https://twsqvdxhsfvdibhpfvqr.supabase.co",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4"
+        );
+
         // Function to show error
         function showError(message) {
             const errorMessage = document.getElementById('errorMessage');
@@ -127,46 +134,35 @@
             errorMessage.style.display = 'block';
         }
 
-       document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    // Clear previous error
-    document.getElementById('errorMessage').style.display = 'none';
+        // Form submission handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // Clear previous error
+            document.getElementById('errorMessage').style.display = 'none';
 
-    try {
-        // Use our backend server for authentication
-        const response = await fetch('/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email, password })
+            try {
+                // Use Supabase for authentication
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) throw error;
+
+                // Check if login was successful
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) throw new Error("Login failed - no user returned");
+
+                // Redirect to messaging page
+                window.location.href = 'message.html';
+            } catch (error) {
+                console.error('Login error:', error);
+                showError(error.message || "Login failed. Please try again.");
+            }
         });
-
-        const data = await response.json();
-
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        // Store the session
-        localStorage.setItem('session', JSON.stringify(data.session));
-
-        // Verify session was stored
-        const storedSession = localStorage.getItem('session');
-        if (!storedSession) {
-            throw new Error('Failed to store session');
-        }
-
-        // Redirect to messaging page
-        window.location.href = 'message.html';
-    } catch (error) {
-        console.error('Login error:', error);
-        showError(error.message);
-    }
-});
     </script>
 </body>
 </html>
