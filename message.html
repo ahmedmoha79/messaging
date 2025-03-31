@@ -190,7 +190,28 @@
         .logout-button:hover {
             background: rgba(255, 0, 0, 0.3);
         }
-        
+       .user-profile-button {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.user-profile-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}  
         /* Chat Styles */
         .chat-container {
             flex: 1;
@@ -347,6 +368,7 @@
             text-shadow: 0 0 8px white, 0 0 8px white;
             filter: drop-shadow(0 0 4px black);
         }
+         
     </style>
 </head>
 <body>
@@ -378,6 +400,9 @@
             <button class="logout-button" id="logoutButton">
                 ⬅️ Logout
             </button>
+           <button class="user-profile-button" id="userProfileButton">
+         👤 Account
+           </button>
         </div>
         
         <div class="chat-view" id="chatView">
@@ -920,6 +945,11 @@
             document.getElementById('sidebarToggle').addEventListener('click', () => {
                 document.getElementById('sidebar').classList.toggle('collapsed');
             });
+            
+            // User profile button
+document.getElementById('userProfileButton').addEventListener('click', () => {
+    window.location.href = 'accounts.html';
+});
 
             // Back to map button
             document.getElementById('backToMapButton').addEventListener('click', () => {
