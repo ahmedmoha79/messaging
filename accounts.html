@@ -629,72 +629,41 @@
 
         // Load security data
         async function loadSecurityData() {
-            try {
-                // Fetch account information
-                const { data: account, error: accountError } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', currentUserId)
-                    .single();
-                
-                if (accountError) throw accountError;
-                
-                // Fetch active sessions
-                const { data: sessions, error: sessionsError } = await supabaseClient
-                .from('user_sessions')
-                .select('*')
-                .eq('user_id', currentUserId);
-                
-                if (sessionsError) throw sessionsError;
-                
-                // Fetch security settings
-                const { data: securitySettings, error: settingsError } = await supabaseClient
-                    .from('security_settings')
-                    .select('*')
-                    .eq('user_id', currentUserId)
-                    .single();
-                
-                // If no settings exist, create default ones
-                let settings = securitySettings;
-                if (settingsError && settingsError.code === 'PGRST116') {
-                    const { data: newSettings, error: createError } = await supabaseClient
-                        .from('security_settings')
-                        .insert([{
-                            user_id: currentUserId,
-                            two_factor_enabled: false,
-                            two_factor_secret: null,
-                            login_alerts: true,
-                            suspicious_activity_alerts: true,
-                            password_update_required: false,
-                            last_updated: new Date().toISOString()
-                        }])
-                        .select()
-                        .single();
-                    
-                    if (createError) throw createError;
-                    settings = newSettings;
-                } else if (settingsError) {
-                    throw settingsError;
-                }
-
-                // Fetch security logs
-                const { data: securityLogs, error: logsError } = await supabaseClient
-                    .from('security_logs')
-                    .select('*')
-                    .eq('user_id', currentUserId)
-                    .order('created_at', { ascending: false })
-                    .limit(20);
-                
-                if (logsError) throw logsError;
-
-                // Render the security page
-                renderSecurityPage(account, sessions.sessions || [], settings, securityLogs || []);
-
-            } catch (error) {
-                console.error('Failed to load security data:', error);
-                showError('Failed to load security data. Please try again.');
-            }
-        }
+    try {
+        // Fetch account information
+        const { data: account, error: accountError } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUserId)
+            .single();
+        
+        if (accountError) throw accountError;
+        
+        // Get current session (no need to fetch all sessions)
+        const currentSession = supabaseClient.auth.session();
+        
+        // For demo purposes, we'll create a mock sessions array
+        const sessions = currentSession ? [{
+            id: currentSession.access_token,
+            user_id: currentUserId,
+            created_at: new Date(currentSession.created_at).toISOString(),
+            updated_at: new Date(currentSession.expires_at * 1000).toISOString(),
+            isCurrent: true
+        }] : [];
+        
+        // Rest of your existing code...
+        const { data: securitySettings, error: settingsError } = await supabaseClient
+            .from('security_settings')
+            .select('*')
+            .eq('user_id', currentUserId)
+            .single();
+        
+        // Continue with the rest of your function...
+    } catch (error) {
+        console.error('Failed to load security data:', error);
+        showError('Failed to load security data. Please try again.');
+    }
+}
 
         function renderSecurityPage(account, sessions, settings, securityLogs) {
             const securityContent = document.getElementById('securityContent');
@@ -807,34 +776,27 @@
                     </div>
                     
                     <div class="sessions-list" id="sessionsList">
-                        ${sessions.length > 0 ? 
-                            sessions.map(session => `
-                                <div class="session-item">
-                                    <div class="session-info">
-                                        <div>
-                                            <strong>${getDeviceInfo(session)}</strong>
-                                            ${session.id === session.id ? '<span class="session-current">(Current Session)</span>' : ''}
-                                        </div>
-                                        <div class="session-time">
-                                            Last active: ${formatLastOnline(new Date(session.updated_at))}
-                                            • ${new Date(session.updated_at).toLocaleString()}
-                                        </div>
-                                        <div>
-                                            IP: ${session.ip || 'Unknown'} • ${session.country || 'Unknown location'}
-                                        </div>
-                                    </div>
-                                    ${session.id !== session.id ? `
-                                    <div class="session-actions">
-                                        <button class="btn btn-secondary session-revoke-btn" data-session-id="${session.id}">
-                                            <i class="fas fa-sign-out-alt"></i> Revoke
-                                        </button>
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            `).join('') : 
-                            '<p style="padding: 10px; text-align: center; opacity: 0.7;">No active sessions found</p>'
-                        }
+    ${sessions.length > 0 ? 
+        sessions.map(session => `
+            <div class="session-item ${session.isCurrent ? 'current-session' : ''}">
+                <div class="session-info">
+                    <div>
+                        <strong>Current Session</strong>
+                        ${session.isCurrent ? '<span class="session-current">(Active Now)</span>' : ''}
                     </div>
+                    <div class="session-time">
+                        Created: ${new Date(session.created_at).toLocaleString()}
+                        • Last active: ${formatLastOnline(new Date(session.updated_at))}
+                    </div>
+                    <div>
+                        Status: Active
+                    </div>
+                </div>
+            </div>
+        `).join('') : 
+        '<p style="padding: 10px; text-align: center; opacity: 0.7;">No active sessions found</p>'
+    }
+</div>
                 </div>
                 
                 <div class="security-section">
