@@ -121,8 +121,8 @@
     <!-- Load Supabase first -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Initialize Supabase client
-        const supabase = supabase.createClient(
+        // Initialize Supabase client with proper variable declaration
+        const supabaseClient = supabase.createClient(
             "https://twsqvdxhsfvdibhpfvqr.supabase.co",
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4"
         );
@@ -145,18 +145,22 @@
 
             try {
                 // Use Supabase for authentication
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email: email,
                     password: password
                 });
 
                 if (error) throw error;
 
+                // Check if login was successful
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) throw new Error("Login failed - no user returned");
+
                 // Redirect to messaging page
                 window.location.href = 'message.html';
             } catch (error) {
                 console.error('Login error:', error);
-                showError(error.message);
+                showError(error.message || "Login failed. Please try again.");
             }
         });
     </script>
