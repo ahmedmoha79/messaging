@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Settings</title>
+    <title>My Account</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -38,7 +38,7 @@
         }
         
         /* Main Container */
-        .security-container {
+        .account-container {
             max-width: 800px;
             margin: 40px auto;
             width: 90%;
@@ -59,24 +59,22 @@
             text-align: center;
             position: relative;
         }
-        .avatar-container {
-            position: relative;
+        .profile-avatar {
             width: 120px;
             height: 120px;
-            margin-bottom: 20px;
-        }
-        .profile-avatar {
-            width: 100%;
-            height: 100%;
             border-radius: 50%;
             object-fit: cover;
             border: 3px solid #00ff88;
+            margin-bottom: 20px;
             box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
         }
         .profile-name {
             font-size: 2em;
             font-weight: bold;
             margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .profile-email {
             opacity: 0.8;
@@ -100,8 +98,8 @@
         .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
         .offline { background: #666; }
         
-        /* Security Sections */
-        .security-section {
+        /* Profile Sections */
+        .profile-section {
             background: rgba(255, 255, 255, 0.02);
             border-radius: 15px;
             padding: 25px;
@@ -132,168 +130,66 @@
             font-weight: 500;
         }
         
-        /* Security Features */
-        .security-feature {
+        /* Name Editing */
+        .edit-name-container {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
-        }
-        .security-toggle {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 30px;
-        }
-        .security-toggle input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(255, 255, 255, 0.1);
-            transition: .4s;
-            border-radius: 34px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 22px;
-            width: 22px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: #00ff88;
-        }
-        input:checked + .slider:before {
-            transform: translateX(30px);
-        }
-        .security-description {
-            font-size: 0.9em;
-            opacity: 0.7;
+            gap: 10px;
             margin-top: 5px;
         }
+        .name-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 1em;
+            width: 250px;
+        }
+        .edit-icon {
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.2s ease;
+        }
+        .edit-icon:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        .name-availability {
+            margin-top: 5px;
+            font-size: 0.8em;
+        }
+        .available {
+            color: #00ff88;
+        }
+        .unavailable {
+            color: #ff4444;
+        }
         
-        /* Sessions List */
-        .sessions-list {
+        /* Activity Log */
+        .activity-log {
             max-height: 300px;
             overflow-y: auto;
             padding-right: 10px;
         }
-        .sessions-list::-webkit-scrollbar {
+        .activity-log::-webkit-scrollbar {
             width: 5px;
         }
-        .sessions-list::-webkit-scrollbar-thumb {
+        .activity-log::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.2);
             border-radius: 10px;
         }
-        .session-item {
+        .activity-item {
             padding: 12px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
-        .session-info {
-            flex: 1;
+        .activity-item:last-child {
+            border-bottom: none;
         }
-        .session-time {
+        .activity-time {
             font-size: 0.8em;
             opacity: 0.6;
             margin-top: 5px;
-        }
-        .session-current {
-            color: #00ff88;
-            font-size: 0.8em;
-            margin-left: 10px;
-        }
-        .session-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        /* Password Change */
-        .password-form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .form-label {
-            font-size: 0.95em;
-            opacity: 0.8;
-        }
-        .form-input {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            font-size: 1em;
-        }
-        .form-input:focus {
-            outline: none;
-            border-color: #00ff88;
-        }
-        .password-strength {
-            height: 5px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-            margin-top: 5px;
-            overflow: hidden;
-        }
-        .strength-bar {
-            height: 100%;
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-        .weak { background: #ff4444; width: 33%; }
-        .medium { background: #ffcc00; width: 66%; }
-        .strong { background: #00ff88; width: 100%; }
-        
-        /* 2FA Setup */
-        .two-factor-setup {
-            display: none;
-            margin-top: 20px;
-            padding: 20px;
-            background: rgba(0, 255, 136, 0.05);
-            border-radius: 10px;
-            border: 1px solid rgba(0, 255, 136, 0.2);
-        }
-        .qr-code-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 15px 0;
-        }
-        .qr-code {
-            width: 200px;
-            height: 200px;
-            background: white;
-            padding: 10px;
-            margin-bottom: 15px;
-        }
-        .recovery-codes {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            font-family: monospace;
-            text-align: center;
         }
         
         /* Action Buttons */
@@ -420,16 +316,6 @@
             width: 90%;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .modal-title {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            color: #00ff88;
-            text-align: center;
-        }
-        .modal-message {
-            margin-bottom: 20px;
-            text-align: center;
-        }
         .modal-buttons {
             display: flex;
             gap: 15px;
@@ -439,7 +325,7 @@
         
         /* Responsive Adjustments */
         @media (max-width: 768px) {
-            .security-container {
+            .account-container {
                 margin: 20px auto;
                 padding: 20px;
                 width: 95%;
@@ -447,7 +333,7 @@
             .profile-header {
                 margin-bottom: 20px;
             }
-            .avatar-container {
+            .profile-avatar {
                 width: 100px;
                 height: 100px;
             }
@@ -458,11 +344,6 @@
             .detail-label {
                 width: 100%;
             }
-            .security-feature {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
             .action-buttons {
                 flex-direction: column;
                 gap: 10px;
@@ -471,18 +352,8 @@
                 width: 100%;
                 justify-content: center;
             }
-            .session-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-            .session-actions {
+            .name-input {
                 width: 100%;
-                justify-content: flex-end;
-            }
-            .qr-code {
-                width: 150px;
-                height: 150px;
             }
         }
     </style>
@@ -490,74 +361,18 @@
 <body>
     <div class="connection-status">Connecting...</div>
     
-    <a href="accounts.html" class="nav-button">
-        <i class="fas fa-arrow-left"></i> Back to Account
+    <a href="message.html" class="nav-button">
+        <i class="fas fa-arrow-left"></i> Back to Messages
     </a>
     
-    <div id="securityContent" class="security-container">
+    <div id="accountContent" class="account-container">
         <div class="loading-state">
             <div class="loading-spinner"></div>
-            <p>Loading security settings...</p>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirmationModal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <h2 class="modal-title" id="modalTitle">Confirm Action</h2>
-            <p class="modal-message" id="modalMessage">Are you sure you want to perform this action?</p>
-            <div class="modal-buttons">
-                <button class="btn btn-primary" id="confirmActionBtn">
-                    <i class="fas fa-check"></i> Confirm
-                </button>
-                <button class="btn btn-secondary" id="cancelActionBtn">
-                    <i class="fas fa-times"></i> Cancel
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2FA Setup Modal -->
-    <div id="twoFactorModal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <h2 class="modal-title">Two-Factor Authentication Setup</h2>
-            <div id="twoFactorSetupStep1">
-                <p class="modal-message">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
-                <div class="qr-code-container">
-                    <div class="qr-code" id="qrCodeDisplay"></div>
-                    <p>Or enter this code manually: <strong id="manualCode"></strong></p>
-                </div>
-                <div class="form-group" style="margin-top: 20px;">
-                    <label class="form-label">Enter the 6-digit code from your app</label>
-                    <input type="text" class="form-input" id="twoFactorCode" placeholder="123456" maxlength="6">
-                </div>
-                <div class="modal-buttons">
-                    <button class="btn btn-primary" id="verifyTwoFactorBtn">
-                        <i class="fas fa-check"></i> Verify
-                    </button>
-                    <button class="btn btn-secondary" id="cancelTwoFactorBtn">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>
-                </div>
-            </div>
-            <div id="twoFactorSetupStep2" style="display: none;">
-                <p class="modal-message">Two-factor authentication has been successfully enabled!</p>
-                <div class="recovery-codes">
-                    <h3>Recovery Codes</h3>
-                    <p>Save these codes in a safe place. Each code can be used once if you lose access to your authenticator app.</p>
-                    <div id="recoveryCodesList"></div>
-                </div>
-                <div class="modal-buttons">
-                    <button class="btn btn-primary" id="doneTwoFactorBtn">
-                        <i class="fas fa-check"></i> Done
-                    </button>
-                </div>
-            </div>
+            <p>Loading your account...</p>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <script>
         // Configuration
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
@@ -566,9 +381,9 @@
         let supabaseClient, presenceChannel;
         let currentUserId = null, session = null;
         let isOnline = false;
-        let currentAction = null;
-        let currentSessionId = null;
-        let twoFactorSecret = null;
+        let isEditingName = false;
+        let originalName = '';
+        let currentName = '';
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -609,101 +424,91 @@
                 if (authError) throw authError;
                 if (!user) throw new Error("User verification failed");
 
-                // Load security data
-                await loadSecurityData();
+                // Load account data
+                await loadAccountData();
                 initializeRealtime();
-
-                // Setup event listeners for modals
-                document.getElementById('confirmActionBtn').addEventListener('click', executeAction);
-                document.getElementById('cancelActionBtn').addEventListener('click', () => {
-                    document.getElementById('confirmationModal').style.display = 'none';
-                });
-                
-                document.getElementById('verifyTwoFactorBtn').addEventListener('click', verifyTwoFactorCode);
-                document.getElementById('cancelTwoFactorBtn').addEventListener('click', () => {
-                    document.getElementById('twoFactorModal').style.display = 'none';
-                });
-                document.getElementById('doneTwoFactorBtn').addEventListener('click', () => {
-                    document.getElementById('twoFactorModal').style.display = 'none';
-                    loadSecurityData();
-                });
 
             } catch (error) {
                 console.error("Initialization error:", error);
-                showError(`Failed to load security settings: ${error.message}`);
+                showError(`Failed to load account: ${error.message}`);
             }
         });
 
-        // Load security data
-        async function loadSecurityData() {
+        // Load account data
+        async function loadAccountData() {
             try {
                 // Fetch account information
-                const { data: account, error: accountError } = await supabaseClient
+                let { data: account, error: accountError } = await supabaseClient
                     .from('profiles')
                     .select('*')
                     .eq('id', currentUserId)
                     .single();
                 
-                if (accountError) throw accountError;
-                
-                // Fetch active sessions
-                const { data: sessions, error: sessionsError } = await supabaseClient
-                    .auth.admin.listUserSessions(currentUserId);
-                
-                if (sessionsError) throw sessionsError;
-                
-                // Fetch security settings
-                const { data: securitySettings, error: settingsError } = await supabaseClient
-                    .from('security_settings')
-                    .select('*')
-                    .eq('user_id', currentUserId)
-                    .single();
-                
-                // If no settings exist, create default ones
-                let settings = securitySettings;
-                if (settingsError && settingsError.code === 'PGRST116') {
-                    const { data: newSettings, error: createError } = await supabaseClient
-                        .from('security_settings')
+                // If profile doesn't exist, create one
+                if (accountError && accountError.code === 'PGRST116') {
+                    const { data: newProfile, error: createError } = await supabaseClient
+                        .from('profiles')
                         .insert([{
-                            user_id: currentUserId,
-                            two_factor_enabled: false,
-                            login_alerts: true,
-                            suspicious_activity_alerts: true,
-                            password_update_required: false,
-                            last_updated: new Date().toISOString()
+                            id: currentUserId,
+                            email: session.user.email,
+                            full_name: session.user.email.split('@')[0],
+                            created_at: new Date().toISOString()
                         }])
                         .select()
                         .single();
-                    
-                    if (createError) throw createError;
-                    settings = newSettings;
-                } else if (settingsError) {
-                    throw settingsError;
-                }
 
-                // Render the security page
-                renderSecurityPage(account, sessions.sessions || [], settings);
+                    if (createError) throw createError;
+                    account = newProfile;
+                } else if (accountError) {
+                    throw accountError;
+                }
+                
+                // Fetch recent activity
+                const { data: activity, error: activityError } = await supabaseClient
+                    .from('account_activity')
+                    .select('*')
+                    .eq('user_id', currentUserId)
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                
+                if (activityError) throw activityError;
+
+                // Render the account page
+                renderAccountPage(account, activity || []);
 
             } catch (error) {
-                console.error('Failed to load security data:', error);
-                showError('Failed to load security data. Please try again.');
+                console.error('Failed to load account data:', error);
+                showError('Failed to load account data. Please try again.');
             }
         }
 
-        function renderSecurityPage(account, sessions, settings) {
-            const securityContent = document.getElementById('securityContent');
+        function renderAccountPage(account, activity) {
+            const accountContent = document.getElementById('accountContent');
+            originalName = account.full_name || '';
+            currentName = originalName;
             
             // Format dates
             const createdAt = account.created_at ? new Date(account.created_at) : null;
             const lastActive = account.last_updated ? new Date(account.last_updated) : null;
             
-            securityContent.innerHTML = `
+            accountContent.innerHTML = `
                 <div class="profile-header">
-                    <div class="avatar-container">
-                        <img src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
-                            class="profile-avatar" alt="${account.full_name || 'User'}">
+                    <img id="profileAvatar" src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
+                        class="profile-avatar" alt="${account.full_name || 'User'}">
+                    <h1 class="profile-name">
+                        <span id="nameDisplay">${account.full_name || 'User'}</span>
+                        <i class="fas fa-pencil-alt edit-icon" id="editNameIcon"></i>
+                    </h1>
+                    <div class="edit-name-container" id="editNameContainer" style="display: none;">
+                        <input type="text" class="name-input" id="nameInput" value="${account.full_name || ''}" maxlength="50">
+                        <button class="btn btn-primary" id="saveNameBtn" disabled>
+                            <i class="fas fa-check"></i> Save
+                        </button>
+                        <button class="btn btn-secondary" id="cancelEditBtn">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
                     </div>
-                    <h1 class="profile-name">Security Settings</h1>
+                    <div class="name-availability" id="nameAvailability"></div>
                     <p class="profile-email">${account.email || 'No email'}</p>
                     <div class="profile-status">
                         <span id="statusIndicator" class="status-indicator ${isOnline ? 'online' : 'offline'}"></span>
@@ -711,328 +516,208 @@
                     </div>
                 </div>
                 
-                <div class="security-section">
+                <div class="profile-section">
                     <div class="section-title">
-                        <i class="fas fa-shield-alt"></i> Account Protection
+                        <i class="fas fa-info-circle"></i> Account Information
                     </div>
-                    
-                    <div class="security-feature">
-                        <div>
-                            <h3>Two-Factor Authentication</h3>
-                            <p class="security-description">
-                                Add an extra layer of security to your account with an authenticator app
-                            </p>
-                        </div>
-                        <label class="security-toggle">
-                            <input type="checkbox" id="twoFactorToggle" ${settings.two_factor_enabled ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
+                    <div class="detail-row">
+                        <div class="detail-label">Full Name</div>
+                        <div class="detail-value">${account.full_name || 'Not provided'}</div>
                     </div>
-                    
-                    <div id="twoFactorSetup" class="two-factor-setup" style="${settings.two_factor_enabled ? 'display: block;' : 'display: none;'}">
-                        <h3><i class="fas fa-check-circle" style="color: #00ff88;"></i> Two-Factor Enabled</h3>
-                        <p>Two-factor authentication is currently active on your account.</p>
-                        <button class="btn btn-danger" id="disableTwoFactorBtn" style="margin-top: 15px;">
-                            <i class="fas fa-times"></i> Disable Two-Factor
-                        </button>
+                    <div class="detail-row">
+                        <div class="detail-label">Email</div>
+                        <div class="detail-value">${account.email || 'Not provided'}</div>
                     </div>
-                    
-                    <div class="security-feature">
-                        <div>
-                            <h3>Login Alerts</h3>
-                            <p class="security-description">
-                                Get notified when someone logs into your account from a new device
-                            </p>
-                        </div>
-                        <label class="security-toggle">
-                            <input type="checkbox" id="loginAlertsToggle" ${settings.login_alerts ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
+                    <div class="detail-row">
+                        <div class="detail-label">Account Created</div>
+                        <div class="detail-value">${createdAt ? createdAt.toLocaleString() : 'Unknown'}</div>
                     </div>
-                    
-                    <div class="security-feature">
-                        <div>
-                            <h3>Suspicious Activity Alerts</h3>
-                            <p class="security-description">
-                                Receive alerts for unusual activity like logins from new locations
-                            </p>
-                        </div>
-                        <label class="security-toggle">
-                            <input type="checkbox" id="activityAlertsToggle" ${settings.suspicious_activity_alerts ? 'checked' : ''}>
-                            <span class="slider"></span>
-                        </label>
+                    <div class="detail-row">
+                        <div class="detail-label">Last Active</div>
+                        <div class="detail-value">${lastActive ? formatLastOnline(lastActive) : 'Never'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Account Role</div>
+                        <div class="detail-value">${account.role || 'Standard User'}</div>
                     </div>
                 </div>
                 
-                <div class="security-section">
+                <div class="profile-section">
                     <div class="section-title">
-                        <i class="fas fa-key"></i> Password Management
+                        <i class="fas fa-shield-alt"></i> Security
                     </div>
-                    
-                    <div class="password-form">
-                        <div class="form-group">
-                            <label class="form-label">Current Password</label>
-                            <input type="password" class="form-input" id="currentPassword" placeholder="Enter current password">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">New Password</label>
-                            <input type="password" class="form-input" id="newPassword" placeholder="Enter new password">
-                            <div class="password-strength">
-                                <div class="strength-bar" id="passwordStrength"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Confirm New Password</label>
-                            <input type="password" class="form-input" id="confirmPassword" placeholder="Confirm new password">
-                        </div>
-                        
-                        <button class="btn btn-primary" id="changePasswordBtn">
-                            <i class="fas fa-key"></i> Change Password
-                        </button>
+                    <div class="detail-row">
+                        <div class="detail-label">Two-Factor Auth</div>
+                        <div class="detail-value">Disabled</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Last Login</div>
+                        <div class="detail-value">${lastActive ? formatLastOnline(lastActive) : 'Never'}</div>
                     </div>
                 </div>
                 
-                <div class="security-section">
+                <div class="profile-section">
                     <div class="section-title">
-                        <i class="fas fa-laptop"></i> Active Sessions
+                        <i class="fas fa-history"></i> Recent Activity
                     </div>
-                    
-                    <div class="sessions-list" id="sessionsList">
-                        ${sessions.length > 0 ? 
-                            sessions.map(session => `
-                                <div class="session-item">
-                                    <div class="session-info">
-                                        <div>
-                                            <strong>${getDeviceInfo(session)}</strong>
-                                            ${session.id === session.id ? '<span class="session-current">(Current Session)</span>' : ''}
-                                        </div>
-                                        <div class="session-time">
-                                            Last active: ${formatLastOnline(new Date(session.updated_at))}
-                                            • ${new Date(session.updated_at).toLocaleString()}
-                                        </div>
-                                        <div>
-                                            IP: ${session.ip || 'Unknown'} • ${session.country || 'Unknown location'}
-                                        </div>
-                                    </div>
-                                    ${session.id !== session.id ? `
-                                    <div class="session-actions">
-                                        <button class="btn btn-secondary session-revoke-btn" data-session-id="${session.id}">
-                                            <i class="fas fa-sign-out-alt"></i> Revoke
-                                        </button>
-                                    </div>
-                                    ` : ''}
+                    <div class="activity-log" id="activityLog">
+                        ${activity.length > 0 ? 
+                            activity.map(item => `
+                                <div class="activity-item">
+                                    <div>${item.action || 'Unknown activity'}</div>
+                                    <div class="activity-time">${formatLastOnline(new Date(item.created_at))}</div>
                                 </div>
                             `).join('') : 
-                            '<p style="padding: 10px; text-align: center; opacity: 0.7;">No active sessions found</p>'
+                            '<p style="padding: 10px; text-align: center; opacity: 0.7;">No recent activity</p>'
                         }
                     </div>
                 </div>
                 
                 <div class="action-buttons">
-                    <button class="btn btn-danger" id="logoutAllBtn">
-                        <i class="fas fa-sign-out-alt"></i> Logout All Devices
+                    <button class="btn btn-secondary" id="securitySettingsBtn">
+                        <i class="fas fa-lock"></i> Security Settings
                     </button>
-                    <button class="btn btn-secondary" id="backToAccountBtn">
-                        <i class="fas fa-user"></i> Back to Account
+                    <button class="btn btn-danger" id="logoutButton">
+                        <i class="fas fa-sign-out-alt"></i> Logout
                     </button>
                 </div>
             `;
             
             // Setup event listeners
-            document.getElementById('twoFactorToggle').addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    setupTwoFactorAuthentication();
-                } else {
-                    showConfirmation(
-                        'Disable Two-Factor Authentication',
-                        'Your account will be less secure without two-factor authentication. Are you sure?',
-                        'disableTwoFactor'
-                    );
+            document.getElementById('editNameIcon').addEventListener('click', startNameEditing);
+            document.getElementById('cancelEditBtn').addEventListener('click', cancelNameEditing);
+            document.getElementById('saveNameBtn').addEventListener('click', saveName);
+            document.getElementById('nameInput').addEventListener('input', checkNameAvailability);
+            
+            document.getElementById('securitySettingsBtn').addEventListener('click', () => {
+                alert('Security settings would go here');
+            });
+            
+            document.getElementById('logoutButton').addEventListener('click', async () => {
+                try {
+                    if (presenceChannel) {
+                        await supabaseClient.removeChannel(presenceChannel);
+                    }
+                    
+                    await supabaseClient.auth.signOut();
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('Failed to logout. Please try again.');
                 }
             });
-            
-            document.getElementById('disableTwoFactorBtn')?.addEventListener('click', () => {
-                showConfirmation(
-                    'Disable Two-Factor Authentication',
-                    'Your account will be less secure without two-factor authentication. Are you sure?',
-                    'disableTwoFactor'
-                );
-            });
-            
-            document.getElementById('loginAlertsToggle').addEventListener('change', (e) => {
-                updateSecuritySetting('login_alerts', e.target.checked);
-            });
-            
-            document.getElementById('activityAlertsToggle').addEventListener('change', (e) => {
-                updateSecuritySetting('suspicious_activity_alerts', e.target.checked);
-            });
-            
-            document.getElementById('newPassword').addEventListener('input', (e) => {
-                updatePasswordStrength(e.target.value);
-            });
-            
-            document.getElementById('changePasswordBtn').addEventListener('click', changePassword);
-            
-            document.querySelectorAll('.session-revoke-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const sessionId = e.target.closest('button').dataset.sessionId;
-                    showConfirmation(
-                        'Revoke Session',
-                        'Are you sure you want to revoke this session? The device will be logged out immediately.',
-                        'revokeSession',
-                        sessionId
-                    );
-                });
-            });
-            
-            document.getElementById('logoutAllBtn').addEventListener('click', () => {
-                showConfirmation(
-                    'Logout All Devices',
-                    'This will log you out of all devices except this one. Are you sure?',
-                    'logoutAllDevices'
-                );
-            });
-            
-            document.getElementById('backToAccountBtn').addEventListener('click', () => {
-                window.location.href = 'accounts.html';
-            });
         }
 
-        function getDeviceInfo(session) {
-            if (session.user_agent) {
-                if (session.user_agent.includes('Mobile')) {
-                    return 'Mobile Device';
-                } else if (session.user_agent.includes('Windows')) {
-                    return 'Windows Computer';
-                } else if (session.user_agent.includes('Mac')) {
-                    return 'Mac Computer';
-                } else if (session.user_agent.includes('Linux')) {
-                    return 'Linux Computer';
-                }
+        function startNameEditing() {
+            isEditingName = true;
+            document.getElementById('nameDisplay').style.display = 'none';
+            document.getElementById('editNameIcon').style.display = 'none';
+            document.getElementById('editNameContainer').style.display = 'flex';
+            document.getElementById('nameInput').focus();
+        }
+
+        function cancelNameEditing() {
+            isEditingName = false;
+            document.getElementById('nameDisplay').style.display = 'inline';
+            document.getElementById('editNameIcon').style.display = 'inline-block';
+            document.getElementById('editNameContainer').style.display = 'none';
+            document.getElementById('nameInput').value = currentName;
+            document.getElementById('nameAvailability').textContent = '';
+            document.getElementById('saveNameBtn').disabled = true;
+        }
+
+        async function checkNameAvailability() {
+            const newName = document.getElementById('nameInput').value.trim();
+            const availabilityElement = document.getElementById('nameAvailability');
+            const saveBtn = document.getElementById('saveNameBtn');
+            
+            if (newName.toLowerCase() === originalName.toLowerCase()) {
+                availabilityElement.textContent = 'This is your current name';
+                availabilityElement.className = 'name-availability';
+                saveBtn.disabled = true;
+                return;
             }
-            return 'Unknown Device';
-        }
-
-        function showConfirmation(title, message, action, data = null) {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalMessage').textContent = message;
-            document.getElementById('confirmationModal').style.display = 'flex';
-            currentAction = action;
-            currentSessionId = data;
-        }
-
-        async function executeAction() {
-            document.getElementById('confirmationModal').style.display = 'none';
             
-            try {
-                switch (currentAction) {
-                    case 'disableTwoFactor':
-                        await disableTwoFactor();
-                        break;
-                    case 'revokeSession':
-                        await revokeSession(currentSessionId);
-                        break;
-                    case 'logoutAllDevices':
-                        await logoutAllDevices();
-                        break;
-                }
-            } catch (error) {
-                console.error(`Error executing ${currentAction}:`, error);
-                showError(`Failed to complete action: ${error.message}`);
+            if (newName.length < 3) {
+                availabilityElement.textContent = 'Name must be at least 3 characters';
+                availabilityElement.className = 'name-availability unavailable';
+                saveBtn.disabled = true;
+                return;
             }
-        }
-
-        async function setupTwoFactorAuthentication() {
-            try {
-                // In a real implementation, you would generate a real secret and QR code
-                // For demo purposes, we'll simulate this
-                twoFactorSecret = generateRandomString(32);
-                const email = session.user.email;
-                const issuer = "SecureApp";
-                const otpUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${twoFactorSecret}&issuer=${encodeURIComponent(issuer)}`;
-                
-                // Display QR code
-                QRCode.toCanvas(document.getElementById('qrCodeDisplay'), otpUrl, { width: 200 }, (error) => {
-                    if (error) console.error('Error generating QR code:', error);
-                });
-                
-                document.getElementById('manualCode').textContent = twoFactorSecret;
-                document.getElementById('twoFactorModal').style.display = 'flex';
-                document.getElementById('twoFactorSetupStep1').style.display = 'block';
-                document.getElementById('twoFactorSetupStep2').style.display = 'none';
-                
-            } catch (error) {
-                console.error('Error setting up two-factor:', error);
-                document.getElementById('twoFactorToggle').checked = false;
-                showError('Failed to setup two-factor authentication');
-            }
-        }
-
-        async function verifyTwoFactorCode() {
-            const code = document.getElementById('twoFactorCode').value;
             
-            if (!code || code.length !== 6) {
-                alert('Please enter a valid 6-digit code');
+            if (newName.length > 50) {
+                availabilityElement.textContent = 'Name must be less than 50 characters';
+                availabilityElement.className = 'name-availability unavailable';
+                saveBtn.disabled = true;
                 return;
             }
             
             try {
-                // In a real implementation, you would verify the code against the secret
-                // For demo purposes, we'll simulate a successful verification
-                const isValid = true; // Normally you would verify this
+                // Case-insensitive check
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name')
+                    .ilike('full_name', newName)
+                    .neq('id', currentUserId);
                 
-                if (isValid) {
-                    // Update security settings
-                    const { data, error } = await supabaseClient
-                        .from('security_settings')
-                        .update({ 
-                            two_factor_enabled: true,
-                            last_updated: new Date().toISOString()
-                        })
-                        .eq('user_id', currentUserId)
-                        .select();
-                    
-                    if (error) throw error;
-                    
-                    // Generate recovery codes
-                    const recoveryCodes = Array.from({length: 10}, () => generateRandomString(12).toUpperCase());
-                    
-                    // Display success and recovery codes
-                    document.getElementById('twoFactorSetupStep1').style.display = 'none';
-                    document.getElementById('twoFactorSetupStep2').style.display = 'block';
-                    document.getElementById('recoveryCodesList').innerHTML = recoveryCodes.map(code => 
-                        `<div>${code}</div>`
-                    ).join('');
-                    
-                    // Log the activity
-                    await supabaseClient
-                        .from('account_activity')
-                        .insert([{
-                            user_id: currentUserId,
-                            action: 'Enabled two-factor authentication',
-                            created_at: new Date().toISOString()
-                        }]);
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    availabilityElement.textContent = 'Name is already taken';
+                    availabilityElement.className = 'name-availability unavailable';
+                    saveBtn.disabled = true;
                 } else {
-                    alert('Invalid verification code. Please try again.');
+                    availabilityElement.textContent = 'Name is available';
+                    availabilityElement.className = 'name-availability available';
+                    saveBtn.disabled = false;
                 }
             } catch (error) {
-                console.error('Error verifying two-factor code:', error);
-                document.getElementById('twoFactorToggle').checked = false;
-                showError('Failed to verify two-factor code');
+                console.error('Error checking name:', error);
+                availabilityElement.textContent = 'Error checking name availability';
+                availabilityElement.className = 'name-availability unavailable';
+                saveBtn.disabled = true;
             }
         }
 
-        async function disableTwoFactor() {
+        async function saveName() {
+            const newName = document.getElementById('nameInput').value.trim();
+            const saveBtn = document.getElementById('saveNameBtn');
+            
+            if (!newName || newName.toLowerCase() === originalName.toLowerCase()) {
+                cancelNameEditing();
+                return;
+            }
+            
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            
             try {
+                // First confirm the name is still available
+                const { data: checkData, error: checkError } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name')
+                    .ilike('full_name', newName)
+                    .neq('id', currentUserId);
+                
+                if (checkError) throw checkError;
+                
+                if (checkData && checkData.length > 0) {
+                    document.getElementById('nameAvailability').textContent = 'Name was just taken by another user';
+                    document.getElementById('nameAvailability').className = 'name-availability unavailable';
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+                    return;
+                }
+                
+                // Update the name
                 const { data, error } = await supabaseClient
-                    .from('security_settings')
+                    .from('profiles')
                     .update({ 
-                        two_factor_enabled: false,
+                        full_name: newName,
                         last_updated: new Date().toISOString()
                     })
-                    .eq('user_id', currentUserId)
+                    .eq('id', currentUserId)
                     .select();
                 
                 if (error) throw error;
@@ -1042,205 +727,31 @@
                     .from('account_activity')
                     .insert([{
                         user_id: currentUserId,
-                        action: 'Disabled two-factor authentication',
+                        action: 'Changed display name',
                         created_at: new Date().toISOString()
                     }]);
                 
-                // Reload settings
-                await loadSecurityData();
+                // Update UI
+                currentName = newName;
+                document.getElementById('nameDisplay').textContent = newName;
+                cancelNameEditing();
                 
                 // Show success message
-                alert('Two-factor authentication has been disabled!');
+                const availabilityElement = document.getElementById('nameAvailability');
+                availabilityElement.textContent = 'Name updated successfully!';
+                availabilityElement.className = 'name-availability available';
+                
+                setTimeout(() => {
+                    availabilityElement.textContent = '';
+                }, 3000);
                 
             } catch (error) {
-                console.error('Error disabling two-factor:', error);
-                document.getElementById('twoFactorToggle').checked = true;
-                showError('Failed to disable two-factor authentication');
+                console.error('Error saving name:', error);
+                document.getElementById('nameAvailability').textContent = 'Error saving name: ' + error.message;
+                document.getElementById('nameAvailability').className = 'name-availability unavailable';
+            } finally {
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
             }
-        }
-
-        async function updateSecuritySetting(setting, value) {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('security_settings')
-                    .update({ 
-                        [setting]: value,
-                        last_updated: new Date().toISOString()
-                    })
-                    .eq('user_id', currentUserId)
-                    .select();
-                
-                if (error) throw error;
-                
-                // Log the activity
-                await supabaseClient
-                    .from('account_activity')
-                    .insert([{
-                        user_id: currentUserId,
-                        action: `Updated ${setting.replace('_', ' ')} to ${value}`,
-                        created_at: new Date().toISOString()
-                    }]);
-                
-            } catch (error) {
-                console.error(`Error updating ${setting}:`, error);
-                
-                // Revert the toggle
-                document.getElementById(`${setting}Toggle`).checked = !value;
-                
-                showError(`Failed to update ${setting.replace('_', ' ')}`);
-            }
-        }
-
-        function updatePasswordStrength(password) {
-            const strengthBar = document.getElementById('passwordStrength');
-            
-            // Reset
-            strengthBar.className = 'strength-bar';
-            strengthBar.style.width = '0%';
-            
-            if (!password) return;
-            
-            // Very basic strength check (in a real app, use a proper library)
-            let strength = 0;
-            if (password.length >= 8) strength++;
-            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
-            if (password.match(/[0-9]/)) strength++;
-            if (password.match(/[^a-zA-Z0-9]/)) strength++;
-            
-            if (strength < 2) {
-                strengthBar.classList.add('weak');
-            } else if (strength < 4) {
-                strengthBar.classList.add('medium');
-            } else {
-                strengthBar.classList.add('strong');
-            }
-        }
-
-        async function changePassword() {
-            const currentPassword = document.getElementById('currentPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            
-            if (!currentPassword || !newPassword || !confirmPassword) {
-                alert('Please fill in all password fields');
-                return;
-            }
-            
-            if (newPassword !== confirmPassword) {
-                alert('New passwords do not match');
-                return;
-            }
-            
-            if (newPassword.length < 8) {
-                alert('Password must be at least 8 characters');
-                return;
-            }
-            
-            try {
-                // First verify current password
-                const { data: verifyData, error: verifyError } = await supabaseClient
-                    .auth.signInWithPassword({
-                        email: session.user.email,
-                        password: currentPassword
-                    });
-                
-                if (verifyError) throw verifyError;
-                
-                // Update password
-                const { data: updateData, error: updateError } = await supabaseClient
-                    .auth.updateUser({
-                        password: newPassword
-                    });
-                
-                if (updateError) throw updateError;
-                
-                // Update security settings
-                await supabaseClient
-                    .from('security_settings')
-                    .update({ 
-                        password_update_required: false,
-                        last_updated: new Date().toISOString()
-                    })
-                    .eq('user_id', currentUserId);
-                
-                // Log the activity
-                await supabaseClient
-                    .from('account_activity')
-                    .insert([{
-                        user_id: currentUserId,
-                        action: 'Changed password',
-                        created_at: new Date().toISOString()
-                    }]);
-                
-                // Clear fields
-                document.getElementById('currentPassword').value = '';
-                document.getElementById('newPassword').value = '';
-                document.getElementById('confirmPassword').value = '';
-                document.getElementById('passwordStrength').className = 'strength-bar';
-                document.getElementById('passwordStrength').style.width = '0%';
-                
-                // Show success
-                alert('Password changed successfully!');
-                
-            } catch (error) {
-                console.error('Error changing password:', error);
-                alert(`Failed to change password: ${error.message}`);
-            }
-        }
-
-        async function revokeSession(sessionId) {
-            try {
-                const { data, error } = await supabaseClient
-                    .auth.admin.signOut(sessionId);
-                
-                if (error) throw error;
-                
-                // Reload sessions
-                await loadSecurityData();
-                
-                // Show success
-                alert('Session revoked successfully!');
-                
-            } catch (error) {
-                console.error('Error revoking session:', error);
-                throw error;
-            }
-        }
-
-        async function logoutAllDevices() {
-            try {
-                // Get all sessions except current one
-                const { data: sessions, error: sessionsError } = await supabaseClient
-                    .auth.admin.listUserSessions(currentUserId);
-                
-                if (sessionsError) throw sessionsError;
-                
-                // Revoke all sessions except current
-                const revokePromises = sessions.sessions
-                    .filter(s => s.id !== session.id)
-                    .map(s => supabaseClient.auth.admin.signOut(s.id));
-                
-                await Promise.all(revokePromises);
-                
-                // Reload sessions
-                await loadSecurityData();
-                
-                // Show success
-                alert('Logged out all other devices successfully!');
-                
-            } catch (error) {
-                console.error('Error logging out all devices:', error);
-                throw error;
-            }
-        }
-
-        function generateRandomString(length) {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return result;
         }
 
         function formatLastOnline(date) {
@@ -1271,10 +782,10 @@
         }
 
         function showError(message) {
-            const securityContent = document.getElementById('securityContent');
-            securityContent.innerHTML = `
+            const accountContent = document.getElementById('accountContent');
+            accountContent.innerHTML = `
                 <div class="error-state">
-                    <h2>Error Loading Security Settings</h2>
+                    <h2>Error Loading Account</h2>
                     <p>${message}</p>
                     <button onclick="window.location.reload()">Try Again</button>
                     <button onclick="window.location.href='login.html'" style="margin-top: 10px;">
