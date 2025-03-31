@@ -96,15 +96,7 @@
             color: #00ff88;
             text-decoration: none;
         }
-
-        </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        const supabase = supabase.createClient(
-            "https://twsqvdxhsfvdibhpfvqr.supabase.co",
-            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4"
-        );
-    </script>
+    </style>
 </head>
 <body>
     <div class="login-container">
@@ -126,7 +118,15 @@
         </div>
     </div>
 
+    <!-- Load Supabase first -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        // Initialize Supabase client
+        const supabase = supabase.createClient(
+            "https://twsqvdxhsfvdibhpfvqr.supabase.co",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4"
+        );
+
         // Function to show error
         function showError(message) {
             const errorMessage = document.getElementById('errorMessage');
@@ -134,30 +134,31 @@
             errorMessage.style.display = 'block';
         }
 
-       document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    // Clear previous error
-    document.getElementById('errorMessage').style.display = 'none';
+        // Form submission handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // Clear previous error
+            document.getElementById('errorMessage').style.display = 'none';
 
-    try {
-        // Use Supabase for authentication directly
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
+            try {
+                // Use Supabase for authentication
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) throw error;
+
+                // Redirect to messaging page
+                window.location.href = 'message.html';
+            } catch (error) {
+                console.error('Login error:', error);
+                showError(error.message);
+            }
         });
-
-        if (error) throw error;
-
-        // Redirect to messaging page
-        window.location.href = 'message.html';
-    } catch (error) {
-        console.error('Login error:', error);
-        showError(error.message);
-    }
-});
     </script>
 </body>
 </html>
