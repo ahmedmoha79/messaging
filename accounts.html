@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Account</title>
+    <title>Security Settings</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -38,7 +38,7 @@
         }
         
         /* Main Container */
-        .account-container {
+        .security-container {
             max-width: 800px;
             margin: 40px auto;
             width: 90%;
@@ -73,31 +73,10 @@
             border: 3px solid #00ff88;
             box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
         }
-        .edit-avatar-icon {
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            background: rgba(0, 0, 0, 0.7);
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .edit-avatar-icon:hover {
-            background: rgba(0, 0, 0, 0.9);
-            transform: scale(1.1);
-        }
         .profile-name {
             font-size: 2em;
             font-weight: bold;
             margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
         .profile-email {
             opacity: 0.8;
@@ -121,8 +100,8 @@
         .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
         .offline { background: #666; }
         
-        /* Profile Sections */
-        .profile-section {
+        /* Security Sections */
+        .security-section {
             background: rgba(255, 255, 255, 0.02);
             border-radius: 15px;
             padding: 25px;
@@ -153,66 +132,165 @@
             font-weight: 500;
         }
         
-        /* Name Editing */
-        .edit-name-container {
+        /* Security Features */
+        .security-feature {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 10px;
-            margin-top: 5px;
+            margin-bottom: 15px;
         }
-        .name-input {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            padding: 8px 15px;
-            border-radius: 8px;
-            font-size: 1em;
-            width: 250px;
+        .security-toggle {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
         }
-        .edit-icon {
+        .security-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
             cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #00ff88;
+        }
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+        .security-description {
+            font-size: 0.9em;
             opacity: 0.7;
-            transition: all 0.2s ease;
-        }
-        .edit-icon:hover {
-            opacity: 1;
-            transform: scale(1.1);
-        }
-        .name-availability {
             margin-top: 5px;
-            font-size: 0.8em;
-        }
-        .available {
-            color: #00ff88;
-        }
-        .unavailable {
-            color: #ff4444;
         }
         
-        /* Activity Log */
-        .activity-log {
+        /* Sessions List */
+        .sessions-list {
             max-height: 300px;
             overflow-y: auto;
             padding-right: 10px;
         }
-        .activity-log::-webkit-scrollbar {
+        .sessions-list::-webkit-scrollbar {
             width: 5px;
         }
-        .activity-log::-webkit-scrollbar-thumb {
+        .sessions-list::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.2);
             border-radius: 10px;
         }
-        .activity-item {
+        .session-item {
             padding: 12px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .activity-item:last-child {
-            border-bottom: none;
+        .session-info {
+            flex: 1;
         }
-        .activity-time {
+        .session-time {
             font-size: 0.8em;
             opacity: 0.6;
             margin-top: 5px;
+        }
+        .session-current {
+            color: #00ff88;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        .session-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Password Change */
+        .password-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .form-label {
+            font-size: 0.95em;
+            opacity: 0.8;
+        }
+        .form-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #00ff88;
+        }
+        .password-strength {
+            height: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .strength-bar {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .weak { background: #ff4444; width: 33%; }
+        .medium { background: #ffcc00; width: 66%; }
+        .strong { background: #00ff88; width: 100%; }
+        
+        /* 2FA Setup */
+        .two-factor-setup {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 255, 136, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+        .qr-code-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .recovery-codes {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: monospace;
+        }
+        .recovery-code {
+            display: inline-block;
+            margin: 5px;
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.5);
         }
         
         /* Action Buttons */
@@ -318,7 +396,7 @@
             background: rgba(0, 0, 0, 0.9);
         }
         
-        /* File Upload Modal */
+        /* Modals */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -345,36 +423,9 @@
             color: #00ff88;
             text-align: center;
         }
-        .file-upload-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-        .file-input-label {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 200px;
-            height: 200px;
-            border: 2px dashed rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .file-input-label:hover {
-            border-color: #00ff88;
-            background: rgba(0, 255, 136, 0.05);
-        }
-        .file-input {
-            display: none;
-        }
-        .preview-image {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 10px;
-            display: none;
+        .modal-message {
+            margin-bottom: 20px;
+            text-align: center;
         }
         .modal-buttons {
             display: flex;
@@ -385,7 +436,7 @@
         
         /* Responsive Adjustments */
         @media (max-width: 768px) {
-            .account-container {
+            .security-container {
                 margin: 20px auto;
                 padding: 20px;
                 width: 95%;
@@ -404,6 +455,11 @@
             .detail-label {
                 width: 100%;
             }
+            .security-feature {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
             .action-buttons {
                 flex-direction: column;
                 gap: 10px;
@@ -412,8 +468,14 @@
                 width: 100%;
                 justify-content: center;
             }
-            .name-input {
+            .session-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .session-actions {
                 width: 100%;
+                justify-content: flex-end;
             }
         }
     </style>
@@ -421,43 +483,74 @@
 <body>
     <div class="connection-status">Connecting...</div>
     
-    <a href="message.html" class="nav-button">
-        <i class="fas fa-arrow-left"></i> Back to Messages
+    <a href="accounts.html" class="nav-button">
+        <i class="fas fa-arrow-left"></i> Back to Account
     </a>
     
-    <div id="accountContent" class="account-container">
+    <div id="securityContent" class="security-container">
         <div class="loading-state">
             <div class="loading-spinner"></div>
-            <p>Loading your account...</p>
+            <p>Loading security settings...</p>
         </div>
     </div>
 
-    <!-- File Upload Modal -->
-    <div id="uploadModal" class="modal-overlay" style="display: none;">
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <h2 class="modal-title">Update Profile Picture</h2>
-            <div class="file-upload-container">
-                <label for="avatarUpload" class="file-input-label" id="fileInputLabel">
-                    <i class="fas fa-cloud-upload-alt" style="font-size: 3em; margin-bottom: 10px;"></i>
-                    <span>Click to upload</span>
-                    <span style="font-size: 0.8em; opacity: 0.7;">(JPG, PNG, GIF)</span>
-                    <img id="previewImage" class="preview-image" alt="Preview">
-                </label>
-                <input type="file" id="avatarUpload" class="file-input" accept="image/jpeg, image/png, image/gif">
+            <h2 class="modal-title" id="modalTitle">Confirm Action</h2>
+            <p class="modal-message" id="modalMessage">Are you sure you want to perform this action?</p>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="confirmActionBtn">
+                    <i class="fas fa-check"></i> Confirm
+                </button>
+                <button class="btn btn-secondary" id="cancelActionBtn">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2FA Setup Modal -->
+    <div id="twoFactorModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2 class="modal-title">Two-Factor Authentication Setup</h2>
+            <div id="twoFactorSetupContent">
+                <p>Scan the QR code below with your authenticator app:</p>
+                <div class="qr-code-container">
+                    <img id="qrCodeImage" src="" alt="QR Code">
+                </div>
+                <p>Or enter this code manually:</p>
+                <div style="text-align: center; font-size: 1.2em; font-weight: bold; margin: 10px 0;">
+                    <code id="manualCode"></code>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Enter verification code</label>
+                    <input type="text" class="form-input" id="verificationCode" placeholder="6-digit code">
+                </div>
                 <div class="modal-buttons">
-                    <button class="btn btn-primary" id="uploadBtn" disabled>
-                        <i class="fas fa-upload"></i> Upload
+                    <button class="btn btn-primary" id="verify2faBtn">
+                        <i class="fas fa-check"></i> Verify
                     </button>
-                    <button class="btn btn-secondary" id="cancelUploadBtn">
+                    <button class="btn btn-secondary" id="cancel2faBtn">
                         <i class="fas fa-times"></i> Cancel
                     </button>
                 </div>
-                <div id="uploadStatus" style="margin-top: 15px; text-align: center;"></div>
+            </div>
+            <div id="recoveryCodesContent" style="display: none;">
+                <h3>Recovery Codes</h3>
+                <p>Save these codes in a secure place. You'll need them if you lose access to your authenticator app.</p>
+                <div class="recovery-codes" id="recoveryCodesList"></div>
+                <div class="modal-buttons">
+                    <button class="btn btn-primary" id="done2faBtn">
+                        <i class="fas fa-check"></i> I've saved these codes
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/otplib@12.0.1/otplib-browser.js"></script>
     <script>
         // Configuration
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
@@ -466,10 +559,9 @@
         let supabaseClient, presenceChannel;
         let currentUserId = null, session = null;
         let isOnline = false;
-        let isEditingName = false;
-        let originalName = '';
-        let currentName = '';
-        let selectedFile = null;
+        let currentAction = null;
+        let currentSessionId = null;
+        let twoFactorSecret = null;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -510,99 +602,112 @@
                 if (authError) throw authError;
                 if (!user) throw new Error("User verification failed");
 
-                // Load account data
-                await loadAccountData();
+                // Load security data
+                await loadSecurityData();
                 initializeRealtime();
 
-                // Setup file upload listeners
-                setupFileUpload();
+                // Setup event listeners for modals
+                document.getElementById('confirmActionBtn').addEventListener('click', executeAction);
+                document.getElementById('cancelActionBtn').addEventListener('click', () => {
+                    document.getElementById('confirmationModal').style.display = 'none';
+                });
+                
+                document.getElementById('verify2faBtn').addEventListener('click', verifyTwoFactorCode);
+                document.getElementById('cancel2faBtn').addEventListener('click', () => {
+                    document.getElementById('twoFactorModal').style.display = 'none';
+                });
+                document.getElementById('done2faBtn').addEventListener('click', () => {
+                    document.getElementById('twoFactorModal').style.display = 'none';
+                    window.location.reload();
+                });
 
             } catch (error) {
                 console.error("Initialization error:", error);
-                showError(`Failed to load account: ${error.message}`);
+                showError(`Failed to load security settings: ${error.message}`);
             }
         });
 
-        // Load account data
-        async function loadAccountData() {
+        // Load security data
+        async function loadSecurityData() {
             try {
                 // Fetch account information
-                let { data: account, error: accountError } = await supabaseClient
+                const { data: account, error: accountError } = await supabaseClient
                     .from('profiles')
                     .select('*')
                     .eq('id', currentUserId)
                     .single();
                 
-                // If profile doesn't exist, create one
-                if (accountError && accountError.code === 'PGRST116') {
-                    const { data: newProfile, error: createError } = await supabaseClient
-                        .from('profiles')
+                if (accountError) throw accountError;
+                
+                // Fetch active sessions
+                const { data: sessions, error: sessionsError } = await supabaseClient
+                    .auth.admin.listUserSessions(currentUserId);
+                
+                if (sessionsError) throw sessionsError;
+                
+                // Fetch security settings
+                const { data: securitySettings, error: settingsError } = await supabaseClient
+                    .from('security_settings')
+                    .select('*')
+                    .eq('user_id', currentUserId)
+                    .single();
+                
+                // If no settings exist, create default ones
+                let settings = securitySettings;
+                if (settingsError && settingsError.code === 'PGRST116') {
+                    const { data: newSettings, error: createError } = await supabaseClient
+                        .from('security_settings')
                         .insert([{
-                            id: currentUserId,
-                            email: session.user.email,
-                            full_name: session.user.email.split('@')[0],
-                            created_at: new Date().toISOString()
+                            user_id: currentUserId,
+                            two_factor_enabled: false,
+                            two_factor_secret: null,
+                            login_alerts: true,
+                            suspicious_activity_alerts: true,
+                            password_update_required: false,
+                            last_updated: new Date().toISOString()
                         }])
                         .select()
                         .single();
-
+                    
                     if (createError) throw createError;
-                    account = newProfile;
-                } else if (accountError) {
-                    throw accountError;
+                    settings = newSettings;
+                } else if (settingsError) {
+                    throw settingsError;
                 }
-                
-                // Fetch recent activity
-                const { data: activity, error: activityError } = await supabaseClient
-                    .from('account_activity')
+
+                // Fetch security logs
+                const { data: securityLogs, error: logsError } = await supabaseClient
+                    .from('security_logs')
                     .select('*')
                     .eq('user_id', currentUserId)
                     .order('created_at', { ascending: false })
-                    .limit(5);
+                    .limit(20);
                 
-                if (activityError) throw activityError;
+                if (logsError) throw logsError;
 
-                // Render the account page
-                renderAccountPage(account, activity || []);
+                // Render the security page
+                renderSecurityPage(account, sessions.sessions || [], settings, securityLogs || []);
 
             } catch (error) {
-                console.error('Failed to load account data:', error);
-                showError('Failed to load account data. Please try again.');
+                console.error('Failed to load security data:', error);
+                showError('Failed to load security data. Please try again.');
             }
         }
 
-        function renderAccountPage(account, activity) {
-            const accountContent = document.getElementById('accountContent');
-            originalName = account.full_name || '';
-            currentName = originalName;
+        function renderSecurityPage(account, sessions, settings, securityLogs) {
+            const securityContent = document.getElementById('securityContent');
             
             // Format dates
             const createdAt = account.created_at ? new Date(account.created_at) : null;
             const lastActive = account.last_updated ? new Date(account.last_updated) : null;
             
-            accountContent.innerHTML = `
+            securityContent.innerHTML = `
                 <div class="profile-header">
                     <div class="avatar-container">
-                        <img id="profileAvatar" src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
+                        <img src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
                             class="profile-avatar" alt="${account.full_name || 'User'}">
-                        <div class="edit-avatar-icon" id="editAvatarBtn">
-                            <i class="fas fa-pencil-alt"></i>
-                        </div>
                     </div>
-                    <h1 class="profile-name">
-                        <span id="nameDisplay">${account.full_name || 'User'}</span>
-                        <i class="fas fa-pencil-alt edit-icon" id="editNameIcon"></i>
-                    </h1>
-                    <div class="edit-name-container" id="editNameContainer" style="display: none;">
-                        <input type="text" class="name-input" id="nameInput" value="${account.full_name || ''}" maxlength="50">
-                        <button class="btn btn-primary" id="saveNameBtn" disabled>
-                            <i class="fas fa-check"></i> Save
-                        </button>
-                        <button class="btn btn-secondary" id="cancelEditBtn">
-                            <i class="fas fa-times"></i> Cancel
-                        </button>
-                    </div>
-                    <div class="name-availability" id="nameAvailability"></div>
+                    <h1 class="profile-name">Security Settings</h1>
                     <p class="profile-email">${account.email || 'No email'}</p>
                     <div class="profile-status">
                         <span id="statusIndicator" class="status-indicator ${isOnline ? 'online' : 'offline'}"></span>
@@ -610,394 +715,627 @@
                     </div>
                 </div>
                 
-                <div class="profile-section">
+                <div class="security-section">
                     <div class="section-title">
-                        <i class="fas fa-info-circle"></i> Account Information
+                        <i class="fas fa-shield-alt"></i> Account Protection
                     </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Full Name</div>
-                        <div class="detail-value">${account.full_name || 'Not provided'}</div>
+                    
+                    <div class="security-feature">
+                        <div>
+                            <h3>Two-Factor Authentication</h3>
+                            <p class="security-description">
+                                Add an extra layer of security to your account with an authenticator app
+                            </p>
+                        </div>
+                        <label class="security-toggle">
+                            <input type="checkbox" id="twoFactorToggle" ${settings.two_factor_enabled ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
                     </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Email</div>
-                        <div class="detail-value">${account.email || 'Not provided'}</div>
+                    
+                    <div id="twoFactorSetup" class="two-factor-setup" style="${settings.two_factor_enabled ? 'display: block;' : 'display: none;'}">
+                        <h4>Two-Factor Status: <span style="color: #00ff88;">${settings.two_factor_enabled ? 'Enabled' : 'Disabled'}</span></h4>
+                        ${settings.two_factor_enabled ? `
+                            <button class="btn btn-danger" id="disable2faBtn" style="margin-top: 15px;">
+                                <i class="fas fa-times-circle"></i> Disable Two-Factor
+                            </button>
+                        ` : ''}
                     </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Account Created</div>
-                        <div class="detail-value">${createdAt ? createdAt.toLocaleString() : 'Unknown'}</div>
+                    
+                    <div class="security-feature">
+                        <div>
+                            <h3>Login Alerts</h3>
+                            <p class="security-description">
+                                Get notified when someone logs into your account from a new device
+                            </p>
+                        </div>
+                        <label class="security-toggle">
+                            <input type="checkbox" id="loginAlertsToggle" ${settings.login_alerts ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
                     </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Last Active</div>
-                        <div class="detail-value">${lastActive ? formatLastOnline(lastActive) : 'Never'}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Account Role</div>
-                        <div class="detail-value">${account.role || 'Standard User'}</div>
+                    
+                    <div class="security-feature">
+                        <div>
+                            <h3>Suspicious Activity Alerts</h3>
+                            <p class="security-description">
+                                Receive alerts for unusual activity like logins from new locations
+                            </p>
+                        </div>
+                        <label class="security-toggle">
+                            <input type="checkbox" id="activityAlertsToggle" ${settings.suspicious_activity_alerts ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
                     </div>
                 </div>
                 
-                <div class="profile-section">
+                <div class="security-section">
                     <div class="section-title">
-                        <i class="fas fa-shield-alt"></i> Security
+                        <i class="fas fa-key"></i> Password Management
                     </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Two-Factor Auth</div>
-                        <div class="detail-value">Disabled</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Last Login</div>
-                        <div class="detail-value">${lastActive ? formatLastOnline(lastActive) : 'Never'}</div>
+                    
+                    <div class="password-form">
+                        <div class="form-group">
+                            <label class="form-label">Current Password</label>
+                            <input type="password" class="form-input" id="currentPassword" placeholder="Enter current password">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">New Password</label>
+                            <input type="password" class="form-input" id="newPassword" placeholder="Enter new password">
+                            <div class="password-strength">
+                                <div class="strength-bar" id="passwordStrength"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-input" id="confirmPassword" placeholder="Confirm new password">
+                        </div>
+                        
+                        <button class="btn btn-primary" id="changePasswordBtn">
+                            <i class="fas fa-key"></i> Change Password
+                        </button>
                     </div>
                 </div>
                 
-                <div class="profile-section">
+                <div class="security-section">
                     <div class="section-title">
-                        <i class="fas fa-history"></i> Recent Activity
+                        <i class="fas fa-laptop"></i> Active Sessions
                     </div>
-                    <div class="activity-log" id="activityLog">
-                        ${activity.length > 0 ? 
-                            activity.map(item => `
-                                <div class="activity-item">
-                                    <div>${item.action || 'Unknown activity'}</div>
-                                    <div class="activity-time">${formatLastOnline(new Date(item.created_at))}</div>
+                    
+                    <div class="sessions-list" id="sessionsList">
+                        ${sessions.length > 0 ? 
+                            sessions.map(session => `
+                                <div class="session-item">
+                                    <div class="session-info">
+                                        <div>
+                                            <strong>${getDeviceInfo(session)}</strong>
+                                            ${session.id === session.id ? '<span class="session-current">(Current Session)</span>' : ''}
+                                        </div>
+                                        <div class="session-time">
+                                            Last active: ${formatLastOnline(new Date(session.updated_at))}
+                                            • ${new Date(session.updated_at).toLocaleString()}
+                                        </div>
+                                        <div>
+                                            IP: ${session.ip || 'Unknown'} • ${session.country || 'Unknown location'}
+                                        </div>
+                                    </div>
+                                    ${session.id !== session.id ? `
+                                    <div class="session-actions">
+                                        <button class="btn btn-secondary session-revoke-btn" data-session-id="${session.id}">
+                                            <i class="fas fa-sign-out-alt"></i> Revoke
+                                        </button>
+                                    </div>
+                                    ` : ''}
                                 </div>
                             `).join('') : 
-                            '<p style="padding: 10px; text-align: center; opacity: 0.7;">No recent activity</p>'
+                            '<p style="padding: 10px; text-align: center; opacity: 0.7;">No active sessions found</p>'
+                        }
+                    </div>
+                </div>
+                
+                <div class="security-section">
+                    <div class="section-title">
+                        <i class="fas fa-history"></i> Security Logs
+                    </div>
+                    
+                    <div class="sessions-list" id="securityLogs">
+                        ${securityLogs.length > 0 ? 
+                            securityLogs.map(log => `
+                                <div class="session-item">
+                                    <div class="session-info">
+                                        <div>
+                                            <strong>${log.action}</strong>
+                                            ${log.status === 'success' ? 
+                                                '<span style="color: #00ff88;">(Success)</span>' : 
+                                                `<span style="color: #ff4444;">(Failed: ${log.error || 'Unknown error'})</span>`
+                                            }
+                                        </div>
+                                        <div class="session-time">
+                                            ${new Date(log.created_at).toLocaleString()}
+                                            • IP: ${log.ip || 'Unknown'} • ${log.location || 'Unknown location'}
+                                        </div>
+                                        <div>
+                                            ${log.details || ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('') : 
+                            '<p style="padding: 10px; text-align: center; opacity: 0.7;">No security logs found</p>'
                         }
                     </div>
                 </div>
                 
                 <div class="action-buttons">
-                    <button class="btn btn-secondary" id="securitySettingsBtn">
-                        <i class="fas fa-lock"></i> Security Settings
+                    <button class="btn btn-danger" id="logoutAllBtn">
+                        <i class="fas fa-sign-out-alt"></i> Logout All Devices
                     </button>
-                    <button class="btn btn-danger" id="logoutButton">
-                        <i class="fas fa-sign-out-alt"></i> Logout
+                    <button class="btn btn-secondary" id="backToAccountBtn">
+                        <i class="fas fa-user"></i> Back to Account
                     </button>
                 </div>
             `;
             
             // Setup event listeners
-            document.getElementById('editNameIcon').addEventListener('click', startNameEditing);
-            document.getElementById('cancelEditBtn').addEventListener('click', cancelNameEditing);
-            document.getElementById('saveNameBtn').addEventListener('click', saveName);
-            document.getElementById('nameInput').addEventListener('input', checkNameAvailability);
-            document.getElementById('editAvatarBtn').addEventListener('click', showUploadModal);
-            
-            document.getElementById('securitySettingsBtn').addEventListener('click', () => {
-                alert('Security settings would go here');
-            });
-            
-            document.getElementById('logoutButton').addEventListener('click', async () => {
-                try {
-                    if (presenceChannel) {
-                        await supabaseClient.removeChannel(presenceChannel);
-                    }
-                    
-                    await supabaseClient.auth.signOut();
-                    localStorage.clear();
-                    window.location.href = 'login.html';
-                } catch (error) {
-                    console.error('Logout error:', error);
-                    alert('Failed to logout. Please try again.');
+            document.getElementById('twoFactorToggle').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    setupTwoFactorAuthentication();
+                } else {
+                    showConfirmation(
+                        'Disable Two-Factor Authentication',
+                        'Your account will be less secure without two-factor authentication. Are you sure?',
+                        'disableTwoFactor'
+                    );
                 }
             });
+            
+            if (settings.two_factor_enabled) {
+                document.getElementById('disable2faBtn').addEventListener('click', () => {
+                    showConfirmation(
+                        'Disable Two-Factor Authentication',
+                        'Your account will be less secure without two-factor authentication. Are you sure?',
+                        'disableTwoFactor'
+                    );
+                });
+            }
+            
+            document.getElementById('loginAlertsToggle').addEventListener('change', (e) => {
+                updateSecuritySetting('login_alerts', e.target.checked);
+            });
+            
+            document.getElementById('activityAlertsToggle').addEventListener('change', (e) => {
+                updateSecuritySetting('suspicious_activity_alerts', e.target.checked);
+            });
+            
+            document.getElementById('newPassword').addEventListener('input', (e) => {
+                updatePasswordStrength(e.target.value);
+            });
+            
+            document.getElementById('changePasswordBtn').addEventListener('click', changePassword);
+            
+            document.querySelectorAll('.session-revoke-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const sessionId = e.target.closest('button').dataset.sessionId;
+                    showConfirmation(
+                        'Revoke Session',
+                        'Are you sure you want to revoke this session? The device will be logged out immediately.',
+                        'revokeSession',
+                        sessionId
+                    );
+                });
+            });
+            
+            document.getElementById('logoutAllBtn').addEventListener('click', () => {
+                showConfirmation(
+                    'Logout All Devices',
+                    'This will log you out of all devices except this one. Are you sure?',
+                    'logoutAllDevices'
+                );
+            });
+            
+            document.getElementById('backToAccountBtn').addEventListener('click', () => {
+                window.location.href = 'accounts.html';
+            });
         }
 
-        function setupFileUpload() {
-            const fileInput = document.getElementById('avatarUpload');
-            const previewImage = document.getElementById('previewImage');
-            const fileInputLabel = document.getElementById('fileInputLabel');
-            const uploadBtn = document.getElementById('uploadBtn');
-            const cancelUploadBtn = document.getElementById('cancelUploadBtn');
-            const uploadStatus = document.getElementById('uploadStatus');
-            const uploadModal = document.getElementById('uploadModal');
-
-            fileInput.addEventListener('change', function(e) {
-                if (e.target.files.length > 0) {
-                    selectedFile = e.target.files[0];
-                    
-                    // Validate file type
-                    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-                    if (!validTypes.includes(selectedFile.type)) {
-                        uploadStatus.innerHTML = '<span style="color: #ff4444;">Invalid file type. Please upload JPG, PNG or GIF.</span>';
-                        uploadBtn.disabled = true;
-                        return;
-                    }
-                    
-                    // Validate file size (max 5MB)
-                    if (selectedFile.size > 5 * 1024 * 1024) {
-                        uploadStatus.innerHTML = '<span style="color: #ff4444;">File too large. Max size is 5MB.</span>';
-                        uploadBtn.disabled = true;
-                        return;
-                    }
-                    
-                    // Show preview
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        previewImage.src = event.target.result;
-                        previewImage.style.display = 'block';
-                        fileInputLabel.querySelector('i').style.display = 'none';
-                        fileInputLabel.querySelector('span').style.display = 'none';
-                        uploadBtn.disabled = false;
-                        uploadStatus.textContent = '';
-                    };
-                    reader.readAsDataURL(selectedFile);
+        function getDeviceInfo(session) {
+            if (session.user_agent) {
+                if (session.user_agent.includes('Mobile')) {
+                    return 'Mobile Device';
+                } else if (session.user_agent.includes('Windows')) {
+                    return 'Windows Computer';
+                } else if (session.user_agent.includes('Mac')) {
+                    return 'Mac Computer';
+                } else if (session.user_agent.includes('Linux')) {
+                    return 'Linux Computer';
                 }
-            });
-
-            uploadBtn.addEventListener('click', async function() {
-                if (!selectedFile) return;
-                
-                uploadBtn.disabled = true;
-                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-                uploadStatus.innerHTML = '<span style="color: #00ff88;">Uploading your profile picture...</span>';
-                
-                try {
-                    // Upload to Supabase Storage
-                    const fileExt = selectedFile.name.split('.').pop();
-                    const fileName = `avatar_${currentUserId}.${fileExt}`;
-                    const filePath = `${currentUserId}/${fileName}`;
-                    
-                    // Delete old avatar if exists
-                    const { data: listData } = await supabaseClient
-                        .storage
-                        .from('avatars')
-                        .list(currentUserId);
-                    
-                    if (listData && listData.length > 0) {
-                        await supabaseClient
-                            .storage
-                            .from('avatars')
-                            .remove([`${currentUserId}/${listData[0].name}`]);
-                    }
-                    
-                    // Upload new avatar
-                    const { data: uploadData, error: uploadError } = await supabaseClient
-                        .storage
-                        .from('avatars')
-                        .upload(filePath, selectedFile, {
-                            cacheControl: '3600',
-                            upsert: true
-                        });
-                    
-                    if (uploadError) throw uploadError;
-                    
-                    // Get public URL
-                    const { data: urlData } = supabaseClient
-                        .storage
-                        .from('avatars')
-                        .getPublicUrl(filePath);
-                    
-                    // Update profile with new avatar URL
-                    const { data: profileData, error: profileError } = await supabaseClient
-                        .from('profiles')
-                        .update({ 
-                            avatar_url: urlData.publicUrl,
-                            last_updated: new Date().toISOString()
-                        })
-                        .eq('id', currentUserId)
-                        .select();
-                    
-                    if (profileError) throw profileError;
-                    
-                    // Log the activity
-                    await supabaseClient
-                        .from('account_activity')
-                        .insert([{
-                            user_id: currentUserId,
-                            action: 'Changed profile picture',
-                            created_at: new Date().toISOString()
-                        }]);
-                    
-                    // Update UI
-                    document.getElementById('profileAvatar').src = urlData.publicUrl + '?t=' + Date.now();
-                    
-                    // Show success message
-                    uploadStatus.innerHTML = '<span style="color: #00ff88;">Profile picture updated successfully!</span>';
-                    
-                    // Close modal after delay
-                    setTimeout(() => {
-                        uploadModal.style.display = 'none';
-                        uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
-                        uploadBtn.disabled = false;
-                        previewImage.src = '';
-                        previewImage.style.display = 'none';
-                        fileInputLabel.querySelector('i').style.display = 'block';
-                        fileInputLabel.querySelector('span').style.display = 'block';
-                        fileInput.value = '';
-                        selectedFile = null;
-                        uploadStatus.textContent = '';
-                    }, 1500);
-                    
-                } catch (error) {
-                    console.error('Error uploading avatar:', error);
-                    uploadStatus.innerHTML = `<span style="color: #ff4444;">Error: ${error.message}</span>`;
-                    uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
-                    uploadBtn.disabled = false;
-                }
-            });
-
-            cancelUploadBtn.addEventListener('click', function() {
-                uploadModal.style.display = 'none';
-                previewImage.src = '';
-                previewImage.style.display = 'none';
-                fileInputLabel.querySelector('i').style.display = 'block';
-                fileInputLabel.querySelector('span').style.display = 'block';
-                fileInput.value = '';
-                selectedFile = null;
-                uploadStatus.textContent = '';
-                uploadBtn.disabled = true;
-                uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
-            });
-        }
-
-        function showUploadModal() {
-            document.getElementById('uploadModal').style.display = 'flex';
-        }
-
-        function startNameEditing() {
-            isEditingName = true;
-            document.getElementById('nameDisplay').style.display = 'none';
-            document.getElementById('editNameIcon').style.display = 'none';
-            document.getElementById('editNameContainer').style.display = 'flex';
-            document.getElementById('nameInput').focus();
-        }
-
-        function cancelNameEditing() {
-            isEditingName = false;
-            document.getElementById('nameDisplay').style.display = 'inline';
-            document.getElementById('editNameIcon').style.display = 'inline-block';
-            document.getElementById('editNameContainer').style.display = 'none';
-            document.getElementById('nameInput').value = currentName;
-            document.getElementById('nameAvailability').textContent = '';
-            document.getElementById('saveNameBtn').disabled = true;
-        }
-
-        async function checkNameAvailability() {
-            const newName = document.getElementById('nameInput').value.trim();
-            const availabilityElement = document.getElementById('nameAvailability');
-            const saveBtn = document.getElementById('saveNameBtn');
-            
-            if (newName.toLowerCase() === originalName.toLowerCase()) {
-                availabilityElement.textContent = 'This is your current name';
-                availabilityElement.className = 'name-availability';
-                saveBtn.disabled = true;
-                return;
             }
-            
-            if (newName.length < 3) {
-                availabilityElement.textContent = 'Name must be at least 3 characters';
-                availabilityElement.className = 'name-availability unavailable';
-                saveBtn.disabled = true;
-                return;
-            }
-            
-            if (newName.length > 50) {
-                availabilityElement.textContent = 'Name must be less than 50 characters';
-                availabilityElement.className = 'name-availability unavailable';
-                saveBtn.disabled = true;
-                return;
-            }
+            return 'Unknown Device';
+        }
+
+        function showConfirmation(title, message, action, data = null) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('confirmationModal').style.display = 'flex';
+            currentAction = action;
+            currentSessionId = data;
+        }
+
+        async function executeAction() {
+            document.getElementById('confirmationModal').style.display = 'none';
             
             try {
-                // Case-insensitive check
-                const { data, error } = await supabaseClient
-                    .from('profiles')
-                    .select('full_name')
-                    .ilike('full_name', newName)
-                    .neq('id', currentUserId);
-                
-                if (error) throw error;
-                
-                if (data && data.length > 0) {
-                    availabilityElement.textContent = 'Name is already taken';
-                    availabilityElement.className = 'name-availability unavailable';
-                    saveBtn.disabled = true;
-                } else {
-                    availabilityElement.textContent = 'Name is available';
-                    availabilityElement.className = 'name-availability available';
-                    saveBtn.disabled = false;
+                switch (currentAction) {
+                    case 'toggleTwoFactor':
+                        await toggleTwoFactor(currentSessionId);
+                        break;
+                    case 'disableTwoFactor':
+                        await disableTwoFactor();
+                        break;
+                    case 'revokeSession':
+                        await revokeSession(currentSessionId);
+                        break;
+                    case 'logoutAllDevices':
+                        await logoutAllDevices();
+                        break;
                 }
             } catch (error) {
-                console.error('Error checking name:', error);
-                availabilityElement.textContent = 'Error checking name availability';
-                availabilityElement.className = 'name-availability unavailable';
-                saveBtn.disabled = true;
+                console.error(`Error executing ${currentAction}:`, error);
+                showError(`Failed to complete action: ${error.message}`);
             }
         }
 
-        async function saveName() {
-            const newName = document.getElementById('nameInput').value.trim();
-            const saveBtn = document.getElementById('saveNameBtn');
+        async function setupTwoFactorAuthentication() {
+            try {
+                // Generate a new secret
+                twoFactorSecret = otplib.authenticator.generateSecret();
+                
+                // Create a TOTP URI for QR code generation
+                const totpUri = otplib.authenticator.keyuri(
+                    session.user.email,
+                    'YourAppName',
+                    twoFactorSecret
+                );
+                
+                // Display QR code
+                document.getElementById('qrCodeImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}`;
+                document.getElementById('manualCode').textContent = twoFactorSecret;
+                
+                // Show the 2FA setup modal
+                document.getElementById('twoFactorModal').style.display = 'flex';
+                document.getElementById('twoFactorSetupContent').style.display = 'block';
+                document.getElementById('recoveryCodesContent').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Error setting up 2FA:', error);
+                showError('Failed to setup two-factor authentication');
+            }
+        }
+
+        async function verifyTwoFactorCode() {
+            const code = document.getElementById('verificationCode').value.trim();
             
-            if (!newName || newName.toLowerCase() === originalName.toLowerCase()) {
-                cancelNameEditing();
+            if (!code || code.length !== 6) {
+                alert('Please enter a valid 6-digit code');
                 return;
             }
             
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-            
             try {
-                // First confirm the name is still available
-                const { data: checkData, error: checkError } = await supabaseClient
-                    .from('profiles')
-                    .select('full_name')
-                    .ilike('full_name', newName)
-                    .neq('id', currentUserId);
+                // Verify the code
+                const isValid = otplib.authenticator.check(code, twoFactorSecret);
                 
-                if (checkError) throw checkError;
-                
-                if (checkData && checkData.length > 0) {
-                    document.getElementById('nameAvailability').textContent = 'Name was just taken by another user';
-                    document.getElementById('nameAvailability').className = 'name-availability unavailable';
-                    saveBtn.disabled = true;
-                    saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+                if (!isValid) {
+                    alert('Invalid verification code. Please try again.');
                     return;
                 }
                 
-                // Update the name
+                // Generate recovery codes
+                const recoveryCodes = Array.from({ length: 10 }, () => 
+                    Math.random().toString(36).substring(2, 8).toUpperCase()
+                );
+                
+                // Update security settings
                 const { data, error } = await supabaseClient
-                    .from('profiles')
+                    .from('security_settings')
                     .update({ 
-                        full_name: newName,
+                        two_factor_enabled: true,
+                        two_factor_secret: twoFactorSecret,
+                        recovery_codes: recoveryCodes,
                         last_updated: new Date().toISOString()
                     })
-                    .eq('id', currentUserId)
+                    .eq('user_id', currentUserId)
                     .select();
                 
                 if (error) throw error;
                 
                 // Log the activity
                 await supabaseClient
-                    .from('account_activity')
+                    .from('security_logs')
                     .insert([{
                         user_id: currentUserId,
-                        action: 'Changed display name',
+                        action: 'Enabled two-factor authentication',
+                        status: 'success',
+                        ip: '', // You would get this from the request
+                        location: '', // You would geolocate the IP
                         created_at: new Date().toISOString()
                     }]);
                 
-                // Update UI
-                currentName = newName;
-                document.getElementById('nameDisplay').textContent = newName;
-                cancelNameEditing();
+                // Show recovery codes
+                document.getElementById('twoFactorSetupContent').style.display = 'none';
+                document.getElementById('recoveryCodesContent').style.display = 'block';
                 
-                // Show success message
-                const availabilityElement = document.getElementById('nameAvailability');
-                availabilityElement.textContent = 'Name updated successfully!';
-                availabilityElement.className = 'name-availability available';
-                
-                setTimeout(() => {
-                    availabilityElement.textContent = '';
-                }, 3000);
+                const codesList = document.getElementById('recoveryCodesList');
+                codesList.innerHTML = '';
+                recoveryCodes.forEach(code => {
+                    const codeElement = document.createElement('div');
+                    codeElement.className = 'recovery-code';
+                    codeElement.textContent = code;
+                    codesList.appendChild(codeElement);
+                });
                 
             } catch (error) {
-                console.error('Error saving name:', error);
-                document.getElementById('nameAvailability').textContent = 'Error saving name: ' + error.message;
-                document.getElementById('nameAvailability').className = 'name-availability unavailable';
-            } finally {
-                saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+                console.error('Error verifying 2FA code:', error);
+                showError('Failed to verify two-factor authentication code');
+            }
+        }
+
+        async function disableTwoFactor() {
+            try {
+                // Update security settings
+                const { data, error } = await supabaseClient
+                    .from('security_settings')
+                    .update({ 
+                        two_factor_enabled: false,
+                        two_factor_secret: null,
+                        recovery_codes: null,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('user_id', currentUserId)
+                    .select();
+                
+                if (error) throw error;
+                
+                // Log the activity
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Disabled two-factor authentication',
+                        status: 'success',
+                        ip: '', // You would get this from the request
+                        location: '', // You would geolocate the IP
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                // Reload settings
+                await loadSecurityData();
+                
+                // Show success
+                alert('Two-factor authentication has been disabled.');
+                
+            } catch (error) {
+                console.error('Error disabling 2FA:', error);
+                throw error;
+            }
+        }
+
+        async function updateSecuritySetting(setting, value) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('security_settings')
+                    .update({ 
+                        [setting]: value,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('user_id', currentUserId)
+                    .select();
+                
+                if (error) throw error;
+                
+                // Log the activity
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: `Updated ${setting.replace('_', ' ')} to ${value}`,
+                        status: 'success',
+                        ip: '', // You would get this from the request
+                        location: '', // You would geolocate the IP
+                        created_at: new Date().toISOString()
+                    }]);
+                
+            } catch (error) {
+                console.error(`Error updating ${setting}:`, error);
+                
+                // Revert the toggle
+                document.getElementById(`${setting}Toggle`).checked = !value;
+                
+                showError(`Failed to update ${setting.replace('_', ' ')}`);
+            }
+        }
+
+        function updatePasswordStrength(password) {
+            const strengthBar = document.getElementById('passwordStrength');
+            
+            // Reset
+            strengthBar.className = 'strength-bar';
+            strengthBar.style.width = '0%';
+            
+            if (!password) return;
+            
+            // Very basic strength check (in a real app, use a proper library)
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+            if (password.match(/[0-9]/)) strength++;
+            if (password.match(/[^a-zA-Z0-9]/)) strength++;
+            
+            if (strength < 2) {
+                strengthBar.classList.add('weak');
+            } else if (strength < 4) {
+                strengthBar.classList.add('medium');
+            } else {
+                strengthBar.classList.add('strong');
+            }
+        }
+
+        async function changePassword() {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                alert('Please fill in all password fields');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                alert('New passwords do not match');
+                return;
+            }
+            
+            if (newPassword.length < 8) {
+                alert('Password must be at least 8 characters');
+                return;
+            }
+            
+            try {
+                // First verify current password
+                const { data: verifyData, error: verifyError } = await supabaseClient
+                    .auth.signInWithPassword({
+                        email: session.user.email,
+                        password: currentPassword
+                    });
+                
+                if (verifyError) throw verifyError;
+                
+                // Update password
+                const { data: updateData, error: updateError } = await supabaseClient
+                    .auth.updateUser({
+                        password: newPassword
+                    });
+                
+                if (updateError) throw updateError;
+                
+                // Update security settings
+                await supabaseClient
+                    .from('security_settings')
+                    .update({ 
+                        password_update_required: false,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('user_id', currentUserId);
+                
+                // Log the activity
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Changed password',
+                        status: 'success',
+                        ip: '', // You would get this from the request
+                        location: '', // You would geolocate the IP
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                // Clear fields
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+                document.getElementById('passwordStrength').className = 'strength-bar';
+                document.getElementById('passwordStrength').style.width = '0%';
+                
+                // Show success
+                alert('Password changed successfully!');
+                
+            } catch (error) {
+                console.error('Error changing password:', error);
+                
+                // Log the failed attempt
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Failed password change attempt',
+                        status: 'failed',
+                        error: error.message,
+                        ip: '', // You would get this from the request
+                        location: '', // You would geolocate the IP
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                alert(`Failed to change password: ${error.message}`);
+            }
+        }
+
+        async function revokeSession(sessionId) {
+            try {
+                const { data, error } = await supabaseClient
+                    .auth.admin.signOut(sessionId);
+                
+                if (error) throw error;
+                
+                // Log the activity
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Revoked session',
+                        status: 'success',
+                        ip: '', // You would get this from the request
+                        location: '', // You would geolocate the IP
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                // Reload sessions
+                await loadSecurityData();
+                
+                // Show success
+                alert('Session revoked successfully!');
+                
+            } catch (error) {
+                console.error('Error revoking session:', error);
+                throw error;
+            }
+        }
+
+        async function logoutAllDevices() {
+            try {
+                // Get all sessions except current one
+                const { data: sessions, error: sessionsError } = await supabaseClient
+                    .auth.admin.listUserSessions(currentUserId);
+                
+                if (sessionsError) throw sessionsError;
+                
+                // Revoke all sessions except current
+                const revokePromises = sessions.sessions
+                    .filter(s => s.id !== session.id)
+                    .map(s => supabaseClient.auth.admin.signOut(s.id));
+                
+                await Promise.all(revokePromises);
+                
+                // Log the activity
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Revoked all other sessions',
+                        status: 'success',
+                        ip: '', // You would get this from the request
+                        location: '', // You would geolocate the IP
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                // Reload sessions
+                await loadSecurityData();
+                
+                // Show success
+                alert('Logged out all other devices successfully!');
+                
+            } catch (error) {
+                console.error('Error logging out all devices:', error);
+                throw error;
             }
         }
 
@@ -1029,10 +1367,10 @@
         }
 
         function showError(message) {
-            const accountContent = document.getElementById('accountContent');
-            accountContent.innerHTML = `
+            const securityContent = document.getElementById('securityContent');
+            securityContent.innerHTML = `
                 <div class="error-state">
-                    <h2>Error Loading Account</h2>
+                    <h2>Error Loading Security Settings</h2>
                     <p>${message}</p>
                     <button onclick="window.location.reload()">Try Again</button>
                     <button onclick="window.location.href='login.html'" style="margin-top: 10px;">
