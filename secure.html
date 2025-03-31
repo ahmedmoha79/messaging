@@ -1225,55 +1225,52 @@
             // Setup buttons
             document.getElementById('cancelPasswordChangeBtn').addEventListener('click', closeModal);
             
-            document.getElementById('confirmPasswordChangeBtn').addEventListener('click', async () => {
-                const currentPassword = document.getElementById('currentPassword').value;
-                const newPassword = document.getElementById('newPassword').value;
-                const confirmPassword = document.getElementById('confirmPassword').value;
-                
-                if (newPassword !== confirmPassword) {
-                    showError('New passwords do not match');
-                    return;
-                }
-                
-                try {
-                    // In a real app, you would update the password through your auth system
-                    // For Supabase, you would use: await supabaseClient.auth.updateUser({ password: newPassword })
-                    
-                    // For this demo, we'll just simulate it
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    // Update last password change
-                    const { error } = await supabaseClient
-                        .from('user_security')
-                        .update({ 
-                            last_password_change: new Date().toISOString()
-                        })
-                        .eq('user_id', currentUserId);
-                    
-                    if (error) throw error;
-                    
-                    // Log the event
-                    await logSecurityEvent('PASSWORD_CHANGED', 'User changed their password');
-                    
-                    // Show success
-                    showModal(
-                        'Password Changed', 
-                        'Your password has been successfully updated.',
-                        [
-                            { text: 'OK', action: () => {
-                                closeModal();
-                                window.location.reload();
-                            }, class: 'btn-primary' }
-                        ]
-                    );
-                    
-                } catch (error) {
-                    console.error('Error changing password:', error);
-                    showError('Failed to change password. Please try again.');
-                }
-            });
-        }
-
+document.getElementById('confirmPasswordChangeBtn').addEventListener('click', async () => {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (newPassword !== confirmPassword) {
+        showError('New passwords do not match');
+        return;
+    }
+    
+    try {
+        // Actually update the password with Supabase
+        const { data, error } = await supabaseClient.auth.updateUser({
+            password: newPassword
+        });
+        
+        if (error) throw error;
+        
+        // Update last password change in your security table
+        const { error: updateError } = await supabaseClient
+            .from('user_security')
+            .update({ 
+                last_password_change: new Date().toISOString()
+            })
+            .eq('user_id', currentUserId);
+        
+        if (updateError) throw updateError;
+        
+        await logSecurityEvent('PASSWORD_CHANGED', 'User changed their password');
+        
+        showModal(
+            'Password Changed', 
+            'Your password has been successfully updated.',
+            [
+                { text: 'OK', action: () => {
+                    closeModal();
+                    window.location.reload();
+                }, class: 'btn-primary' }
+            ]
+        );
+        
+    } catch (error) {
+        console.error('Error changing password:', error);
+        showError(error.message || 'Failed to change password. Please try again.');
+    }
+});
         function togglePasswordVisibility(inputId, toggleIcon) {
             const input = document.getElementById(inputId);
             if (input.type === 'password') {
@@ -1435,32 +1432,49 @@
             }
         }
 
-        function showModal(title, message, buttons, customContent = null) {
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            
-            if (customContent) {
-                modal.innerHTML = customContent;
-            } else {
-                modal.innerHTML = `
-                    <div class="modal-content">
-                        ${title ? `<div class="modal-title">${title}</div>` : ''}
-                        ${message ? `<div class="modal-message">${message}</div>` : ''}
-                        <div class="modal-buttons">
-                            ${buttons.map(btn => `
-                                <button class="btn ${btn.class}" id="${btn.id || ''}">${btn.text}</button>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                
-                // Add event listeners to buttons
-                buttons.forEach(btn => {
-                    if (btn.id && btn.action) {
-                        document.getElementById(btn.id).addEventListener('click', btn.action);
-                    }
-                });
-            }
+       function showModal(title, message, buttons, customContent = null) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    
+    if (customContent) {
+        modal.innerHTML = customContent;
+    } else {
+        modal.innerHTML = `
+            <div class="modal-content">
+                ${title ? `<div class="modal-title">${title}</div>` : ''}
+                ${message ? `<div class="modal-message">${message}</div>` : ''}
+                <div class="modal-buttons">
+                    ${buttons.map((btn, index) => `
+                        <button class="btn ${btn.class}" id="modal-btn-${index}">${btn.text}</button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    document.body.appendChild(modal);
+    
+    // Add event listeners to buttons
+    buttons.forEach((btn, index) => {
+        const button = document.getElementById(`modal-btn-${index}`);
+        if (button && btn.action) {
+            button.addEventListener('click', btn.action);
+        }
+    });
+    
+    // For custom content modals, manually attach listeners to known buttons
+    if (customContent) {
+        const closeBtn = modal.querySelector('#closeErrorBtn, #closeRecoveryCodesBtn, #cancelMfaSetupBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeModal);
+        }
+        
+        const confirmBtn = modal.querySelector('#verifyMfaBtn, #confirmPasswordChangeBtn');
+        if (confirmBtn && confirmBtn.onclick) {
+            confirmBtn.addEventListener('click', confirmBtn.onclick);
+        }
+    }
+}
             
             document.body.appendChild(modal);
         }
