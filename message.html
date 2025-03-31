@@ -142,16 +142,17 @@
         
         /* Chat View Styles */
        .chat-view {
-    flex: 1;
-    position: absolute;
+    position: fixed;
     top: 0;
-    left: 0;
+    left: 30%; /* Matches sidebar width */
     right: 0;
     bottom: 0;
     display: none;
     flex-direction: column;
     background: rgba(0, 0, 0, 0.85);
     z-index: 500;
+    margin-left: 0;
+    transition: all 0.3s ease;
 }
         .chat-view.active {
             display: flex;
@@ -680,38 +681,56 @@
         }
 
         async function selectUser(user) {
-            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
-            document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
-            
-            selectedUser = { id: user.id, name: user.name };
-            document.getElementById('chatPartnerName').textContent = user.name;
-            await loadMessages(user.id);
-            
-            // Switch to chat view
-            document.getElementById('mapContainer').classList.add('hidden');
-            document.getElementById('chatView').classList.add('active');
-        }
+    document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
+    
+    selectedUser = { id: user.id, name: user.name };
+    document.getElementById('chatPartnerName').textContent = user.name;
+    
+    // Hide sidebar and expand map before showing chat
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.getElementById('mapContainer').style.width = '100%';
+    document.getElementById('mapContainer').style.marginLeft = '0';
+    
+    await loadMessages(user.id);
+    
+    // Show chat view
+    document.getElementById('mapContainer').classList.add('hidden');
+    document.getElementById('chatView').classList.add('active');
+    document.getElementById('chatView').style.left = '0'; // Full width chat
+    
+    // Refresh map
+    if (map) {
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 300);
+    }
+}
 
         function showMapView() {
     const mapContainer = document.getElementById('mapContainer');
     const chatView = document.getElementById('chatView');
+    const sidebar = document.getElementById('sidebar');
     
-    // Force hardware acceleration for smooth transition
-    chatView.style.transform = 'translateX(100%)';
-    mapContainer.style.opacity = '0';
+    // Reset chat view position
+    chatView.style.left = '30%';
     
-    setTimeout(() => {
-        mapContainer.classList.remove('hidden');
-        chatView.classList.remove('active');
-        chatView.style.transform = '';
-        mapContainer.style.opacity = '1';
-        
-        // Reset map viewport
-        if(map && lastPosition) {
-            map.setView([lastPosition.lat, lastPosition.lng], 15);
-            map.invalidateSize();
-        }
-    }, 300);
+    // Hide chat and show map
+    chatView.classList.remove('active');
+    mapContainer.classList.remove('hidden');
+    
+    // Reset sidebar if it was collapsed
+    if (sidebar.classList.contains('collapsed')) {
+        sidebar.classList.remove('collapsed');
+        mapContainer.style.width = '70%';
+        mapContainer.style.marginLeft = '30%';
+    }
+    
+    // Reset map viewport
+    if (map && lastPosition) {
+        map.setView([lastPosition.lat, lastPosition.lng], 15);
+        map.invalidateSize();
+    }
 }
 
         async function loadMessages(userId) {
