@@ -116,10 +116,12 @@
         
         /* Map Styles */
         .map-container {
-            flex: 1;
-            position: relative;
-            display: block;
-        }
+    flex: 1;
+    position: relative;
+    display: block;
+    transition: opacity 0.3s ease;
+    z-index: 100;
+}
         .map-container.hidden {
             display: none;
         }
@@ -130,13 +132,18 @@
         }
         
         /* Chat View Styles */
-        .chat-view {
-            flex: 1;
-            position: relative;
-            display: none;
-            flex-direction: column;
-            background: rgba(0, 0, 0, 0.85);
-        }
+       .chat-view {
+    flex: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 500;
+}
         .chat-view.active {
             display: flex;
         }
@@ -658,9 +665,26 @@
         }
 
         function showMapView() {
-            document.getElementById('mapContainer').classList.remove('hidden');
-            document.getElementById('chatView').classList.remove('active');
+    const mapContainer = document.getElementById('mapContainer');
+    const chatView = document.getElementById('chatView');
+    
+    // Force hardware acceleration for smooth transition
+    chatView.style.transform = 'translateX(100%)';
+    mapContainer.style.opacity = '0';
+    
+    setTimeout(() => {
+        mapContainer.classList.remove('hidden');
+        chatView.classList.remove('active');
+        chatView.style.transform = '';
+        mapContainer.style.opacity = '1';
+        
+        // Reset map viewport
+        if(map && lastPosition) {
+            map.setView([lastPosition.lat, lastPosition.lng], 15);
+            map.invalidateSize();
         }
+    }, 300);
+}
 
         async function loadMessages(userId) {
             try {
