@@ -59,14 +59,37 @@
             text-align: center;
             position: relative;
         }
-        .profile-avatar {
+        .avatar-container {
+            position: relative;
             width: 120px;
             height: 120px;
+            margin-bottom: 20px;
+        }
+        .profile-avatar {
+            width: 100%;
+            height: 100%;
             border-radius: 50%;
             object-fit: cover;
             border: 3px solid #00ff88;
-            margin-bottom: 20px;
             box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+        .edit-avatar-icon {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .edit-avatar-icon:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: scale(1.1);
         }
         .profile-name {
             font-size: 2em;
@@ -295,7 +318,7 @@
             background: rgba(0, 0, 0, 0.9);
         }
         
-        /* Confirmation Modal */
+        /* File Upload Modal */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -316,6 +339,43 @@
             width: 90%;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
+        .modal-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #00ff88;
+            text-align: center;
+        }
+        .file-upload-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .file-input-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 200px;
+            height: 200px;
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .file-input-label:hover {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.05);
+        }
+        .file-input {
+            display: none;
+        }
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            display: none;
+        }
         .modal-buttons {
             display: flex;
             gap: 15px;
@@ -333,7 +393,7 @@
             .profile-header {
                 margin-bottom: 20px;
             }
-            .profile-avatar {
+            .avatar-container {
                 width: 100px;
                 height: 100px;
             }
@@ -372,6 +432,31 @@
         </div>
     </div>
 
+    <!-- File Upload Modal -->
+    <div id="uploadModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2 class="modal-title">Update Profile Picture</h2>
+            <div class="file-upload-container">
+                <label for="avatarUpload" class="file-input-label" id="fileInputLabel">
+                    <i class="fas fa-cloud-upload-alt" style="font-size: 3em; margin-bottom: 10px;"></i>
+                    <span>Click to upload</span>
+                    <span style="font-size: 0.8em; opacity: 0.7;">(JPG, PNG, GIF)</span>
+                    <img id="previewImage" class="preview-image" alt="Preview">
+                </label>
+                <input type="file" id="avatarUpload" class="file-input" accept="image/jpeg, image/png, image/gif">
+                <div class="modal-buttons">
+                    <button class="btn btn-primary" id="uploadBtn" disabled>
+                        <i class="fas fa-upload"></i> Upload
+                    </button>
+                    <button class="btn btn-secondary" id="cancelUploadBtn">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+                <div id="uploadStatus" style="margin-top: 15px; text-align: center;"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         // Configuration
@@ -384,6 +469,7 @@
         let isEditingName = false;
         let originalName = '';
         let currentName = '';
+        let selectedFile = null;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -427,6 +513,9 @@
                 // Load account data
                 await loadAccountData();
                 initializeRealtime();
+
+                // Setup file upload listeners
+                setupFileUpload();
 
             } catch (error) {
                 console.error("Initialization error:", error);
@@ -493,8 +582,13 @@
             
             accountContent.innerHTML = `
                 <div class="profile-header">
-                    <img id="profileAvatar" src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
-                        class="profile-avatar" alt="${account.full_name || 'User'}">
+                    <div class="avatar-container">
+                        <img id="profileAvatar" src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
+                            class="profile-avatar" alt="${account.full_name || 'User'}">
+                        <div class="edit-avatar-icon" id="editAvatarBtn">
+                            <i class="fas fa-pencil-alt"></i>
+                        </div>
+                    </div>
                     <h1 class="profile-name">
                         <span id="nameDisplay">${account.full_name || 'User'}</span>
                         <i class="fas fa-pencil-alt edit-icon" id="editNameIcon"></i>
@@ -588,6 +682,7 @@
             document.getElementById('cancelEditBtn').addEventListener('click', cancelNameEditing);
             document.getElementById('saveNameBtn').addEventListener('click', saveName);
             document.getElementById('nameInput').addEventListener('input', checkNameAvailability);
+            document.getElementById('editAvatarBtn').addEventListener('click', showUploadModal);
             
             document.getElementById('securitySettingsBtn').addEventListener('click', () => {
                 alert('Security settings would go here');
@@ -607,6 +702,158 @@
                     alert('Failed to logout. Please try again.');
                 }
             });
+        }
+
+        function setupFileUpload() {
+            const fileInput = document.getElementById('avatarUpload');
+            const previewImage = document.getElementById('previewImage');
+            const fileInputLabel = document.getElementById('fileInputLabel');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const cancelUploadBtn = document.getElementById('cancelUploadBtn');
+            const uploadStatus = document.getElementById('uploadStatus');
+            const uploadModal = document.getElementById('uploadModal');
+
+            fileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    selectedFile = e.target.files[0];
+                    
+                    // Validate file type
+                    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                    if (!validTypes.includes(selectedFile.type)) {
+                        uploadStatus.innerHTML = '<span style="color: #ff4444;">Invalid file type. Please upload JPG, PNG or GIF.</span>';
+                        uploadBtn.disabled = true;
+                        return;
+                    }
+                    
+                    // Validate file size (max 5MB)
+                    if (selectedFile.size > 5 * 1024 * 1024) {
+                        uploadStatus.innerHTML = '<span style="color: #ff4444;">File too large. Max size is 5MB.</span>';
+                        uploadBtn.disabled = true;
+                        return;
+                    }
+                    
+                    // Show preview
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        previewImage.src = event.target.result;
+                        previewImage.style.display = 'block';
+                        fileInputLabel.querySelector('i').style.display = 'none';
+                        fileInputLabel.querySelector('span').style.display = 'none';
+                        uploadBtn.disabled = false;
+                        uploadStatus.textContent = '';
+                    };
+                    reader.readAsDataURL(selectedFile);
+                }
+            });
+
+            uploadBtn.addEventListener('click', async function() {
+                if (!selectedFile) return;
+                
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+                uploadStatus.innerHTML = '<span style="color: #00ff88;">Uploading your profile picture...</span>';
+                
+                try {
+                    // Upload to Supabase Storage
+                    const fileExt = selectedFile.name.split('.').pop();
+                    const fileName = `avatar_${currentUserId}.${fileExt}`;
+                    const filePath = `${currentUserId}/${fileName}`;
+                    
+                    // Delete old avatar if exists
+                    const { data: listData } = await supabaseClient
+                        .storage
+                        .from('avatars')
+                        .list(currentUserId);
+                    
+                    if (listData && listData.length > 0) {
+                        await supabaseClient
+                            .storage
+                            .from('avatars')
+                            .remove([`${currentUserId}/${listData[0].name}`]);
+                    }
+                    
+                    // Upload new avatar
+                    const { data: uploadData, error: uploadError } = await supabaseClient
+                        .storage
+                        .from('avatars')
+                        .upload(filePath, selectedFile, {
+                            cacheControl: '3600',
+                            upsert: true
+                        });
+                    
+                    if (uploadError) throw uploadError;
+                    
+                    // Get public URL
+                    const { data: urlData } = supabaseClient
+                        .storage
+                        .from('avatars')
+                        .getPublicUrl(filePath);
+                    
+                    // Update profile with new avatar URL
+                    const { data: profileData, error: profileError } = await supabaseClient
+                        .from('profiles')
+                        .update({ 
+                            avatar_url: urlData.publicUrl,
+                            last_updated: new Date().toISOString()
+                        })
+                        .eq('id', currentUserId)
+                        .select();
+                    
+                    if (profileError) throw profileError;
+                    
+                    // Log the activity
+                    await supabaseClient
+                        .from('account_activity')
+                        .insert([{
+                            user_id: currentUserId,
+                            action: 'Changed profile picture',
+                            created_at: new Date().toISOString()
+                        }]);
+                    
+                    // Update UI
+                    document.getElementById('profileAvatar').src = urlData.publicUrl + '?t=' + Date.now();
+                    
+                    // Show success message
+                    uploadStatus.innerHTML = '<span style="color: #00ff88;">Profile picture updated successfully!</span>';
+                    
+                    // Close modal after delay
+                    setTimeout(() => {
+                        uploadModal.style.display = 'none';
+                        uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+                        uploadBtn.disabled = false;
+                        previewImage.src = '';
+                        previewImage.style.display = 'none';
+                        fileInputLabel.querySelector('i').style.display = 'block';
+                        fileInputLabel.querySelector('span').style.display = 'block';
+                        fileInput.value = '';
+                        selectedFile = null;
+                        uploadStatus.textContent = '';
+                    }, 1500);
+                    
+                } catch (error) {
+                    console.error('Error uploading avatar:', error);
+                    uploadStatus.innerHTML = `<span style="color: #ff4444;">Error: ${error.message}</span>`;
+                    uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+                    uploadBtn.disabled = false;
+                }
+            });
+
+            cancelUploadBtn.addEventListener('click', function() {
+                uploadModal.style.display = 'none';
+                previewImage.src = '';
+                previewImage.style.display = 'none';
+                fileInputLabel.querySelector('i').style.display = 'block';
+                fileInputLabel.querySelector('span').style.display = 'block';
+                fileInput.value = '';
+                selectedFile = null;
+                uploadStatus.textContent = '';
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+            });
+        }
+
+        function showUploadModal() {
+            document.getElementById('uploadModal').style.display = 'flex';
         }
 
         function startNameEditing() {
