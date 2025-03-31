@@ -641,7 +641,9 @@
                 
                 // Fetch active sessions
                 const { data: sessions, error: sessionsError } = await supabaseClient
-                    .auth.admin.listUserSessions(currentUserId);
+                .from('user_sessions')
+                .select('*')
+                .eq('user_id', currentUserId);
                 
                 if (sessionsError) throw sessionsError;
                 
