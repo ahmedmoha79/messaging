@@ -41,21 +41,22 @@
         
         /* Sidebar Styles */
         .sidebar {
-    width: 350px;
-    background: rgba(0, 0, 0, 0.85);
+    width: 30%;
+    min-width: 300px;
+    max-width: 400px;
+    background: rgba(20, 20, 20, 0.9);
     backdrop-filter: blur(10px);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
     z-index: 100;
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
+    position: relative;
     transition: all 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
 }
         .sidebar.collapsed {
-    display: none;
+    transform: translateX(-100%);
+    position: absolute;
 }
         /* User List Styles */
         .search-bar {
@@ -66,6 +67,9 @@
             z-index: 20;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
+           .app-container {
+           transition: all 0.3s ease;
+}
         .search-input {
             width: 100%;
             padding: 12px 20px;
@@ -122,8 +126,10 @@
     flex: 1;
     position: relative;
     display: block;
-    transition: opacity 0.3s ease;
+    transition: all 0.3s ease;
     z-index: 100;
+    margin-left: 0;
+    width: 70%;
 }
         .map-container.hidden {
             display: none;
@@ -964,8 +970,25 @@
 
             // Sidebar toggle
             document.getElementById('sidebarToggle').addEventListener('click', () => {
-                document.getElementById('sidebar').classList.toggle('collapsed');
-            });
+    const sidebar = document.getElementById('sidebar');
+    const mapContainer = document.getElementById('mapContainer');
+    
+    sidebar.classList.toggle('collapsed');
+    if (sidebar.classList.contains('collapsed')) {
+        mapContainer.style.width = '100%';
+        mapContainer.style.marginLeft = '0';
+    } else {
+        mapContainer.style.width = '70%';
+        mapContainer.style.marginLeft = '30%';
+    }
+    
+    // Refresh map when resizing
+    if (map) {
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 300);
+    }
+});
 
             // Back to map button
             document.getElementById('backToMapButton').addEventListener('click', () => {
