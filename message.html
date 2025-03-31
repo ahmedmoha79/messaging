@@ -485,7 +485,7 @@
                 document.querySelector('.session-check').innerHTML = `
                     <h2>Session verification failed</h2>
                     <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                    <button onclick="window.location.href='login.html'" 
+                    <button onclick="window.location.href='accounts.html'" 
                             style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
                         Go to Login
                     </button>
@@ -935,7 +935,7 @@
                     
                     await supabaseClient.auth.signOut();
                     localStorage.clear();
-                    window.location.href = 'account.html';
+                    window.location.href = 'accounts.html';
                 } catch (error) {
                     console.error('Logout error:', error);
                 }
