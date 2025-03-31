@@ -57,6 +57,7 @@
             align-items: center;
             margin-bottom: 30px;
             text-align: center;
+            position: relative;
         }
         .profile-avatar {
             width: 120px;
@@ -71,6 +72,9 @@
             font-size: 2em;
             font-weight: bold;
             margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .profile-email {
             opacity: 0.8;
@@ -124,6 +128,42 @@
         .detail-value {
             flex: 1;
             font-weight: 500;
+        }
+        
+        /* Name Editing */
+        .edit-name-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .name-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 1em;
+            width: 250px;
+        }
+        .edit-icon {
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.2s ease;
+        }
+        .edit-icon:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        .name-availability {
+            margin-top: 5px;
+            font-size: 0.8em;
+        }
+        .available {
+            color: #00ff88;
+        }
+        .unavailable {
+            color: #ff4444;
         }
         
         /* Activity Log */
@@ -188,6 +228,11 @@
             transform: translateY(-3px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
         
         /* Loading and Error States */
         .loading-state {
@@ -250,6 +295,34 @@
             background: rgba(0, 0, 0, 0.9);
         }
         
+        /* Confirmation Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        
         /* Responsive Adjustments */
         @media (max-width: 768px) {
             .account-container {
@@ -279,6 +352,9 @@
                 width: 100%;
                 justify-content: center;
             }
+            .name-input {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -305,6 +381,9 @@
         let supabaseClient, presenceChannel;
         let currentUserId = null, session = null;
         let isOnline = false;
+        let isEditingName = false;
+        let originalName = '';
+        let currentName = '';
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -359,13 +438,30 @@
         async function loadAccountData() {
             try {
                 // Fetch account information
-                const { data: account, error: accountError } = await supabaseClient
+                let { data: account, error: accountError } = await supabaseClient
                     .from('profiles')
                     .select('*')
                     .eq('id', currentUserId)
                     .single();
                 
-                if (accountError) throw accountError;
+                // If profile doesn't exist, create one
+                if (accountError && accountError.code === 'PGRST116') {
+                    const { data: newProfile, error: createError } = await supabaseClient
+                        .from('profiles')
+                        .insert([{
+                            id: currentUserId,
+                            email: session.user.email,
+                            full_name: session.user.email.split('@')[0],
+                            created_at: new Date().toISOString()
+                        }])
+                        .select()
+                        .single();
+
+                    if (createError) throw createError;
+                    account = newProfile;
+                } else if (accountError) {
+                    throw accountError;
+                }
                 
                 // Fetch recent activity
                 const { data: activity, error: activityError } = await supabaseClient
@@ -388,6 +484,8 @@
 
         function renderAccountPage(account, activity) {
             const accountContent = document.getElementById('accountContent');
+            originalName = account.full_name || '';
+            currentName = originalName;
             
             // Format dates
             const createdAt = account.created_at ? new Date(account.created_at) : null;
@@ -397,7 +495,20 @@
                 <div class="profile-header">
                     <img id="profileAvatar" src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
                         class="profile-avatar" alt="${account.full_name || 'User'}">
-                    <h1 class="profile-name">${account.full_name || 'User'}</h1>
+                    <h1 class="profile-name">
+                        <span id="nameDisplay">${account.full_name || 'User'}</span>
+                        <i class="fas fa-pencil-alt edit-icon" id="editNameIcon"></i>
+                    </h1>
+                    <div class="edit-name-container" id="editNameContainer" style="display: none;">
+                        <input type="text" class="name-input" id="nameInput" value="${account.full_name || ''}" maxlength="50">
+                        <button class="btn btn-primary" id="saveNameBtn" disabled>
+                            <i class="fas fa-check"></i> Save
+                        </button>
+                        <button class="btn btn-secondary" id="cancelEditBtn">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                    <div class="name-availability" id="nameAvailability"></div>
                     <p class="profile-email">${account.email || 'No email'}</p>
                     <div class="profile-status">
                         <span id="statusIndicator" class="status-indicator ${isOnline ? 'online' : 'offline'}"></span>
@@ -463,9 +574,6 @@
                 </div>
                 
                 <div class="action-buttons">
-                    <button class="btn btn-primary" id="editAccountBtn">
-                        <i class="fas fa-edit"></i> Edit Profile
-                    </button>
                     <button class="btn btn-secondary" id="securitySettingsBtn">
                         <i class="fas fa-lock"></i> Security Settings
                     </button>
@@ -476,9 +584,10 @@
             `;
             
             // Setup event listeners
-            document.getElementById('editAccountBtn').addEventListener('click', () => {
-                alert('Edit profile functionality would go here');
-            });
+            document.getElementById('editNameIcon').addEventListener('click', startNameEditing);
+            document.getElementById('cancelEditBtn').addEventListener('click', cancelNameEditing);
+            document.getElementById('saveNameBtn').addEventListener('click', saveName);
+            document.getElementById('nameInput').addEventListener('input', checkNameAvailability);
             
             document.getElementById('securitySettingsBtn').addEventListener('click', () => {
                 alert('Security settings would go here');
@@ -498,6 +607,151 @@
                     alert('Failed to logout. Please try again.');
                 }
             });
+        }
+
+        function startNameEditing() {
+            isEditingName = true;
+            document.getElementById('nameDisplay').style.display = 'none';
+            document.getElementById('editNameIcon').style.display = 'none';
+            document.getElementById('editNameContainer').style.display = 'flex';
+            document.getElementById('nameInput').focus();
+        }
+
+        function cancelNameEditing() {
+            isEditingName = false;
+            document.getElementById('nameDisplay').style.display = 'inline';
+            document.getElementById('editNameIcon').style.display = 'inline-block';
+            document.getElementById('editNameContainer').style.display = 'none';
+            document.getElementById('nameInput').value = currentName;
+            document.getElementById('nameAvailability').textContent = '';
+            document.getElementById('saveNameBtn').disabled = true;
+        }
+
+        async function checkNameAvailability() {
+            const newName = document.getElementById('nameInput').value.trim();
+            const availabilityElement = document.getElementById('nameAvailability');
+            const saveBtn = document.getElementById('saveNameBtn');
+            
+            if (newName.toLowerCase() === originalName.toLowerCase()) {
+                availabilityElement.textContent = 'This is your current name';
+                availabilityElement.className = 'name-availability';
+                saveBtn.disabled = true;
+                return;
+            }
+            
+            if (newName.length < 3) {
+                availabilityElement.textContent = 'Name must be at least 3 characters';
+                availabilityElement.className = 'name-availability unavailable';
+                saveBtn.disabled = true;
+                return;
+            }
+            
+            if (newName.length > 50) {
+                availabilityElement.textContent = 'Name must be less than 50 characters';
+                availabilityElement.className = 'name-availability unavailable';
+                saveBtn.disabled = true;
+                return;
+            }
+            
+            try {
+                // Case-insensitive check
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name')
+                    .ilike('full_name', newName)
+                    .neq('id', currentUserId);
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    availabilityElement.textContent = 'Name is already taken';
+                    availabilityElement.className = 'name-availability unavailable';
+                    saveBtn.disabled = true;
+                } else {
+                    availabilityElement.textContent = 'Name is available';
+                    availabilityElement.className = 'name-availability available';
+                    saveBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error checking name:', error);
+                availabilityElement.textContent = 'Error checking name availability';
+                availabilityElement.className = 'name-availability unavailable';
+                saveBtn.disabled = true;
+            }
+        }
+
+        async function saveName() {
+            const newName = document.getElementById('nameInput').value.trim();
+            const saveBtn = document.getElementById('saveNameBtn');
+            
+            if (!newName || newName.toLowerCase() === originalName.toLowerCase()) {
+                cancelNameEditing();
+                return;
+            }
+            
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            
+            try {
+                // First confirm the name is still available
+                const { data: checkData, error: checkError } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name')
+                    .ilike('full_name', newName)
+                    .neq('id', currentUserId);
+                
+                if (checkError) throw checkError;
+                
+                if (checkData && checkData.length > 0) {
+                    document.getElementById('nameAvailability').textContent = 'Name was just taken by another user';
+                    document.getElementById('nameAvailability').className = 'name-availability unavailable';
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+                    return;
+                }
+                
+                // Update the name
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .update({ 
+                        full_name: newName,
+                        last_updated: new Date().toISOString()
+                    })
+                    .eq('id', currentUserId)
+                    .select();
+                
+                if (error) throw error;
+                
+                // Log the activity
+                await supabaseClient
+                    .from('account_activity')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Changed display name',
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                // Update UI
+                currentName = newName;
+                document.getElementById('nameDisplay').textContent = newName;
+                cancelNameEditing();
+                
+                // Show success message
+                const availabilityElement = document.getElementById('nameAvailability');
+                availabilityElement.textContent = 'Name updated successfully!';
+                availabilityElement.className = 'name-availability available';
+                
+                setTimeout(() => {
+                    availabilityElement.textContent = '';
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Error saving name:', error);
+                document.getElementById('nameAvailability').textContent = 'Error saving name: ' + error.message;
+                document.getElementById('nameAvailability').className = 'name-availability unavailable';
+            } finally {
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+            }
         }
 
         function formatLastOnline(date) {
