@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logistics Secure Messaging</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.35/src/ua-parser.min.js"></script>
     <style>
         /* Base Styles */
         * {
@@ -709,25 +708,25 @@
             color: #000;
         }
         
+        /* Battery indicator */
+        .battery-indicator {
+            position: absolute;
+            top: 20px;
+            left: 70px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(10px);
+        }
+        
         /* Mobile Specific Styles */
-        .mobile-only {
-            display: none;
-        }
-        
-        .desktop-only {
-            display: block;
-        }
-        
-        /* Responsive Adjustments */
         @media (max-width: 768px) {
-            .mobile-only {
-                display: block;
-            }
-            
-            .desktop-only {
-                display: none;
-            }
-            
             .sidebar {
                 position: absolute;
                 width: 100%;
@@ -805,6 +804,13 @@
                 height: 36px;
                 font-size: 16px;
             }
+            
+            .battery-indicator {
+                top: 20px;
+                left: 60px;
+                font-size: 11px;
+                padding: 5px 10px;
+            }
         }
         
         /* Animation for new message notification */
@@ -828,169 +834,6 @@
         
         .user-card.has-unread .new-message-notification {
             display: block;
-        }
-        
-        /* Device indicator */
-        .device-indicator {
-            position: absolute;
-            top: 50px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .device-indicator i {
-            font-style: normal;
-        }
-        
-        /* Battery indicator */
-        .battery-indicator {
-            position: absolute;
-            top: 50px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            backdrop-filter: blur(10px);
-        }
-        
-        /* Network quality indicator */
-        .network-indicator {
-            position: absolute;
-            top: 50px;
-            right: 120px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            backdrop-filter: blur(10px);
-        }
-        
-        /* Time indicator */
-        .time-indicator {
-            position: absolute;
-            top: 50px;
-            left: 120px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            backdrop-filter: blur(10px);
-        }
-        
-        /* Advanced user status */
-        .user-status {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 6px;
-        }
-        
-        .status-online {
-            background: #00ff88;
-            box-shadow: 0 0 6px #00ff88;
-        }
-        
-        .status-offline {
-            background: #666;
-        }
-        
-        .status-away {
-            background: #ffcc00;
-            box-shadow: 0 0 6px #ffcc00;
-        }
-        
-        .status-busy {
-            background: #ff4444;
-            box-shadow: 0 0 6px #ff4444;
-        }
-        
-        /* Message status indicators */
-        .message-status {
-            font-size: 10px;
-            margin-left: 5px;
-            opacity: 0.7;
-        }
-        
-        /* Message reactions */
-        .message-reactions {
-            display: flex;
-            gap: 5px;
-            margin-top: 5px;
-        }
-        
-        .reaction {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 2px 6px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .reaction:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
-        }
-        
-        .reaction-count {
-            font-size: 10px;
-            margin-left: 2px;
-        }
-        
-        /* Message context menu */
-        .message-context-menu {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 5px 0;
-            z-index: 1000;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-            display: none;
-        }
-        
-        .message-context-menu button {
-            background: none;
-            border: none;
-            color: white;
-            padding: 8px 15px;
-            text-align: left;
-            width: 100%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .message-context-menu button:hover {
-            background: rgba(255, 255, 255, 0.1);
         }
         
         /* Custom scrollbar for mobile */
@@ -1040,6 +883,10 @@
                 👤 Account
             </button>
             
+            <div class="battery-indicator" id="batteryIndicator">
+                <span id="batteryLevel">100%</span>
+            </div>
+            
             <div class="location-controls">
                 <button class="location-control" id="centerMapButton" title="Center on my location">
                     🎯
@@ -1047,20 +894,6 @@
                 <button class="location-control active" id="toggleUserLocationsButton" title="Toggle team locations">
                     👥
                 </button>
-            </div>
-            
-            <!-- Device information indicators -->
-            <div class="device-indicator" id="deviceIndicator">
-                <i>📱</i> <span id="deviceType">Device</span>
-            </div>
-            <div class="battery-indicator" id="batteryIndicator">
-                <i>🔋</i> <span id="batteryLevel">100%</span>
-            </div>
-            <div class="network-indicator" id="networkIndicator">
-                <i>📶</i> <span id="networkQuality">Good</span>
-            </div>
-            <div class="time-indicator" id="timeIndicator">
-                <i>🕒</i> <span id="currentTime">00:00</span>
             </div>
         </div>
         
@@ -1081,14 +914,6 @@
         </div>
     </div>
 
-    <!-- Context menu for messages -->
-    <div class="message-context-menu" id="messageContextMenu">
-        <button data-action="reply"><i>↩️</i> Reply</button>
-        <button data-action="copy"><i>📋</i> Copy</button>
-        <button data-action="delete"><i>🗑️</i> Delete</button>
-        <button data-action="react"><i>👍</i> Add Reaction</button>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -1105,20 +930,12 @@
         let watchId = null;
         let userDataCache = {};
         let unreadMessages = {};
-        let deviceType = 'desktop';
         let batteryLevel = 100;
-        let networkQuality = 'good';
-        let isMobile = false;
+        let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Detect device type
-                detectDevice();
-                
-                // Initialize device monitoring
-                initDeviceMonitoring();
-                
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
@@ -1149,7 +966,7 @@
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendButton').disabled = false;
 
-                // Initialize map with device-specific settings
+                // Initialize map
                 initializeMap();
                 
                 // Load users and setup event listeners
@@ -1167,9 +984,8 @@
                     }
                 });
 
-                // Update time indicator every minute
-                updateTime();
-                setInterval(updateTime, 60000);
+                // Initialize battery monitoring
+                initBatteryMonitoring();
 
             } catch (error) {
                 console.error("Initialization error:", error);
@@ -1184,118 +1000,35 @@
             }
         });
 
-        // Detect device type and set appropriate UI
-        function detectDevice() {
-            const parser = new UAParser();
-            const result = parser.getResult();
-            
-            deviceType = result.device.type || 'desktop';
-            isMobile = deviceType === 'mobile' || deviceType === 'tablet';
-            
-            // Update UI based on device
-            document.getElementById('deviceType').textContent = 
-                isMobile ? (deviceType === 'tablet' ? 'Tablet' : 'Mobile') : 'Desktop';
-            
-            // Add device class to body for specific styling
-            document.body.classList.add(isMobile ? 'mobile-device' : 'desktop-device');
-            
-            // Adjust map zoom level based on device
-            if (isMobile) {
-                // Collapse sidebar by default on mobile
-                document.getElementById('sidebar').classList.add('collapsed');
-            }
-        }
-
-        // Initialize device monitoring (battery, network, etc.)
-        function initDeviceMonitoring() {
-            // Battery status
+        // Initialize battery monitoring
+        function initBatteryMonitoring() {
             if ('getBattery' in navigator) {
                 navigator.getBattery().then(battery => {
                     updateBatteryStatus(battery);
                     battery.addEventListener('levelchange', () => updateBatteryStatus(battery));
                     battery.addEventListener('chargingchange', () => updateBatteryStatus(battery));
                 });
+            } else {
+                // Fallback for browsers that don't support Battery Status API
+                document.getElementById('batteryIndicator').style.display = 'none';
             }
-            
-            // Network status
-            if ('connection' in navigator) {
-                updateNetworkStatus();
-                navigator.connection.addEventListener('change', updateNetworkStatus);
-            }
-            
-            // Online/offline status
-            window.addEventListener('online', () => {
-                updateConnectionStatus("Reconnecting...");
-                initializeRealtime();
-            });
-            
-            window.addEventListener('offline', () => {
-                updateConnectionStatus("Offline - No connection", true);
-            });
         }
 
         // Update battery status display
         function updateBatteryStatus(battery) {
             batteryLevel = Math.round(battery.level * 100);
-            let batteryIcon = '🔋';
-            
-            if (battery.charging) {
-                batteryIcon = '⚡';
-            } else if (batteryLevel <= 20) {
-                batteryIcon = '🪫';
-            }
-            
             document.getElementById('batteryLevel').textContent = `${batteryLevel}%`;
-            document.querySelector('#batteryIndicator i').textContent = batteryIcon;
             
             // Change color based on battery level
             const batteryElem = document.getElementById('batteryIndicator');
-            batteryElem.style.color = batteryLevel <= 20 ? '#ff4444' : '#ffffff';
+            if (batteryLevel <= 20) {
+                batteryElem.style.color = '#ff4444';
+            } else {
+                batteryElem.style.color = '#ffffff';
+            }
         }
 
-        // Update network status display
-        function updateNetworkStatus() {
-            if (!navigator.connection) {
-                networkQuality = 'good';
-                document.getElementById('networkQuality').textContent = 'Good';
-                return;
-            }
-            
-            const connection = navigator.connection;
-            let quality = 'good';
-            let icon = '📶';
-            
-            if (connection.effectiveType) {
-                if (connection.effectiveType.includes('2g')) {
-                    quality = 'Slow';
-                    icon = '🐢';
-                } else if (connection.effectiveType.includes('3g')) {
-                    quality = 'Fair';
-                    icon = '📶';
-                } else {
-                    quality = 'Fast';
-                    icon = '🚀';
-                }
-            }
-            
-            if (connection.downlink && connection.downlink < 1) {
-                quality = 'Slow';
-                icon = '🐢';
-            }
-            
-            networkQuality = quality.toLowerCase();
-            document.getElementById('networkQuality').textContent = quality;
-            document.querySelector('#networkIndicator i').textContent = icon;
-        }
-
-        // Update time display
-        function updateTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('currentTime').textContent = timeString;
-        }
-
-        // Initialize the map with device-specific settings
+        // Initialize the map
         function initializeMap() {
             const mapOptions = {
                 zoomControl: true,
@@ -1303,14 +1036,9 @@
                 minZoom: 2,
                 preferCanvas: true,
                 zoomSnap: 0.5,
-                zoomDelta: 0.5
+                zoomDelta: 0.5,
+                tap: isMobile ? false : true
             };
-            
-            // Adjust settings for mobile devices
-            if (isMobile) {
-                mapOptions.tap = false; // Prevent conflicts with other touch events
-                mapOptions.dragging = !L.Browser.mobile; // Disable dragging on mobile if it causes issues
-            }
             
             map = L.map('map', mapOptions).setView([0, 0], 2);
 
@@ -1320,19 +1048,13 @@
                 detectRetina: true
             }).addTo(map);
 
-            // Start watching position with device-specific settings
+            // Start watching position
             if (navigator.geolocation) {
                 const geoOptions = { 
                     enableHighAccuracy: true,
                     maximumAge: 30000,
                     timeout: 10000
                 };
-                
-                // Adjust for mobile devices
-                if (isMobile) {
-                    geoOptions.timeout = 15000; // Longer timeout for mobile
-                    geoOptions.maximumAge = 60000; // Accept slightly older positions
-                }
                 
                 watchId = navigator.geolocation.watchPosition(
                     updateLocation,
@@ -1370,7 +1092,7 @@
                 
                 if (marker) map.removeLayer(marker);
                 
-                // Create a person marker with device-specific icon
+                // Create a person marker
                 const iconHtml = isMobile ? '📱' : '💻';
                 marker = L.marker([lat, lng], {
                     icon: L.divIcon({
@@ -1400,29 +1122,27 @@
                     }, 500);
                 }
                 
-                // Smooth panning to new location with device-specific duration
+                // Smooth panning to new location
                 const flyDuration = isMobile ? 1.5 : 1;
                 map.flyTo([lat, lng], 15, {
                     duration: flyDuration,
                     easeLinearity: 0.25
                 });
                 
-                // Send location to server with device info
+                // Send location to server
                 sendLocationToServer(lat, lng, accuracy);
                 
                 lastPosition = { lat, lng, accuracy };
             }
         }
 
-        // Send location to server with additional device context
+        // Send location to server
         async function sendLocationToServer(lat, lng, accuracy) {
             try {
                 const now = new Date();
                 const deviceContext = {
-                    device_type: deviceType,
-                    battery_level: batteryLevel,
-                    network_quality: networkQuality,
-                    is_mobile: isMobile
+                    is_mobile: isMobile,
+                    battery_level: batteryLevel
                 };
                 
                 // Upsert location with device context
@@ -1442,13 +1162,12 @@
                 
                 if (error) throw error;
                 
-                // Update user's status with device info
+                // Update user's status
                 await supabaseClient
                     .from('users')
                     .update({ 
                         lastonline: now.toISOString(),
-                        status: 'online',
-                        device_type: deviceType
+                        status: 'online'
                     })
                     .eq('id', currentUserId);
                 
@@ -1457,17 +1176,17 @@
             }
         }
 
-        // User management with enhanced status tracking
+        // User management
         async function loadUsers() {
             try {
                 showLoading();
                 
-                // Get all users except current user with additional status info
-const { data: users, error: usersError } = await supabaseClient
-    .from('auth.users') // ← To this
-    .select('id, raw_user_meta_data->>name as name, lastonline, status, device_type')
-    .neq('id', currentUserId)
-    .order('lastonline', { ascending: false });
+                // Get all users except current user with status info
+                const { data: users, error: usersError } = await supabaseClient
+                    .from('users')
+                    .select('id, email, name, lastonline, status')
+                    .neq('id', currentUserId)
+                    .order('lastonline', { ascending: false });
                 
                 if (usersError) throw usersError;
                 
@@ -1503,7 +1222,7 @@ const { data: users, error: usersError } = await supabaseClient
                     };
                 });
                 
-                // Cache user data with additional context
+                // Cache user data
                 usersWithLocations.forEach(user => {
                     userDataCache[user.id] = user;
                 });
@@ -1517,7 +1236,7 @@ const { data: users, error: usersError } = await supabaseClient
             }
         }
 
-        // Enhanced user list rendering with device indicators
+        // User list rendering
         function renderUserList(users) {
             const userList = document.getElementById('userList');
             userList.innerHTML = '';
@@ -1533,18 +1252,12 @@ const { data: users, error: usersError } = await supabaseClient
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
-                const deviceType = user.device_type || 'desktop';
                 
-                // Determine status text with single timestamp
+                // Determine status text
                 let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 if (hasLocation) {
                     statusText += ` • ${formatDistance(locationTime)} ago`;
                 }
-                
-                // Device icon
-                let deviceIcon = '💻';
-                if (deviceType === 'mobile') deviceIcon = '📱';
-                if (deviceType === 'tablet') deviceIcon = '⌨️';
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${user.unread_count > 0 ? 'has-unread' : ''}`;
@@ -1554,7 +1267,7 @@ const { data: users, error: usersError } = await supabaseClient
                         ${getInitials(user.name)}
                     </div>
                     <div class="user-info">
-                        <h4>${user.name} <span class="device-icon">${deviceIcon}</span></h4>
+                        <h4>${user.name}</h4>
                         <p>${statusText}</p>
                     </div>
                     <div class="status-indicator ${isOnline ? 'online' : ''}"></div>
@@ -1589,7 +1302,7 @@ const { data: users, error: usersError } = await supabaseClient
             return color;
         }
 
-        // Enhanced user markers with device-specific icons
+        // User markers on map
         function updateUserMarkers(users) {
             // Clear existing markers except our own
             Object.keys(userMarkers).forEach(userId => {
@@ -1599,34 +1312,28 @@ const { data: users, error: usersError } = await supabaseClient
                 }
             });
 
-            // Add new markers with device context
+            // Add new markers
             users.forEach(user => {
                 if (user.id === currentUserId) return;
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const isOnline = onlineUsers[user.id] || (user.status === 'online' && user.lastonline && (Date.now() - new Date(user.lastonline).getTime()) < 300000);
-                const deviceType = user.device_type || 'desktop';
                 
                 if (hasLocation && showUserLocations) {
                     const location = user.user_locations[0];
                     const lastUpdated = new Date(location.last_updated);
                     const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000;
                     
-                    // Determine icon based on device type
-                    let deviceIcon = '💻';
-                    if (deviceType === 'mobile') deviceIcon = '📱';
-                    if (deviceType === 'tablet') deviceIcon = '⌨️';
-                    
-                    // Create custom marker with device context
+                    // Create custom marker
                     const marker = L.marker([location.latitude, location.longitude], {
                         icon: L.divIcon({
                             className: `user-marker ${isOnline && isRecent ? 'online' : 'offline'}`,
                             html: `
                                 <div class="user-marker-tooltip">
-                                    ${user.name} (${deviceType})${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
+                                    ${user.name}${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
                                 </div>
                                 <div class="user-marker-inner">
-                                    ${deviceIcon}
+                                    ${isMobile ? '📱' : '💻'}
                                     ${isOnline && isRecent ? '<div class="user-marker-pulse"></div>' : ''}
                                 </div>
                             `,
@@ -1679,7 +1386,7 @@ const { data: users, error: usersError } = await supabaseClient
             document.getElementById('chatPartnerName').textContent = user.name;
             await loadMessages(user.id);
             
-            // Switch to chat view with device-specific transition
+            // Switch to chat view
             document.getElementById('mapContainer').classList.add('hidden');
             document.getElementById('chatView').classList.add('active');
             
@@ -1765,7 +1472,7 @@ const { data: users, error: usersError } = await supabaseClient
                         receiver_id: receiverId,
                         content: content,
                         status: 'delivered',
-                        device_type: deviceType
+                        device_type: isMobile ? 'mobile' : 'desktop'
                     }])
                     .select()
                     .single();
@@ -1777,8 +1484,7 @@ const { data: users, error: usersError } = await supabaseClient
                 await supabaseClient
                     .from('users')
                     .update({ 
-                        lastonline: new Date().toISOString(),
-                        device_type: deviceType
+                        lastonline: new Date().toISOString()
                     })
                     .eq('id', user.id);
                 
@@ -1815,41 +1521,6 @@ const { data: users, error: usersError } = await supabaseClient
             `;
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            
-            // Add context menu handler
-            messageDiv.addEventListener(isMobile ? 'touchstart' : 'contextmenu', (e) => {
-                e.preventDefault();
-                showMessageContextMenu(e, messageDiv, isSent, messageId);
-            });
-        }
-
-        function showMessageContextMenu(e, messageDiv, isSent, messageId) {
-            const menu = document.getElementById('messageContextMenu');
-            
-            // Position the menu
-            const rect = messageDiv.getBoundingClientRect();
-            menu.style.left = `${rect.left}px`;
-            menu.style.top = `${rect.top}px`;
-            menu.style.display = 'block';
-            
-            // Close menu when clicking elsewhere
-            const closeMenu = () => {
-                menu.style.display = 'none';
-                document.removeEventListener('click', closeMenu);
-                document.removeEventListener('touchstart', closeMenu);
-            };
-            
-            // Close after short delay on mobile to allow menu interaction
-            if (isMobile) {
-                setTimeout(() => {
-                    document.addEventListener('touchstart', closeMenu);
-                }, 300);
-            } else {
-                document.addEventListener('click', closeMenu);
-            }
-            
-            // Prevent closing when clicking on menu
-            menu.addEventListener('click', (e) => e.stopPropagation());
         }
 
         function updateConnectionStatus(message, isError = false) {
@@ -1995,7 +1666,7 @@ const { data: users, error: usersError } = await supabaseClient
                 }
             });
 
-            // Typing indicator with improved detection
+            // Typing indicator
             let isTyping = false;
             let lastTypingTime = 0;
             let typingTimer;
@@ -2028,7 +1699,7 @@ const { data: users, error: usersError } = await supabaseClient
                 }, 1000);
             });
 
-            // Sidebar toggle with improved mobile handling
+            // Sidebar toggle
             document.getElementById('sidebarToggle').addEventListener('click', (e) => {
                 e.stopPropagation();
                 document.getElementById('sidebar').classList.toggle('collapsed');
@@ -2089,7 +1760,7 @@ const { data: users, error: usersError } = await supabaseClient
                 }
             });
             
-            // Toggle user locations button with enhanced feedback
+            // Toggle user locations button
             document.getElementById('toggleUserLocationsButton').addEventListener('click', () => {
                 showUserLocations = !showUserLocations;
                 const button = document.getElementById('toggleUserLocationsButton');
@@ -2113,35 +1784,9 @@ const { data: users, error: usersError } = await supabaseClient
                     });
                 }
             });
-            
-            // Handle message context menu actions
-            document.querySelectorAll('#messageContextMenu button').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const action = button.dataset.action;
-                    const messageId = document.querySelector('.message-context-menu').dataset.messageId;
-                    
-                    switch (action) {
-                        case 'copy':
-                            const messageContent = document.querySelector(`.message[data-message-id="${messageId}"] .message-content p`).textContent;
-                            navigator.clipboard.writeText(messageContent);
-                            break;
-                        case 'reply':
-                            // Implement reply functionality
-                            break;
-                        case 'delete':
-                            // Implement delete functionality
-                            break;
-                        case 'react':
-                            // Implement reaction functionality
-                            break;
-                    }
-                    
-                    document.getElementById('messageContextMenu').style.display = 'none';
-                });
-            });
         }
 
-        // Enhanced realtime functionality with device awareness
+        // Realtime functionality
         async function initializeRealtime() {
             updateConnectionStatus("Connecting to real-time service...");
             
@@ -2151,7 +1796,7 @@ const { data: users, error: usersError } = await supabaseClient
                     supabaseClient.removeChannel(presenceChannel);
                 }
 
-                // Presence channel for online status with device context
+                // Presence channel for online status
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         broadcast: { ack: true },
@@ -2174,8 +1819,7 @@ const { data: users, error: usersError } = await supabaseClient
                     if (status === 'SUBSCRIBED') {
                         await presenceChannel.track({ 
                             online_at: new Date().toISOString(),
-                            user_id: currentUserId,
-                            device_type: deviceType
+                            user_id: currentUserId
                         });
                         updateConnectionStatus("Connected");
                     }
@@ -2200,7 +1844,7 @@ const { data: users, error: usersError } = await supabaseClient
                         updateConnectionStatus("Error: " + err.message, true);
                     });
 
-                // Messages channel with enhanced device awareness
+                // Messages channel
                 const messagesChannel = supabaseClient.channel('messages-channel')
                     .on(
                         'postgres_changes',
@@ -2559,75 +2203,6 @@ const { data: users, error: usersError } = await supabaseClient
                 });
             }
         }
-
-        // SQL for backend updates (to be executed in Supabase SQL editor)
-        /*
-        -- Create a table for user locations if it doesn't exist
-        CREATE TABLE IF NOT EXISTS public.user_locations (
-            user_id UUID PRIMARY KEY REFERENCES auth.users(id),
-            latitude DOUBLE PRECISION NOT NULL,
-            longitude DOUBLE PRECISION NOT NULL,
-            accuracy DOUBLE PRECISION,
-            last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '5 minutes'),
-            device_context JSONB
-        );
-
-        -- Create index for faster location queries
-        CREATE INDEX IF NOT EXISTS idx_user_locations_last_updated ON public.user_locations (last_updated);
-
-        -- Enable Row Level Security for user_locations
-        ALTER TABLE public.user_locations ENABLE ROW LEVEL SECURITY;
-
-        -- Create policies for user_locations
-        CREATE POLICY "Enable read access for all users" 
-        ON public.user_locations
-        FOR SELECT USING (true);
-
-        CREATE POLICY "Enable insert for authenticated users only" 
-        ON public.user_locations
-        FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
-        CREATE POLICY "Enable update for own data only" 
-        ON public.user_locations
-        FOR UPDATE USING (auth.uid() = user_id);
-
-        -- Add device_type column to users table if it doesn't exist
-        ALTER TABLE public.users 
-        ADD COLUMN IF NOT EXISTS device_type TEXT;
-
-        -- Create a function to update user status
-        CREATE OR REPLACE FUNCTION public.update_user_status()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            IF NEW.lastonline IS NOT NULL THEN
-                IF (NOW() - NEW.lastonline) < INTERVAL '5 minutes' THEN
-                    NEW.status := 'online';
-                ELSE
-                    NEW.status := 'offline';
-                END IF;
-            END IF;
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-
-        -- Create trigger for user status updates
-        DROP TRIGGER IF EXISTS trigger_update_user_status ON public.users;
-        CREATE TRIGGER trigger_update_user_status
-        BEFORE INSERT OR UPDATE OF lastonline ON public.users
-        FOR EACH ROW EXECUTE FUNCTION public.update_user_status();
-
-        -- Create a function to clean up old locations
-        CREATE OR REPLACE FUNCTION public.cleanup_old_locations()
-        RETURNS VOID AS $$
-        BEGIN
-            DELETE FROM public.user_locations WHERE expires_at < NOW();
-        END;
-        $$ LANGUAGE plpgsql;
-
-        -- Schedule the cleanup function to run hourly
-        SELECT cron.schedule('hourly-location-cleanup', '0 * * * *', 'SELECT public.cleanup_old_locations()');
-        */
     </script>
 </body>
 </html>
