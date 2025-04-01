@@ -408,21 +408,6 @@
             justify-content: center;
         }
         
-        /* QR Code Container */
-        .qr-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 20px 0;
-        }
-        .qr-code {
-            width: 200px;
-            height: 200px;
-            background: white;
-            padding: 10px;
-            margin-bottom: 20px;
-        }
-        
         /* Responsive Adjustments */
         @media (max-width: 768px) {
             .account-container {
@@ -475,7 +460,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <script>
         // Configuration
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
@@ -484,7 +468,6 @@
         let supabaseClient, presenceChannel;
         let currentUserId = null, session = null;
         let isOnline = false;
-        let mfaSecret = null;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -542,8 +525,6 @@
                         .from('user_security')
                         .insert([{
                             user_id: currentUserId,
-                            mfa_enabled: false,
-                            mfa_secret: null,
                             last_password_change: new Date().toISOString(),
                             login_alerts: true,
                             suspicious_activity_alerts: true
@@ -590,7 +571,6 @@
             
             // Format dates
             const lastPasswordChange = securitySettings.last_password_change ? new Date(securitySettings.last_password_change) : null;
-            const mfaEnabledDate = securitySettings.mfa_enabled ? new Date(securitySettings.mfa_enabled_at) : null;
             
             accountContent.innerHTML = `
                 <div class="profile-header">
@@ -617,36 +597,6 @@
                             <button class="btn btn-secondary btn-sm" id="changePasswordBtn" style="margin-top: 10px;">
                                 <i class="fas fa-key"></i> Change Password
                             </button>
-                        </div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">Two-Factor Auth</div>
-                        <div class="detail-value">
-                            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                                <div>${securitySettings.mfa_enabled ? 'Enabled' : 'Disabled'}</div>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="mfaToggle" ${securitySettings.mfa_enabled ? 'checked' : ''}>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            ${securitySettings.mfa_enabled ? `
-                                <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
-                                    Enabled ${formatLastOnline(mfaEnabledDate)}
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                    <div id="mfaSetupContainer" style="display: ${securitySettings.mfa_enabled ? 'none' : 'block'};">
-                        <div class="detail-row">
-                            <div class="detail-label"></div>
-                            <div class="detail-value">
-                                <div style="margin-bottom: 15px;">
-                                    Two-factor authentication adds an extra layer of security to your account by requiring a code from your authenticator app when you log in.
-                                </div>
-                                <button class="btn btn-primary" id="setupMfaBtn">
-                                    <i class="fas fa-shield-alt"></i> Set Up Two-Factor Authentication
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -751,10 +701,8 @@
             `;
             
             // Setup event listeners
-            document.getElementById('mfaToggle').addEventListener('change', toggleMFA);
             document.getElementById('loginAlertsToggle').addEventListener('change', toggleLoginAlerts);
             document.getElementById('suspiciousActivityToggle').addEventListener('change', toggleSuspiciousActivityAlerts);
-            document.getElementById('setupMfaBtn').addEventListener('click', setupMFA);
             document.getElementById('changePasswordBtn').addEventListener('click', showChangePasswordModal);
             document.getElementById('refreshBtn').addEventListener('click', () => window.location.reload());
             document.getElementById('logoutButton').addEventListener('click', logoutAllDevices);
@@ -802,8 +750,6 @@
                 case 'login': return 'fa-sign-in-alt';
                 case 'logout': return 'fa-sign-out-alt';
                 case 'password_change': return 'fa-key';
-                case 'mfa_enabled': return 'fa-shield-alt';
-                case 'mfa_disabled': return 'fa-shield-virus';
                 case 'session_revoked': return 'fa-user-slash';
                 case 'suspicious_activity': return 'fa-exclamation-triangle';
                 default: return 'fa-info-circle';
@@ -815,169 +761,10 @@
                 case 'login': return '#00ff88';
                 case 'logout': return '#ff4444';
                 case 'password_change': return '#00ccff';
-                case 'mfa_enabled': return '#00ff88';
-                case 'mfa_disabled': return '#ff4444';
                 case 'session_revoked': return '#ff9900';
                 case 'suspicious_activity': return '#ff9900';
                 default: return '#666';
             }
-        }
-
-        async function toggleMFA(e) {
-            const enabled = e.target.checked;
-            
-            if (enabled) {
-                // Show MFA setup modal
-                showMFASetupModal();
-            } else {
-                // Show confirmation for disabling MFA
-                showModal(
-                    'Disable Two-Factor Authentication', 
-                    'Are you sure you want to disable two-factor authentication? This will make your account less secure.',
-                    [
-                        { text: 'Cancel', action: () => { e.target.checked = true; closeModal(); }, class: 'btn-secondary' },
-                        { text: 'Disable', action: async () => {
-                            try {
-                                // Update security settings
-                                const { error } = await supabaseClient
-                                    .from('user_security')
-                                    .update({ 
-                                        mfa_enabled: false,
-                                        mfa_secret: null,
-                                        mfa_disabled_at: new Date().toISOString()
-                                    })
-                                    .eq('user_id', currentUserId);
-                                
-                                if (error) throw error;
-                                
-                                // Log the event
-                                await logSecurityEvent('MFA_DISABLED', 'success', 'User disabled two-factor authentication');
-                                
-                                // Reload the page
-                                window.location.reload();
-                            } catch (error) {
-                                console.error('Error disabling MFA:', error);
-                                showError('Failed to disable two-factor authentication');
-                                e.target.checked = true;
-                                closeModal();
-                            }
-                        }, class: 'btn-danger' }
-                    ]
-                );
-            }
-        }
-
-        async function setupMFA() {
-            try {
-                // Generate a new MFA secret (in a real app, this would be done server-side)
-                mfaSecret = generateRandomString(32, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');
-                
-                // Generate QR code
-                const otpAuthUrl = `otpauth://totp/MyApp:${session.user.email}?secret=${mfaSecret}&issuer=MyApp`;
-                
-                // Show MFA setup modal
-                showMFASetupModal(otpAuthUrl, mfaSecret);
-                
-            } catch (error) {
-                console.error('Error setting up MFA:', error);
-                showError('Failed to set up two-factor authentication');
-            }
-        }
-
-        function showMFASetupModal(qrCodeUrl = null, secret = null) {
-            const modalContent = `
-                <div class="modal-content">
-                    <div class="modal-title">Set Up Two-Factor Authentication</div>
-                    <div class="modal-message">
-                        <p>Scan the QR code below with your authenticator app or enter the secret key manually.</p>
-                        ${qrCodeUrl ? `
-                            <div class="qr-container">
-                                <div id="qrCode" class="qr-code"></div>
-                                <div style="margin-bottom: 15px; font-family: monospace; word-break: break-all;">${secret}</div>
-                            </div>
-                            <p>After scanning, enter the 6-digit code from your authenticator app to verify setup.</p>
-                            <div style="margin-top: 20px;">
-                                <input type="text" id="mfaCodeInput" placeholder="Enter 6-digit code" 
-                                    style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); 
-                                    background: rgba(255,255,255,0.05); color: white; text-align: center; font-size: 1.2em; letter-spacing: 5px;"
-                                    maxlength="6">
-                            </div>
-                        ` : `
-                            <div class="loading-state">
-                                <div class="loading-spinner"></div>
-                                <p>Generating setup code...</p>
-                            </div>
-                        `}
-                    </div>
-                    <div class="modal-buttons">
-                        <button id="cancelMfaSetupBtn" class="btn btn-secondary">Cancel</button>
-                        ${qrCodeUrl ? `<button id="verifyMfaBtn" class="btn btn-primary" disabled>Verify</button>` : ''}
-                    </div>
-                </div>
-            `;
-            
-            showModal('', '', [], modalContent);
-            
-            if (qrCodeUrl) {
-                // Generate QR code
-                QRCode.toCanvas(document.getElementById('qrCode'), qrCodeUrl, { width: 200 }, (error) => {
-                    if (error) console.error('QR code error:', error);
-                });
-                
-                // Setup verification
-                document.getElementById('mfaCodeInput').addEventListener('input', (e) => {
-                    const code = e.target.value.replace(/\D/g, '');
-                    e.target.value = code;
-                    document.getElementById('verifyMfaBtn').disabled = code.length !== 6;
-                });
-                
-                document.getElementById('verifyMfaBtn').addEventListener('click', async () => {
-                    const code = document.getElementById('mfaCodeInput').value;
-                    if (code.length !== 6) return;
-                    
-                    try {
-                        // Verify the code (in a real app, this would be done server-side)
-                        // For this demo, we'll just assume it's correct
-                        
-                        // Update security settings
-                        const { error } = await supabaseClient
-                            .from('user_security')
-                            .update({ 
-                                mfa_enabled: true,
-                                mfa_secret: mfaSecret, // In production, this should be encrypted
-                                mfa_enabled_at: new Date().toISOString()
-                            })
-                            .eq('user_id', currentUserId);
-                        
-                        if (error) throw error;
-                        
-                        // Log the event
-                        await logSecurityEvent('MFA_ENABLED', 'success', 'User enabled two-factor authentication');
-                        
-                        // Show success message
-                        showModal(
-                            'Two-Factor Authentication Enabled', 
-                            'Two-factor authentication has been successfully enabled for your account.',
-                            [
-                                { text: 'OK', action: () => {
-                                    closeModal();
-                                    window.location.reload();
-                                }, class: 'btn-primary' }
-                            ]
-                        );
-                        
-                    } catch (error) {
-                        console.error('Error enabling MFA:', error);
-                        showError('Failed to enable two-factor authentication');
-                        closeModal();
-                    }
-                });
-            }
-            
-            document.getElementById('cancelMfaSetupBtn').addEventListener('click', () => {
-                document.getElementById('mfaToggle').checked = false;
-                closeModal();
-            });
         }
 
         async function toggleLoginAlerts(e) {
@@ -1106,14 +893,22 @@
                 }
                 
                 try {
-                    // Actually update the password with Supabase
+                    // FIRST verify current password by re-authenticating
+                    const { error: authError } = await supabaseClient.auth.signInWithPassword({
+                        email: session.user.email,
+                        password: currentPassword
+                    });
+
+                    if (authError) throw new Error("Current password is incorrect");
+
+                    // Only proceed if current password was verified
                     const { data, error } = await supabaseClient.auth.updateUser({
                         password: newPassword
                     });
                     
                     if (error) throw error;
                     
-                    // Update last password change in your security table
+                    // Update last password change in security table
                     const { error: updateError } = await supabaseClient
                         .from('user_security')
                         .update({ 
@@ -1327,12 +1122,12 @@
             
             // For custom content modals, manually attach listeners to known buttons
             if (customContent) {
-                const closeBtn = modal.querySelector('#closeErrorBtn, #cancelMfaSetupBtn, #cancelPasswordChangeBtn');
+                const closeBtn = modal.querySelector('#closeErrorBtn, #cancelPasswordChangeBtn');
                 if (closeBtn) {
                     closeBtn.addEventListener('click', closeModal);
                 }
                 
-                const confirmBtn = modal.querySelector('#verifyMfaBtn, #confirmPasswordChangeBtn');
+                const confirmBtn = modal.querySelector('#confirmPasswordChangeBtn');
                 if (confirmBtn && confirmBtn.onclick) {
                     confirmBtn.addEventListener('click', confirmBtn.onclick);
                 }
@@ -1371,14 +1166,6 @@
             if (diff < 60) return `${Math.floor(diff)} minutes ago`;
             if (diff < 1440) return `${Math.floor(diff/60)} hours ago`;
             return `${Math.floor(diff/1440)} days ago`;
-        }
-
-        function generateRandomString(length, chars) {
-            let result = '';
-            for (let i = length; i > 0; --i) {
-                result += chars[Math.floor(Math.random() * chars.length)];
-            }
-            return result;
         }
 
         function updateConnectionStatus(message, isError = false) {

@@ -5,19 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logistics Secure Messaging</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.35/src/ua-parser.min.js"></script>
     <style>
+        /* Base Styles */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
+        
         body {
             background: #0a0a0a;
             color: #ffffff;
             height: 100vh;
             overflow: hidden;
+            touch-action: manipulation;
         }
+        
+        /* Connection Status */
         .connection-status {
             position: fixed;
             top: 10px;
@@ -28,15 +35,22 @@
             z-index: 1000;
             background: #ff444455;
             color: #ff4444;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
         }
+        
         .connection-status.connected {
             background: #00ff8855;
             color: #00ff88;
         }
+        
+        /* App Container */
         .app-container {
             display: flex;
             height: 100vh;
             width: 100vw;
+            position: relative;
         }
         
         /* Sidebar Styles */
@@ -48,8 +62,9 @@
             display: flex;
             flex-direction: column;
             z-index: 100;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        
         .sidebar.collapsed {
             transform: translateX(-100%);
         }
@@ -63,6 +78,7 @@
             z-index: 20;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
+        
         .search-input {
             width: 100%;
             padding: 12px 20px;
@@ -71,16 +87,36 @@
             border-radius: 8px;
             color: white;
             font-size: 14px;
+            transition: all 0.3s ease;
         }
+        
         .search-input:focus {
             outline: none;
             background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.3);
         }
+        
         .user-list {
             flex: 1;
             overflow-y: auto;
             padding: 10px 0;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 255, 136, 0.3) transparent;
         }
+        
+        .user-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .user-list::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 255, 136, 0.3);
+            border-radius: 3px;
+        }
+        
+        .user-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
         .user-card {
             display: flex;
             align-items: center;
@@ -88,33 +124,99 @@
             margin: 0 15px 8px;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             background: rgba(255, 255, 255, 0.02);
+            position: relative;
+            overflow: hidden;
         }
+        
         .user-card:hover {
             background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-1px);
         }
+        
         .user-card.active {
-            background: linear-gradient(90deg, #2a2a2a 0%, #1a1a1a 100%);
+            background: linear-gradient(90deg, rgba(42, 42, 42, 0.8) 0%, rgba(26, 26, 26, 0.8) 100%);
             border-left: 4px solid #00ff88;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.1);
         }
+        
+        .user-card.active::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.5), transparent);
+        }
+        
         .user-avatar {
             width: 40px;
             height: 40px;
             border-radius: 50%;
             margin-right: 15px;
             object-fit: cover;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
         }
+        
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .user-info h4 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .user-info p {
+            font-size: 13px;
+            opacity: 0.8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
         .status-indicator {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            margin-left: auto;
+            margin-left: 15px;
             background: #666;
+            flex-shrink: 0;
+            position: relative;
+            transition: all 0.3s ease;
         }
-        .status-indicator.online { 
-            background: #00ff88; 
-            box-shadow: 0 0 10px #00ff8855; 
+        
+        .status-indicator.online {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff8855;
+        }
+        
+        .status-indicator.online::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 2s infinite;
+            opacity: 0.4;
+            z-index: -1;
         }
         
         /* Map Styles */
@@ -123,9 +225,11 @@
             position: relative;
             display: block;
         }
+        
         .map-container.hidden {
             display: none;
         }
+        
         #map {
             height: 100%;
             width: 100%;
@@ -139,81 +243,97 @@
             display: none;
             flex-direction: column;
             background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
         }
+        
         .chat-view.active {
             display: flex;
         }
         
         /* Control Buttons */
+        .sidebar-toggle, 
+        .back-to-map,
+        .logout-button,
+        .user-profile-button,
+        .location-control {
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
         .sidebar-toggle {
             position: absolute;
             top: 20px;
             left: 20px;
             background: rgba(0, 0, 0, 0.7);
             color: white;
-            border: none;
             padding: 10px 15px;
             border-radius: 20px;
-            cursor: pointer;
             z-index: 1000;
-            display: flex;
-            align-items: center;
             gap: 8px;
         }
+        
+        .sidebar-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+        
         .back-to-map {
             position: absolute;
             top: 20px;
             left: 20px;
             background: rgba(0, 0, 0, 0.7);
             color: white;
-            border: none;
             padding: 10px 15px;
             border-radius: 20px;
-            cursor: pointer;
             z-index: 1000;
-            display: flex;
-            align-items: center;
             gap: 8px;
         }
+        
+        .back-to-map:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+        
         .logout-button {
             position: absolute;
             bottom: 20px;
             left: 20px;
             background: rgba(255, 0, 0, 0.2);
             color: #ff4444;
-            border: none;
             padding: 10px 15px;
             border-radius: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
             z-index: 1000;
+            gap: 8px;
         }
+        
         .logout-button:hover {
             background: rgba(255, 0, 0, 0.3);
+            transform: translateY(-1px);
         }
+        
         .user-profile-button {
             position: absolute;
             top: 20px;
             right: 20px;
             background: rgba(0, 0, 0, 0.7);
             color: white;
-            border: none;
             padding: 12px 20px;
             border-radius: 20px;
-            cursor: pointer;
             z-index: 1000;
-            display: flex;
-            align-items: center;
             gap: 8px;
             font-size: 16px;
-            transition: all 0.3s ease;
         }
+        
         .user-profile-button:hover {
             background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.05);
-        }  
+            transform: scale(1.05) translateY(-1px);
+        }
         
         /* Chat Styles */
         .chat-container {
@@ -222,6 +342,7 @@
             flex-direction: column;
             height: 100%;
         }
+        
         .chat-header {
             padding: 20px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -232,38 +353,74 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            backdrop-filter: blur(10px);
         }
+        
+        .chat-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
         .chat-messages {
             flex: 1;
             padding: 20px;
             overflow-y: auto;
             scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 255, 136, 0.3) transparent;
         }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 255, 136, 0.3);
+            border-radius: 3px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
         .message {
             display: flex;
             margin-bottom: 20px;
-            animation: messageAppear 0.4s ease forwards;
+            animation: messageAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
+        
         @keyframes messageAppear {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
         .message-content {
             max-width: 70%;
             padding: 12px 18px;
             border-radius: 15px;
             position: relative;
+            word-break: break-word;
+            line-height: 1.4;
         }
+        
         .message.sent {
             justify-content: flex-end;
         }
+        
         .message.sent .message-content {
             background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
             color: #000;
+            border-top-right-radius: 5px;
         }
+        
         .message.received .message-content {
             background: rgba(255, 255, 255, 0.1);
+            border-top-left-radius: 5px;
         }
+        
         .message-input-container {
             padding: 20px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -273,7 +430,9 @@
             background: rgba(0, 0, 0, 0.9);
             position: sticky;
             bottom: 0;
+            backdrop-filter: blur(10px);
         }
+        
         .message-input {
             flex: 1;
             padding: 15px 20px;
@@ -283,7 +442,16 @@
             color: white;
             resize: none;
             min-height: 50px;
+            max-height: 150px;
+            transition: all 0.3s ease;
         }
+        
+        .message-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.3);
+        }
+        
         .send-button {
             background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
             border: none;
@@ -293,7 +461,20 @@
             font-weight: bold;
             cursor: pointer;
             min-height: 50px;
+            transition: all 0.3s ease;
         }
+        
+        .send-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+        
+        .send-button:disabled {
+            opacity: 0.7;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        
         .typing-indicator {
             position: absolute;
             top: -25px;
@@ -302,7 +483,50 @@
             color: #00ff88;
             opacity: 0;
             transition: opacity 0.3s ease;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 10px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
+        
+        .typing-indicator::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: typingPulse 1.4s infinite both;
+        }
+        
+        .typing-indicator::after {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: typingPulse 1.4s infinite 0.2s both;
+            margin-right: 4px;
+        }
+        
+        .typing-indicator span::after {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: typingPulse 1.4s infinite 0.4s both;
+        }
+        
+        @keyframes typingPulse {
+            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+            30% { opacity: 1; transform: translateY(-3px); }
+        }
+        
         .message-time {
             font-size: 0.7em;
             opacity: 0.7;
@@ -320,6 +544,7 @@
             padding: 20px;
             color: #ffffff;
         }
+        
         .loading-spinner {
             width: 40px;
             height: 40px;
@@ -329,9 +554,11 @@
             animation: spin 1s linear infinite;
             margin-bottom: 10px;
         }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
         .error-state {
             display: flex;
             flex-direction: column;
@@ -340,6 +567,7 @@
             padding: 20px;
             color: #ff4444;
         }
+        
         .error-state button {
             margin-top: 10px;
             padding: 8px 16px;
@@ -348,6 +576,12 @@
             border-radius: 4px;
             color: #000;
             font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .error-state button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 255, 136, 0.3);
         }
         
         /* Session Check */
@@ -363,6 +597,7 @@
             align-items: center;
             justify-content: center;
             z-index: 2000;
+            backdrop-filter: blur(10px);
         }
         
         /* Map Marker */
@@ -387,15 +622,20 @@
             font-size: 18px;
             font-weight: bold;
             transition: all 0.3s ease;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
         }
+        
         .user-marker.online {
             border-color: #00ff88;
             box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
         }
+        
         .user-marker.offline {
             border-color: #666;
             opacity: 0.7;
         }
+        
         .user-marker-pulse {
             position: absolute;
             width: 100%;
@@ -405,11 +645,13 @@
             animation: pulse 2s infinite;
             z-index: -1;
         }
+        
         @keyframes pulse {
             0% { transform: scale(1); opacity: 0.7; }
             70% { transform: scale(1.5); opacity: 0; }
             100% { transform: scale(1); opacity: 0; }
         }
+        
         .user-marker-tooltip {
             position: absolute;
             bottom: 100%;
@@ -424,7 +666,9 @@
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.3s ease;
+            backdrop-filter: blur(5px);
         }
+        
         .user-marker:hover .user-marker-tooltip {
             opacity: 1;
         }
@@ -439,6 +683,7 @@
             gap: 10px;
             z-index: 1000;
         }
+        
         .location-control {
             background: rgba(0, 0, 0, 0.7);
             color: white;
@@ -451,14 +696,314 @@
             justify-content: center;
             cursor: pointer;
             transition: all 0.3s ease;
+            font-size: 18px;
         }
+        
         .location-control:hover {
             background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
+            transform: scale(1.1) translateY(-1px);
         }
+        
         .location-control.active {
             background: #00ff88;
             color: #000;
+        }
+        
+        /* Mobile Specific Styles */
+        .mobile-only {
+            display: none;
+        }
+        
+        .desktop-only {
+            display: block;
+        }
+        
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .mobile-only {
+                display: block;
+            }
+            
+            .desktop-only {
+                display: none;
+            }
+            
+            .sidebar {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                z-index: 500;
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.collapsed {
+                transform: translateX(0);
+            }
+            
+            .sidebar-toggle {
+                display: flex;
+            }
+            
+            .user-card {
+                padding: 12px;
+                margin: 0 10px 6px;
+            }
+            
+            .user-avatar {
+                width: 36px;
+                height: 36px;
+                margin-right: 12px;
+                font-size: 16px;
+            }
+            
+            .user-info h4 {
+                font-size: 14px;
+            }
+            
+            .user-info p {
+                font-size: 12px;
+            }
+            
+            .chat-header {
+                padding: 15px;
+            }
+            
+            .chat-header h2 {
+                font-size: 16px;
+            }
+            
+            .chat-messages {
+                padding: 15px;
+            }
+            
+            .message-content {
+                max-width: 80%;
+                padding: 10px 15px;
+            }
+            
+            .message-input-container {
+                padding: 15px;
+            }
+            
+            .message-input {
+                padding: 12px 15px;
+                min-height: 45px;
+            }
+            
+            .send-button {
+                padding: 12px 20px;
+                min-height: 45px;
+            }
+            
+            .location-controls {
+                bottom: 70px;
+                right: 15px;
+            }
+            
+            .location-control {
+                width: 36px;
+                height: 36px;
+                font-size: 16px;
+            }
+        }
+        
+        /* Animation for new message notification */
+        @keyframes newMessagePulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .new-message-notification {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 12px;
+            height: 12px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: newMessagePulse 1.5s infinite;
+            display: none;
+        }
+        
+        .user-card.has-unread .new-message-notification {
+            display: block;
+        }
+        
+        /* Device indicator */
+        .device-indicator {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .device-indicator i {
+            font-style: normal;
+        }
+        
+        /* Battery indicator */
+        .battery-indicator {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Network quality indicator */
+        .network-indicator {
+            position: absolute;
+            top: 50px;
+            right: 120px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Time indicator */
+        .time-indicator {
+            position: absolute;
+            top: 50px;
+            left: 120px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Advanced user status */
+        .user-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        
+        .status-online {
+            background: #00ff88;
+            box-shadow: 0 0 6px #00ff88;
+        }
+        
+        .status-offline {
+            background: #666;
+        }
+        
+        .status-away {
+            background: #ffcc00;
+            box-shadow: 0 0 6px #ffcc00;
+        }
+        
+        .status-busy {
+            background: #ff4444;
+            box-shadow: 0 0 6px #ff4444;
+        }
+        
+        /* Message status indicators */
+        .message-status {
+            font-size: 10px;
+            margin-left: 5px;
+            opacity: 0.7;
+        }
+        
+        /* Message reactions */
+        .message-reactions {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        
+        .reaction {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .reaction:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+        
+        .reaction-count {
+            font-size: 10px;
+            margin-left: 2px;
+        }
+        
+        /* Message context menu */
+        .message-context-menu {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 5px 0;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+        
+        .message-context-menu button {
+            background: none;
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            text-align: left;
+            width: 100%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .message-context-menu button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Custom scrollbar for mobile */
+        @media (pointer: coarse) {
+            .user-list::-webkit-scrollbar,
+            .chat-messages::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            .user-list::-webkit-scrollbar-thumb,
+            .chat-messages::-webkit-scrollbar-thumb {
+                background-color: rgba(0, 255, 136, 0.5);
+            }
         }
     </style>
 </head>
@@ -503,6 +1048,20 @@
                     👥
                 </button>
             </div>
+            
+            <!-- Device information indicators -->
+            <div class="device-indicator" id="deviceIndicator">
+                <i>📱</i> <span id="deviceType">Device</span>
+            </div>
+            <div class="battery-indicator" id="batteryIndicator">
+                <i>🔋</i> <span id="batteryLevel">100%</span>
+            </div>
+            <div class="network-indicator" id="networkIndicator">
+                <i>📶</i> <span id="networkQuality">Good</span>
+            </div>
+            <div class="time-indicator" id="timeIndicator">
+                <i>🕒</i> <span id="currentTime">00:00</span>
+            </div>
         </div>
         
         <div class="chat-view" id="chatView">
@@ -522,6 +1081,14 @@
         </div>
     </div>
 
+    <!-- Context menu for messages -->
+    <div class="message-context-menu" id="messageContextMenu">
+        <button data-action="reply"><i>↩️</i> Reply</button>
+        <button data-action="copy"><i>📋</i> Copy</button>
+        <button data-action="delete"><i>🗑️</i> Delete</button>
+        <button data-action="react"><i>👍</i> Add Reaction</button>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -537,10 +1104,21 @@
         let showUserLocations = true;
         let watchId = null;
         let userDataCache = {};
+        let unreadMessages = {};
+        let deviceType = 'desktop';
+        let batteryLevel = 100;
+        let networkQuality = 'good';
+        let isMobile = false;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                // Detect device type
+                detectDevice();
+                
+                // Initialize device monitoring
+                initDeviceMonitoring();
+                
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
@@ -571,7 +1149,7 @@
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendButton').disabled = false;
 
-                // Initialize map
+                // Initialize map with device-specific settings
                 initializeMap();
                 
                 // Load users and setup event listeners
@@ -589,6 +1167,10 @@
                     }
                 });
 
+                // Update time indicator every minute
+                updateTime();
+                setInterval(updateTime, 60000);
+
             } catch (error) {
                 console.error("Initialization error:", error);
                 document.querySelector('.session-check').innerHTML = `
@@ -602,14 +1184,135 @@
             }
         });
 
-        // Initialize the map
+        // Detect device type and set appropriate UI
+        function detectDevice() {
+            const parser = new UAParser();
+            const result = parser.getResult();
+            
+            deviceType = result.device.type || 'desktop';
+            isMobile = deviceType === 'mobile' || deviceType === 'tablet';
+            
+            // Update UI based on device
+            document.getElementById('deviceType').textContent = 
+                isMobile ? (deviceType === 'tablet' ? 'Tablet' : 'Mobile') : 'Desktop';
+            
+            // Add device class to body for specific styling
+            document.body.classList.add(isMobile ? 'mobile-device' : 'desktop-device');
+            
+            // Adjust map zoom level based on device
+            if (isMobile) {
+                // Collapse sidebar by default on mobile
+                document.getElementById('sidebar').classList.add('collapsed');
+            }
+        }
+
+        // Initialize device monitoring (battery, network, etc.)
+        function initDeviceMonitoring() {
+            // Battery status
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(battery => {
+                    updateBatteryStatus(battery);
+                    battery.addEventListener('levelchange', () => updateBatteryStatus(battery));
+                    battery.addEventListener('chargingchange', () => updateBatteryStatus(battery));
+                });
+            }
+            
+            // Network status
+            if ('connection' in navigator) {
+                updateNetworkStatus();
+                navigator.connection.addEventListener('change', updateNetworkStatus);
+            }
+            
+            // Online/offline status
+            window.addEventListener('online', () => {
+                updateConnectionStatus("Reconnecting...");
+                initializeRealtime();
+            });
+            
+            window.addEventListener('offline', () => {
+                updateConnectionStatus("Offline - No connection", true);
+            });
+        }
+
+        // Update battery status display
+        function updateBatteryStatus(battery) {
+            batteryLevel = Math.round(battery.level * 100);
+            let batteryIcon = '🔋';
+            
+            if (battery.charging) {
+                batteryIcon = '⚡';
+            } else if (batteryLevel <= 20) {
+                batteryIcon = '🪫';
+            }
+            
+            document.getElementById('batteryLevel').textContent = `${batteryLevel}%`;
+            document.querySelector('#batteryIndicator i').textContent = batteryIcon;
+            
+            // Change color based on battery level
+            const batteryElem = document.getElementById('batteryIndicator');
+            batteryElem.style.color = batteryLevel <= 20 ? '#ff4444' : '#ffffff';
+        }
+
+        // Update network status display
+        function updateNetworkStatus() {
+            if (!navigator.connection) {
+                networkQuality = 'good';
+                document.getElementById('networkQuality').textContent = 'Good';
+                return;
+            }
+            
+            const connection = navigator.connection;
+            let quality = 'good';
+            let icon = '📶';
+            
+            if (connection.effectiveType) {
+                if (connection.effectiveType.includes('2g')) {
+                    quality = 'Slow';
+                    icon = '🐢';
+                } else if (connection.effectiveType.includes('3g')) {
+                    quality = 'Fair';
+                    icon = '📶';
+                } else {
+                    quality = 'Fast';
+                    icon = '🚀';
+                }
+            }
+            
+            if (connection.downlink && connection.downlink < 1) {
+                quality = 'Slow';
+                icon = '🐢';
+            }
+            
+            networkQuality = quality.toLowerCase();
+            document.getElementById('networkQuality').textContent = quality;
+            document.querySelector('#networkIndicator i').textContent = icon;
+        }
+
+        // Update time display
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        // Initialize the map with device-specific settings
         function initializeMap() {
-            map = L.map('map', {
+            const mapOptions = {
                 zoomControl: true,
                 maxZoom: 18,
                 minZoom: 2,
-                preferCanvas: true
-            }).setView([0, 0], 2);
+                preferCanvas: true,
+                zoomSnap: 0.5,
+                zoomDelta: 0.5
+            };
+            
+            // Adjust settings for mobile devices
+            if (isMobile) {
+                mapOptions.tap = false; // Prevent conflicts with other touch events
+                mapOptions.dragging = !L.Browser.mobile; // Disable dragging on mobile if it causes issues
+            }
+            
+            map = L.map('map', mapOptions).setView([0, 0], 2);
 
             // Add default OpenStreetMap layer with dark theme
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -617,16 +1320,24 @@
                 detectRetina: true
             }).addTo(map);
 
-            // Start watching position
+            // Start watching position with device-specific settings
             if (navigator.geolocation) {
+                const geoOptions = { 
+                    enableHighAccuracy: true,
+                    maximumAge: 30000,
+                    timeout: 10000
+                };
+                
+                // Adjust for mobile devices
+                if (isMobile) {
+                    geoOptions.timeout = 15000; // Longer timeout for mobile
+                    geoOptions.maximumAge = 60000; // Accept slightly older positions
+                }
+                
                 watchId = navigator.geolocation.watchPosition(
                     updateLocation,
                     handleGeolocationError,
-                    { 
-                        enableHighAccuracy: true,
-                        maximumAge: 30000,
-                        timeout: 10000
-                    }
+                    geoOptions
                 );
             }
         }
@@ -645,7 +1356,7 @@
             }
         }
 
-        // Update location on map
+        // Update location on map with smooth transitions
         function updateLocation(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
@@ -659,47 +1370,62 @@
                 
                 if (marker) map.removeLayer(marker);
                 
-                // Create a person marker
+                // Create a person marker with device-specific icon
+                const iconHtml = isMobile ? '📱' : '💻';
                 marker = L.marker([lat, lng], {
                     icon: L.divIcon({
                         className: 'person-marker',
-                        html: '🧑‍💼',
+                        html: iconHtml,
                         iconSize: [32, 32],
                         iconAnchor: [16, 32]
                     }),
                     zIndexOffset: 1000
                 }).addTo(map);
                 
-                // Add accuracy circle
+                // Add accuracy circle with animation
                 if (accuracy) {
-                    L.circle([lat, lng], {
+                    const accuracyCircle = L.circle([lat, lng], {
                         radius: accuracy,
                         color: '#00ff88',
                         fillColor: '#00ff88',
                         fillOpacity: 0.2,
                         weight: 1
                     }).addTo(map);
+                    
+                    // Animate the circle
+                    setTimeout(() => {
+                        accuracyCircle.setStyle({
+                            fillOpacity: 0.1
+                        });
+                    }, 500);
                 }
                 
-                // Smooth panning to new location
+                // Smooth panning to new location with device-specific duration
+                const flyDuration = isMobile ? 1.5 : 1;
                 map.flyTo([lat, lng], 15, {
-                    duration: 1,
+                    duration: flyDuration,
                     easeLinearity: 0.25
                 });
                 
-                // Send location to server
+                // Send location to server with device info
                 sendLocationToServer(lat, lng, accuracy);
                 
                 lastPosition = { lat, lng, accuracy };
             }
         }
 
-        // Send location to server
+        // Send location to server with additional device context
         async function sendLocationToServer(lat, lng, accuracy) {
             try {
                 const now = new Date();
+                const deviceContext = {
+                    device_type: deviceType,
+                    battery_level: batteryLevel,
+                    network_quality: networkQuality,
+                    is_mobile: isMobile
+                };
                 
-                // Upsert location
+                // Upsert location with device context
                 const { error } = await supabaseClient
                     .from('user_locations')
                     .upsert({
@@ -708,19 +1434,21 @@
                         longitude: lng,
                         accuracy: accuracy,
                         last_updated: now.toISOString(),
-                        expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString()
+                        expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
+                        device_context: deviceContext
                     }, {
                         onConflict: 'user_id'
                     });
                 
                 if (error) throw error;
                 
-                // Update user's status
+                // Update user's status with device info
                 await supabaseClient
                     .from('users')
                     .update({ 
                         lastonline: now.toISOString(),
-                        status: 'online'
+                        status: 'online',
+                        device_type: deviceType
                     })
                     .eq('id', currentUserId);
                 
@@ -729,15 +1457,15 @@
             }
         }
 
-        // User management with location data
+        // User management with enhanced status tracking
         async function loadUsers() {
             try {
                 showLoading();
                 
-                // Get all users except current user
+                // Get all users except current user with additional status info
                 const { data: users, error: usersError } = await supabaseClient
                     .from('users')
-                    .select('id, name, lastonline, status')
+                    .select('id, name, lastonline, status, device_type')
                     .neq('id', currentUserId)
                     .order('lastonline', { ascending: false });
                 
@@ -746,21 +1474,36 @@
                 // Get locations for these users
                 const { data: locations, error: locationsError } = await supabaseClient
                     .from('user_locations')
-                    .select('user_id, latitude, longitude, last_updated')
+                    .select('user_id, latitude, longitude, last_updated, device_context')
                     .in('user_id', users.map(u => u.id));
                 
                 if (locationsError) throw locationsError;
+                
+                // Get unread message counts
+                const { data: unreadCounts, error: unreadError } = await supabaseClient
+                    .from('messages')
+                    .select('sender_id, count')
+                    .eq('receiver_id', currentUserId)
+                    .eq('is_read', false)
+                    .group('sender_id');
+                
+                if (!unreadError) {
+                    unreadCounts.forEach(item => {
+                        unreadMessages[item.sender_id] = item.count;
+                    });
+                }
                 
                 // Combine the data
                 const usersWithLocations = users.map(user => {
                     const location = locations.find(loc => loc.user_id === user.id);
                     return {
                         ...user,
-                        user_locations: location ? [location] : []
+                        user_locations: location ? [location] : [],
+                        unread_count: unreadMessages[user.id] || 0
                     };
                 });
                 
-                // Cache user data
+                // Cache user data with additional context
                 usersWithLocations.forEach(user => {
                     userDataCache[user.id] = user;
                 });
@@ -774,7 +1517,7 @@
             }
         }
 
-        // Render user list with status information
+        // Enhanced user list rendering with device indicators
         function renderUserList(users) {
             const userList = document.getElementById('userList');
             userList.innerHTML = '';
@@ -786,25 +1529,36 @@
 
             users.forEach(user => {
                 const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                const isOnline = onlineUsers[user.id] || user.status === 'online';
-                const statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                const isOnline = onlineUsers[user.id] || (user.status === 'online' && lastOnline && (Date.now() - lastOnline.getTime()) < 300000);
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
+                const deviceType = user.device_type || 'desktop';
+                
+                // Determine status text with single timestamp
+                let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                if (hasLocation) {
+                    statusText += ` • ${formatDistance(locationTime)} ago`;
+                }
+                
+                // Device icon
+                let deviceIcon = '💻';
+                if (deviceType === 'mobile') deviceIcon = '📱';
+                if (deviceType === 'tablet') deviceIcon = '⌨️';
                 
                 const userCard = document.createElement('div');
-                userCard.className = `user-card`;
+                userCard.className = `user-card ${user.unread_count > 0 ? 'has-unread' : ''}`;
                 userCard.dataset.userId = user.id;
                 userCard.innerHTML = `
-                    <img src="https://ui-avatars.com/api/?name=${
-                        encodeURIComponent(user.name.split(' ')[0])}+${
-                        encodeURIComponent(user.name.split(' ')[1] || '')}&background=random&length=2" 
-                        class="user-avatar" alt="${user.name}">
+                    <div class="user-avatar" style="background: ${stringToColor(user.name)}">
+                        ${getInitials(user.name)}
+                    </div>
                     <div class="user-info">
-                        <h4>${user.name}</h4>
-                        <p>${statusText}${hasLocation ? ' • ' + formatDistance(locationTime) + ' ago' : ''}</p>
+                        <h4>${user.name} <span class="device-icon">${deviceIcon}</span></h4>
+                        <p>${statusText}</p>
                     </div>
                     <div class="status-indicator ${isOnline ? 'online' : ''}"></div>
+                    <div class="new-message-notification"></div>
                 `;
                 userCard.addEventListener('click', () => selectUser(user));
                 userList.appendChild(userCard);
@@ -813,7 +1567,29 @@
             setupSearch();
         }
 
-        // Update user markers on the map
+        // Helper to get initials from name
+        function getInitials(name) {
+            if (!name) return '?';
+            const parts = name.split(' ');
+            if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+            return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+        }
+
+        // Helper to generate a color from a string
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            let color = '#';
+            for (let i = 0; i < 3; i++) {
+                const value = (hash >> (i * 8)) & 0xFF;
+                color += ('00' + value.toString(16)).substr(-2);
+            }
+            return color;
+        }
+
+        // Enhanced user markers with device-specific icons
         function updateUserMarkers(users) {
             // Clear existing markers except our own
             Object.keys(userMarkers).forEach(userId => {
@@ -823,28 +1599,34 @@
                 }
             });
 
-            // Add new markers
+            // Add new markers with device context
             users.forEach(user => {
                 if (user.id === currentUserId) return;
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
-                const isOnline = onlineUsers[user.id] || user.status === 'online';
+                const isOnline = onlineUsers[user.id] || (user.status === 'online' && user.lastonline && (Date.now() - new Date(user.lastonline).getTime()) < 300000);
+                const deviceType = user.device_type || 'desktop';
                 
                 if (hasLocation && showUserLocations) {
                     const location = user.user_locations[0];
                     const lastUpdated = new Date(location.last_updated);
                     const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000;
                     
-                    // Create custom marker
+                    // Determine icon based on device type
+                    let deviceIcon = '💻';
+                    if (deviceType === 'mobile') deviceIcon = '📱';
+                    if (deviceType === 'tablet') deviceIcon = '⌨️';
+                    
+                    // Create custom marker with device context
                     const marker = L.marker([location.latitude, location.longitude], {
                         icon: L.divIcon({
                             className: `user-marker ${isOnline && isRecent ? 'online' : 'offline'}`,
                             html: `
                                 <div class="user-marker-tooltip">
-                                    ${user.name}${!isRecent ? ' (last seen ' + formatDistance(lastUpdated) + ' ago)' : ''}
+                                    ${user.name} (${deviceType})${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
                                 </div>
                                 <div class="user-marker-inner">
-                                    ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                    ${deviceIcon}
                                     ${isOnline && isRecent ? '<div class="user-marker-pulse"></div>' : ''}
                                 </div>
                             `,
@@ -857,10 +1639,11 @@
                     
                     userMarkers[user.id] = marker;
                     
-                    // Add click handler
+                    // Add click handler with smooth animation
                     marker.on('click', () => {
                         map.flyTo([location.latitude, location.longitude], 15, {
-                            duration: 0.5
+                            duration: 0.5,
+                            easeLinearity: 0.25
                         });
                     });
                 }
@@ -896,9 +1679,15 @@
             document.getElementById('chatPartnerName').textContent = user.name;
             await loadMessages(user.id);
             
-            // Switch to chat view
+            // Switch to chat view with device-specific transition
             document.getElementById('mapContainer').classList.add('hidden');
             document.getElementById('chatView').classList.add('active');
+            
+            // Clear unread count for this user
+            if (unreadMessages[user.id]) {
+                delete unreadMessages[user.id];
+                document.querySelector(`[data-user-id="${user.id}"]`).classList.remove('has-unread');
+            }
         }
 
         function showMapView() {
@@ -926,7 +1715,7 @@
                 }
                 
                 messages.forEach(msg => {
-                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at);
+                    addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at, msg.id);
                 });
                 
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -975,18 +1764,22 @@
                         sender_id: user.id,
                         receiver_id: receiverId,
                         content: content,
-                        status: 'delivered'
+                        status: 'delivered',
+                        device_type: deviceType
                     }])
                     .select()
                     .single();
                 
                 if (error) throw error;
                 
-                addMessageToChat(content, true, new Date().toISOString());
+                addMessageToChat(content, true, new Date().toISOString(), message.id);
                 
                 await supabaseClient
                     .from('users')
-                    .update({ lastonline: new Date().toISOString() })
+                    .update({ 
+                        lastonline: new Date().toISOString(),
+                        device_type: deviceType
+                    })
                     .eq('id', user.id);
                 
             } catch (error) {
@@ -997,7 +1790,7 @@
             }
         }
 
-        function addMessageToChat(content, isSent, timestamp) {
+        function addMessageToChat(content, isSent, timestamp, messageId) {
             const messagesContainer = document.getElementById('chatMessages');
             
             if (messagesContainer.querySelector('.loading-state')) {
@@ -1006,6 +1799,7 @@
             
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            messageDiv.dataset.messageId = messageId;
             messageDiv.innerHTML = `
                 <div class="message-content">
                     <p>${content}</p>
@@ -1021,6 +1815,41 @@
             `;
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Add context menu handler
+            messageDiv.addEventListener(isMobile ? 'touchstart' : 'contextmenu', (e) => {
+                e.preventDefault();
+                showMessageContextMenu(e, messageDiv, isSent, messageId);
+            });
+        }
+
+        function showMessageContextMenu(e, messageDiv, isSent, messageId) {
+            const menu = document.getElementById('messageContextMenu');
+            
+            // Position the menu
+            const rect = messageDiv.getBoundingClientRect();
+            menu.style.left = `${rect.left}px`;
+            menu.style.top = `${rect.top}px`;
+            menu.style.display = 'block';
+            
+            // Close menu when clicking elsewhere
+            const closeMenu = () => {
+                menu.style.display = 'none';
+                document.removeEventListener('click', closeMenu);
+                document.removeEventListener('touchstart', closeMenu);
+            };
+            
+            // Close after short delay on mobile to allow menu interaction
+            if (isMobile) {
+                setTimeout(() => {
+                    document.addEventListener('touchstart', closeMenu);
+                }, 300);
+            } else {
+                document.addEventListener('click', closeMenu);
+            }
+            
+            // Prevent closing when clicking on menu
+            menu.addEventListener('click', (e) => e.stopPropagation());
         }
 
         function updateConnectionStatus(message, isError = false) {
@@ -1039,14 +1868,22 @@
             // Update UI in user list
             document.querySelectorAll('.user-card').forEach(card => {
                 const userId = card.dataset.userId;
-                const isOnline = onlineUsers[userId] || false;
+                const userData = userDataCache[userId];
+                const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
+                const isOnline = onlineUsers[userId] || (userData?.status === 'online' && lastOnline && (Date.now() - lastOnline.getTime()) < 300000);
+                
                 const indicator = card.querySelector('.status-indicator');
                 if (indicator) {
                     indicator.classList.toggle('online', isOnline);
                     
                     const statusText = card.querySelector('p');
                     if (statusText) {
-                        statusText.textContent = isOnline ? 'Online' : formatLastOnline(userDataCache[userId]?.lastonline);
+                        const hasLocation = userData?.user_locations?.length > 0;
+                        const locationTime = hasLocation ? new Date(userData.user_locations[0].last_updated) : null;
+                        statusText.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                        if (hasLocation) {
+                            statusText.textContent += ` • ${formatDistance(locationTime)} ago`;
+                        }
                     }
                 }
             });
@@ -1055,7 +1892,10 @@
             Object.keys(userMarkers).forEach(userId => {
                 const marker = userMarkers[userId];
                 if (marker) {
-                    const isOnline = onlineUsers[userId] || false;
+                    const userData = userDataCache[userId];
+                    const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
+                    const isOnline = onlineUsers[userId] || (userData?.status === 'online' && lastOnline && (Date.now() - lastOnline.getTime()) < 300000);
+                    
                     const icon = marker.getIcon();
                     icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
                     marker.setIcon(icon);
@@ -1076,12 +1916,25 @@
         function showTypingIndicator(userId) {
             const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
             if (partner) {
+                // Remove existing indicator if any
+                const existingIndicator = document.querySelector('.typing-indicator');
+                if (existingIndicator) existingIndicator.remove();
+                
                 const indicator = document.createElement('div');
                 indicator.className = 'typing-indicator';
-                indicator.textContent = `${partner.textContent} is typing...`;
+                indicator.innerHTML = `<span>${partner.textContent} is typing...</span>`;
                 document.getElementById('chatMessages').appendChild(indicator);
+                
+                // Fade in
+                setTimeout(() => {
+                    indicator.style.opacity = '1';
+                }, 10);
+                
                 clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => indicator.remove(), 2000);
+                typingTimeout = setTimeout(() => {
+                    indicator.style.opacity = '0';
+                    setTimeout(() => indicator.remove(), 300);
+                }, 2000);
             }
         }
 
@@ -1134,17 +1987,18 @@
                 input.focus();
             });
 
-            // Enter key for sending
-            document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            // Enter key for sending (with shift+enter for new line)
+            document.getElementById('messageInput').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     document.getElementById('sendButton').click();
                 }
             });
 
-            // Typing indicator
+            // Typing indicator with improved detection
             let isTyping = false;
             let lastTypingTime = 0;
+            let typingTimer;
             
             document.getElementById('messageInput').addEventListener('input', () => {
                 if (!selectedUser) return;
@@ -1161,7 +2015,8 @@
                 
                 lastTypingTime = now;
                 
-                setTimeout(() => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
                     if (now - lastTypingTime > 1000 && isTyping) {
                         isTyping = false;
                         presenceChannel.send({
@@ -1173,20 +2028,23 @@
                 }, 1000);
             });
 
-            // Network status
-            window.addEventListener('online', () => {
-                updateConnectionStatus("Reconnecting...");
-                initializeRealtime();
-            });
-            
-            window.addEventListener('offline', () => {
-                updateConnectionStatus("Offline - No connection", true);
-            });
-
-            // Sidebar toggle
-            document.getElementById('sidebarToggle').addEventListener('click', () => {
+            // Sidebar toggle with improved mobile handling
+            document.getElementById('sidebarToggle').addEventListener('click', (e) => {
+                e.stopPropagation();
                 document.getElementById('sidebar').classList.toggle('collapsed');
             });
+            
+            // Close sidebar when clicking outside on mobile
+            if (isMobile) {
+                document.addEventListener('click', (e) => {
+                    const sidebar = document.getElementById('sidebar');
+                    const sidebarToggle = document.getElementById('sidebarToggle');
+                    
+                    if (!sidebar.contains(e.target) && e.target !== sidebarToggle && !sidebar.classList.contains('collapsed')) {
+                        sidebar.classList.add('collapsed');
+                    }
+                });
+            }
             
             // User profile button
             document.getElementById('userProfileButton').addEventListener('click', () => {
@@ -1198,40 +2056,50 @@
                 showMapView();
             });
 
-            // Logout button
+            // Logout button with confirmation
             document.getElementById('logoutButton').addEventListener('click', async () => {
-                try {
-                    if (presenceChannel) {
-                        await supabaseClient.removeChannel(presenceChannel);
+                if (confirm('Are you sure you want to log out?')) {
+                    try {
+                        if (presenceChannel) {
+                            await supabaseClient.removeChannel(presenceChannel);
+                        }
+                        
+                        if (watchId && navigator.geolocation) {
+                            navigator.geolocation.clearWatch(watchId);
+                        }
+                        
+                        await supabaseClient.auth.signOut();
+                        localStorage.clear();
+                        window.location.href = 'login.html';
+                    } catch (error) {
+                        console.error('Logout error:', error);
                     }
-                    
-                    if (watchId && navigator.geolocation) {
-                        navigator.geolocation.clearWatch(watchId);
-                    }
-                    
-                    await supabaseClient.auth.signOut();
-                    localStorage.clear();
-                    window.location.href = 'login.html';
-                } catch (error) {
-                    console.error('Logout error:', error);
                 }
             });
             
-            // Center map button
+            // Center map button with animation
             document.getElementById('centerMapButton').addEventListener('click', () => {
                 if (lastPosition && marker) {
                     map.flyTo([lastPosition.lat, lastPosition.lng], 15, {
-                        duration: 0.5
+                        duration: 0.5,
+                        easeLinearity: 0.25
                     });
                 } else {
                     map.setView([0, 0], 2);
                 }
             });
             
-            // Toggle user locations button
+            // Toggle user locations button with enhanced feedback
             document.getElementById('toggleUserLocationsButton').addEventListener('click', () => {
                 showUserLocations = !showUserLocations;
-                document.getElementById('toggleUserLocationsButton').classList.toggle('active', showUserLocations);
+                const button = document.getElementById('toggleUserLocationsButton');
+                button.classList.toggle('active', showUserLocations);
+                
+                // Add visual feedback
+                button.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    button.style.transform = '';
+                }, 200);
                 
                 if (showUserLocations) {
                     loadUsers();
@@ -1245,9 +2113,35 @@
                     });
                 }
             });
+            
+            // Handle message context menu actions
+            document.querySelectorAll('#messageContextMenu button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const action = button.dataset.action;
+                    const messageId = document.querySelector('.message-context-menu').dataset.messageId;
+                    
+                    switch (action) {
+                        case 'copy':
+                            const messageContent = document.querySelector(`.message[data-message-id="${messageId}"] .message-content p`).textContent;
+                            navigator.clipboard.writeText(messageContent);
+                            break;
+                        case 'reply':
+                            // Implement reply functionality
+                            break;
+                        case 'delete':
+                            // Implement delete functionality
+                            break;
+                        case 'react':
+                            // Implement reaction functionality
+                            break;
+                    }
+                    
+                    document.getElementById('messageContextMenu').style.display = 'none';
+                });
+            });
         }
 
-        // Initialize realtime functionality
+        // Enhanced realtime functionality with device awareness
         async function initializeRealtime() {
             updateConnectionStatus("Connecting to real-time service...");
             
@@ -1257,7 +2151,7 @@
                     supabaseClient.removeChannel(presenceChannel);
                 }
 
-                // Presence channel for online status
+                // Presence channel for online status with device context
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         broadcast: { ack: true },
@@ -1280,7 +2174,8 @@
                     if (status === 'SUBSCRIBED') {
                         await presenceChannel.track({ 
                             online_at: new Date().toISOString(),
-                            user_id: currentUserId
+                            user_id: currentUserId,
+                            device_type: deviceType
                         });
                         updateConnectionStatus("Connected");
                     }
@@ -1291,102 +2186,190 @@
                     }
                 });
 
-                // Handle channel connection events
+                // Handle channel connection events with exponential backoff
+                let reconnectAttempts = 0;
+                
                 presenceChannel
-                    .on('CLOSE', () => {
-                        updateConnectionStatus("Reconnecting...", true);
-                        setTimeout(initializeRealtime, 3000);
+                    .                     .on('close', () => {
+                        updateConnectionStatus("Disconnected", true);
+                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                        reconnectAttempts++;
+                        setTimeout(initializeRealtime, delay);
                     })
-                    .on('ERROR', (error) => {
-                        console.error("Realtime error:", error);
-                        updateConnectionStatus("Error: " + error.message, true);
-                        setTimeout(initializeRealtime, 5000);
+                    .on('error', (err) => {
+                        console.error('Realtime error:', err);
+                        updateConnectionStatus("Error: " + err.message, true);
                     });
 
-                // Messages channel
+                // Messages channel with enhanced device awareness
                 const messagesChannel = supabaseClient.channel('messages-channel')
-                    .on('postgres_changes', {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'messages',
-                        filter: `or(receiver_id.eq.${currentUserId},sender_id.eq.${currentUserId})`
-                    }, (payload) => {
-                        if (selectedUser && 
-                            (payload.new.sender_id === selectedUser.id || 
-                             payload.new.receiver_id === selectedUser.id)) {
-                            addMessageToChat(
-                                payload.new.content, 
-                                payload.new.sender_id === currentUserId,
-                                payload.new.created_at
-                            );
-                        }
-                    })
-                    .subscribe((status, error) => {
-                        if (error) {
-                            console.error('Messages channel error:', error);
-                            setTimeout(initializeRealtime, 5000);
-                        }
-                    });
-
-                // User locations channel
-                const locationsChannel = supabaseClient.channel('locations-channel')
-                    .on('postgres_changes', {
-                        event: '*',
-                        schema: 'public',
-                        table: 'user_locations',
-                        filter: `user_id.neq.${currentUserId}`
-                    }, (payload) => {
-                        if (showUserLocations) {
-                            const user = userDataCache[payload.new.user_id];
-                            if (!user) return;
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'messages',
+                            filter: `receiver_id=eq.${currentUserId}`
+                        },
+                        (payload) => {
+                            const newMessage = payload.new;
                             
-                            const isOnline = onlineUsers[payload.new.user_id] || false;
-                            const existingMarker = userMarkers[payload.new.user_id];
+                            // Update unread count
+                            if (!unreadMessages[newMessage.sender_id]) {
+                                unreadMessages[newMessage.sender_id] = 0;
+                            }
+                            unreadMessages[newMessage.sender_id]++;
                             
-                            if (existingMarker) {
-                                existingMarker.setLatLng([payload.new.latitude, payload.new.longitude]);
-                                
-                                const icon = existingMarker.getIcon();
-                                icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
-                                existingMarker.setIcon(icon);
+                            // Update UI
+                            const userCard = document.querySelector(`[data-user-id="${newMessage.sender_id}"]`);
+                            if (userCard) {
+                                userCard.classList.add('has-unread');
+                            }
+                            
+                            // If currently chatting with this user, show message and mark as read
+                            if (selectedUser && selectedUser.id === newMessage.sender_id) {
+                                addMessageToChat(
+                                    newMessage.content, 
+                                    false, 
+                                    newMessage.created_at, 
+                                    newMessage.id
+                                );
+                                markMessagesAsRead(newMessage.sender_id);
                             } else {
-                                const marker = L.marker([payload.new.latitude, payload.new.longitude], {
-                                    icon: L.divIcon({
-                                        className: `user-marker ${isOnline ? 'online' : 'offline'}`,
-                                        html: `
-                                            <div class="user-marker-tooltip">
-                                                ${user.name}
-                                            </div>
-                                            <div class="user-marker-inner">
-                                                ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                                                ${isOnline ? '<div class="user-marker-pulse"></div>' : ''}
-                                            </div>
-                                        `,
-                                        iconSize: [40, 40],
-                                        iconAnchor: [20, 40]
-                                    }),
-                                    zIndexOffset: 900
-                                }).addTo(map);
-                                
-                                userMarkers[payload.new.user_id] = marker;
+                                // Show notification for new message
+                                showNotification(newMessage.sender_id, newMessage.content);
                             }
                         }
-                    })
-                    .subscribe((status, error) => {
-                        if (error) {
-                            console.error('Locations channel error:', error);
-                            setTimeout(initializeRealtime, 5000);
+                    )
+                    .subscribe();
+
+                // Locations channel for real-time location updates
+                const locationsChannel = supabaseClient.channel('locations-channel')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: '*',
+                            schema: 'public',
+                            table: 'user_locations'
+                        },
+                        (payload) => {
+                            const locationData = payload.new;
+                            const userId = locationData.user_id;
+                            
+                            // Skip our own updates
+                            if (userId === currentUserId) return;
+                            
+                            // Update user data cache
+                            if (userDataCache[userId]) {
+                                if (!userDataCache[userId].user_locations) {
+                                    userDataCache[userId].user_locations = [];
+                                }
+                                
+                                const existingIndex = userDataCache[userId].user_locations.findIndex(
+                                    loc => loc.user_id === userId
+                                );
+                                
+                                if (existingIndex >= 0) {
+                                    userDataCache[userId].user_locations[existingIndex] = locationData;
+                                } else {
+                                    userDataCache[userId].user_locations.push(locationData);
+                                }
+                            }
+                            
+                            // Update marker if showing locations
+                            if (showUserLocations) {
+                                updateUserMarkers([userDataCache[userId]]);
+                            }
+                            
+                            // Update status text in user list
+                            const userCard = document.querySelector(`[data-user-id="${userId}"]`);
+                            if (userCard) {
+                                const statusText = userCard.querySelector('p');
+                                if (statusText) {
+                                    const lastOnline = userDataCache[userId]?.lastonline ? 
+                                        new Date(userDataCache[userId].lastonline) : null;
+                                    const isOnline = onlineUsers[userId] || 
+                                        (userDataCache[userId]?.status === 'online' && lastOnline && 
+                                        (Date.now() - lastOnline.getTime()) < 300000);
+                                    
+                                    statusText.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                                    statusText.textContent += ` • ${formatDistance(new Date(locationData.last_updated))} ago`;
+                                }
+                            }
                         }
-                    });
+                    )
+                    .subscribe();
 
             } catch (error) {
-                console.error("Realtime connection error:", error);
-                updateConnectionStatus("Realtime failed: " + error.message, true);
+                console.error('Realtime initialization error:', error);
+                updateConnectionStatus("Connection failed: " + error.message, true);
                 setTimeout(initializeRealtime, 5000);
             }
         }
 
-        // Cleanup function when window closes
+        function showNotification(userId, messageContent) {
+            // Check if notifications are allowed
+            if (Notification.permission === 'granted') {
+                const user = userDataCache[userId];
+                if (user) {
+                    new Notification(`New message from ${user.name}`, {
+                        body: messageContent.length > 50 ? 
+                            messageContent.substring(0, 50) + '...' : messageContent,
+                        icon: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=random'
+                    });
+                }
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        showNotification(userId, messageContent);
+                    }
+                });
+            }
+            
+            // Also show in-app notification for mobile
+            if (isMobile) {
+                const notification = document.createElement('div');
+                notification.className = 'mobile-notification';
+                notification.innerHTML = `
+                    <div class="notification-content">
+                        <div class="notification-avatar" style="background: ${stringToColor(userDataCache[userId]?.name || '?')}">
+                            ${getInitials(userDataCache[userId]?.name || '?')}
+                        </div>
+                        <div class="notification-text">
+                            <strong>${userDataCache[userId]?.name || 'Unknown'}</strong>
+                            <p>${messageContent.length > 30 ? messageContent.substring(0, 30) + '...' : messageContent}</p>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(notification);
+                
+                // Animate in
+                setTimeout(() => {
+                    notification.style.transform = 'translateY(0)';
+                    notification.style.opacity = '1';
+                }, 10);
+                
+                // Remove after delay
+                setTimeout(() => {
+                    notification.style.transform = 'translateY(-100%)';
+                    notification.style.opacity = '0';
+                    setTimeout(() => notification.remove(), 300);
+                }, 5000);
+                
+                // Click handler to open chat
+                notification.addEventListener('click', () => {
+                    if (userDataCache[userId]) {
+                        selectUser(userDataCache[userId]);
+                        showMapView();
+                        document.getElementById('sidebar').classList.add('collapsed');
+                    }
+                    notification.remove();
+                });
+            }
+        }
+
+        // Clean up on page unload
         window.addEventListener('beforeunload', async () => {
             try {
                 if (presenceChannel) {
@@ -1397,18 +2380,255 @@
                     navigator.geolocation.clearWatch(watchId);
                 }
                 
-                // Mark user as offline
+                // Update user status to offline
                 await supabaseClient
                     .from('users')
                     .update({ 
-                        lastonline: new Date().toISOString(),
-                        status: 'offline'
+                        status: 'offline',
+                        lastonline: new Date().toISOString()
                     })
                     .eq('id', currentUserId);
+                
             } catch (error) {
                 console.error('Cleanup error:', error);
             }
         });
+
+        // Mobile-specific touch handlers
+        if (isMobile) {
+            // Prevent zooming on double-tap
+            let lastTap = 0;
+            document.addEventListener('touchend', (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 300 && tapLength > 0) {
+                    e.preventDefault();
+                }
+                lastTap = currentTime;
+            }, { passive: false });
+
+            // Better touch handling for map
+            document.getElementById('map').addEventListener('touchstart', (e) => {
+                if (e.touches.length > 1) {
+                    e.preventDefault(); // Prevent zoom gesture
+                }
+            }, { passive: false });
+
+            // Adjust viewport for mobile devices
+            const setViewport = () => {
+                const viewport = document.querySelector('meta[name="viewport"]');
+                if (window.orientation === 90 || window.orientation === -90) {
+                    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+                } else {
+                    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+                }
+            };
+
+            window.addEventListener('orientationchange', setViewport);
+            setViewport();
+        }
+
+        // Additional mobile CSS
+        const mobileStyles = document.createElement('style');
+        mobileStyles.textContent = `
+            .mobile-notification {
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                background: rgba(0, 0, 0, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                padding: 12px;
+                z-index: 2000;
+                transform: translateY(-100%);
+                opacity: 0;
+                transition: all 0.3s ease;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            }
+            
+            .notification-content {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .notification-avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: white;
+                flex-shrink: 0;
+            }
+            
+            .notification-text {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .notification-text p {
+                margin-top: 4px;
+                opacity: 0.8;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            @media (max-width: 480px) {
+                .sidebar {
+                    width: 100%;
+                }
+                
+                .user-card {
+                    padding: 10px;
+                }
+                
+                .message-content {
+                    max-width: 85%;
+                }
+                
+                .location-controls {
+                    bottom: 60px;
+                    right: 10px;
+                }
+            }
+            
+            /* Prevent body scrolling when sidebar is open on mobile */
+            body.sidebar-open {
+                overflow: hidden;
+                position: fixed;
+                width: 100%;
+                height: 100%;
+            }
+        `;
+        document.head.appendChild(mobileStyles);
+
+        // Handle sidebar state for mobile
+        const sidebar = document.getElementById('sidebar');
+        sidebar.addEventListener('transitionend', () => {
+            if (isMobile) {
+                document.body.classList.toggle('sidebar-open', !sidebar.classList.contains('collapsed'));
+            }
+        });
+
+        // Enhanced error handling for GPS
+        function handleGeolocationError(error) {
+            console.error('Geolocation error:', error);
+            
+            let errorMessage = 'Location access error: ';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage += "Permission denied. Please enable location services.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage += "Location information unavailable.";
+                    break;
+                case error.TIMEOUT:
+                    errorMessage += "Location request timed out.";
+                    break;
+                default:
+                    errorMessage += "Unknown error occurred.";
+            }
+            
+            // Show error to user
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-state';
+            errorDiv.style.position = 'absolute';
+            errorDiv.style.bottom = '20px';
+            errorDiv.style.left = '20px';
+            errorDiv.style.right = '20px';
+            errorDiv.style.zIndex = '1000';
+            errorDiv.innerHTML = `
+                <p>${errorMessage}</p>
+                <button onclick="this.parentElement.remove()">Dismiss</button>
+            `;
+            document.getElementById('mapContainer').appendChild(errorDiv);
+            
+            // Set default location if we don't have one
+            if (!lastPosition) {
+                updateLocation({
+                    coords: {
+                        latitude: 0,
+                        longitude: 0,
+                        accuracy: 100000
+                    }
+                });
+            }
+        }
+
+        // SQL for backend updates (to be executed in Supabase SQL editor)
+        /*
+        -- Create a table for user locations if it doesn't exist
+        CREATE TABLE IF NOT EXISTS public.user_locations (
+            user_id UUID PRIMARY KEY REFERENCES auth.users(id),
+            latitude DOUBLE PRECISION NOT NULL,
+            longitude DOUBLE PRECISION NOT NULL,
+            accuracy DOUBLE PRECISION,
+            last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '5 minutes'),
+            device_context JSONB
+        );
+
+        -- Create index for faster location queries
+        CREATE INDEX IF NOT EXISTS idx_user_locations_last_updated ON public.user_locations (last_updated);
+
+        -- Enable Row Level Security for user_locations
+        ALTER TABLE public.user_locations ENABLE ROW LEVEL SECURITY;
+
+        -- Create policies for user_locations
+        CREATE POLICY "Enable read access for all users" 
+        ON public.user_locations
+        FOR SELECT USING (true);
+
+        CREATE POLICY "Enable insert for authenticated users only" 
+        ON public.user_locations
+        FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+        CREATE POLICY "Enable update for own data only" 
+        ON public.user_locations
+        FOR UPDATE USING (auth.uid() = user_id);
+
+        -- Add device_type column to users table if it doesn't exist
+        ALTER TABLE public.users 
+        ADD COLUMN IF NOT EXISTS device_type TEXT;
+
+        -- Create a function to update user status
+        CREATE OR REPLACE FUNCTION public.update_user_status()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            IF NEW.lastonline IS NOT NULL THEN
+                IF (NOW() - NEW.lastonline) < INTERVAL '5 minutes' THEN
+                    NEW.status := 'online';
+                ELSE
+                    NEW.status := 'offline';
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        -- Create trigger for user status updates
+        DROP TRIGGER IF EXISTS trigger_update_user_status ON public.users;
+        CREATE TRIGGER trigger_update_user_status
+        BEFORE INSERT OR UPDATE OF lastonline ON public.users
+        FOR EACH ROW EXECUTE FUNCTION public.update_user_status();
+
+        -- Create a function to clean up old locations
+        CREATE OR REPLACE FUNCTION public.cleanup_old_locations()
+        RETURNS VOID AS $$
+        BEGIN
+            DELETE FROM public.user_locations WHERE expires_at < NOW();
+        END;
+        $$ LANGUAGE plpgsql;
+
+        -- Schedule the cleanup function to run hourly
+        SELECT cron.schedule('hourly-location-cleanup', '0 * * * *', 'SELECT public.cleanup_old_locations()');
+        */
     </script>
 </body>
 </html>
