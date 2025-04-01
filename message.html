@@ -110,9 +110,12 @@
             height: 10px;
             border-radius: 50%;
             margin-left: auto;
+            background: #666;
         }
-        .online { background: #00ff88; box-shadow: 0 0 10px #00ff8855; }
-        .offline { background: #666; }
+        .status-indicator.online { 
+            background: #00ff88; 
+            box-shadow: 0 0 10px #00ff8855; 
+        }
         
         /* Map Styles */
         .map-container {
@@ -538,63 +541,27 @@
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize Supabase client with proper headers
+                // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    global: {
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json'
-                        }
-                    },
                     auth: {
                         persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: false,
-                        storage: {
-                            getItem: (key) => {
-                                return localStorage.getItem(key) || 
-                                       localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                       localStorage.getItem('session');
-                            },
-                            setItem: (key, value) => localStorage.setItem(key, value),
-                            removeItem: (key) => localStorage.removeItem(key)
-                        }
+                        autoRefreshToken: true
                     }
                 });
 
-                // Check and recover session
+                // Check session
                 const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
                 if (sessionError) throw sessionError;
                 session = currentSession;
-
-                if (!session) {
-                    const sessionData = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
-                                       localStorage.getItem('session');
-                    if (sessionData) {
-                        try {
-                            const parsedSession = JSON.parse(sessionData);
-                            if (parsedSession && parsedSession.access_token) {
-                                await supabaseClient.auth.setSession({
-                                    access_token: parsedSession.access_token,
-                                    refresh_token: parsedSession.refresh_token
-                                });
-                                const { data: { session: recoveredSession } } = await supabaseClient.auth.getSession();
-                                session = recoveredSession;
-                            }
-                        } catch (e) {
-                            console.error("Failed to parse session data:", e);
-                        }
-                    }
-                }
 
                 if (!session) {
                     window.location.href = 'login.html';
                     return;
                 }
 
-                currentUserId = session?.user?.id;
+                currentUserId = session.user.id;
 
-                // Verify user and get profile data
+                // Verify user
                 const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
                 if (authError) throw authError;
                 if (!user) throw new Error("User verification failed");
@@ -604,7 +571,7 @@
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendButton').disabled = false;
 
-                // Initialize map with more detailed settings
+                // Initialize map
                 initializeMap();
                 
                 // Load users and setup event listeners
@@ -635,13 +602,13 @@
             }
         });
 
-        // Initialize the map with enhanced settings
+        // Initialize the map
         function initializeMap() {
             map = L.map('map', {
                 zoomControl: true,
                 maxZoom: 18,
                 minZoom: 2,
-                preferCanvas: true // Better performance for many markers
+                preferCanvas: true
             }).setView([0, 0], 2);
 
             // Add default OpenStreetMap layer with dark theme
@@ -650,21 +617,35 @@
                 detectRetina: true
             }).addTo(map);
 
-            // Start watching position with optimized settings
+            // Start watching position
             if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(
                     updateLocation,
-                    err => console.error('GPS Error:', err),
+                    handleGeolocationError,
                     { 
                         enableHighAccuracy: true,
-                        maximumAge: 30000, // Accept cached position up to 30 seconds old
-                        timeout: 10000 // Timeout after 10 seconds
+                        maximumAge: 30000,
+                        timeout: 10000
                     }
                 );
             }
         }
 
-        // Update location on map with enhanced features
+        function handleGeolocationError(error) {
+            console.error('GPS Error:', error);
+            // Default to a reasonable location if geolocation fails
+            if (!marker) {
+                updateLocation({
+                    coords: {
+                        latitude: 0,
+                        longitude: 0,
+                        accuracy: 100000
+                    }
+                });
+            }
+        }
+
+        // Update location on map
         function updateLocation(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
@@ -676,9 +657,9 @@
                 Math.abs(lastPosition.lng - lng) > 0.0001 ||
                 !marker) {
                 
-                if (marker) marker.remove();
+                if (marker) map.removeLayer(marker);
                 
-                // Create a person marker instead of lollipop
+                // Create a person marker
                 marker = L.marker([lat, lng], {
                     icon: L.divIcon({
                         className: 'person-marker',
@@ -706,21 +687,20 @@
                     easeLinearity: 0.25
                 });
                 
-                // Send location to server with optimized frequency
+                // Send location to server
                 sendLocationToServer(lat, lng, accuracy);
                 
                 lastPosition = { lat, lng, accuracy };
             }
         }
 
-        // Send location to server with optimized payload
+        // Send location to server
         async function sendLocationToServer(lat, lng, accuracy) {
             try {
-                const deviceId = getDeviceId();
                 const now = new Date();
                 
-                // Upsert location to minimize database writes
-                const { data, error } = await supabaseClient
+                // Upsert location
+                const { error } = await supabaseClient
                     .from('user_locations')
                     .upsert({
                         user_id: currentUserId,
@@ -728,14 +708,14 @@
                         longitude: lng,
                         accuracy: accuracy,
                         last_updated: now.toISOString(),
-                        expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString() // 5 minute TTL
+                        expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString()
                     }, {
                         onConflict: 'user_id'
                     });
                 
                 if (error) throw error;
                 
-                // Update user's last online time
+                // Update user's status
                 await supabaseClient
                     .from('users')
                     .update({ 
@@ -749,22 +729,12 @@
             }
         }
 
-        // Get device ID
-        function getDeviceId() {
-            let deviceId = localStorage.getItem('deviceId');
-            if (!deviceId) {
-                deviceId = `DEV-${Math.random().toString(36).substring(2, 10)}-${Date.now()}`;
-                localStorage.setItem('deviceId', deviceId);
-            }
-            return deviceId;
-        }
-
         // User management with location data
         async function loadUsers() {
             try {
                 showLoading();
                 
-                // First get all users (simplified query)
+                // Get all users except current user
                 const { data: users, error: usersError } = await supabaseClient
                     .from('users')
                     .select('id, name, lastonline, status')
@@ -773,7 +743,7 @@
                 
                 if (usersError) throw usersError;
                 
-                // Then get locations for these users
+                // Get locations for these users
                 const { data: locations, error: locationsError } = await supabaseClient
                     .from('user_locations')
                     .select('user_id, latitude, longitude, last_updated')
@@ -790,14 +760,12 @@
                     };
                 });
                 
-                // Cache user data for marker tooltips
+                // Cache user data
                 usersWithLocations.forEach(user => {
                     userDataCache[user.id] = user;
                 });
                 
                 renderUserList(usersWithLocations);
-                
-                // Update user markers on map
                 updateUserMarkers(usersWithLocations);
                 
             } catch (error) {
@@ -806,7 +774,7 @@
             }
         }
 
-        // Render user list with enhanced status information
+        // Render user list with status information
         function renderUserList(users) {
             const userList = document.getElementById('userList');
             userList.innerHTML = '';
@@ -818,15 +786,14 @@
 
             users.forEach(user => {
                 const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                let isOnline = onlineUsers[user.id] || user.status === 'online';
-                let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                const isOnline = onlineUsers[user.id] || user.status === 'online';
+                const statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 
-                // Check if user has location data
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
                 
                 const userCard = document.createElement('div');
-                userCard.className = `user-card ${isOnline ? 'online' : ''}`;
+                userCard.className = `user-card`;
                 userCard.dataset.userId = user.id;
                 userCard.innerHTML = `
                     <img src="https://ui-avatars.com/api/?name=${
@@ -837,7 +804,7 @@
                         <h4>${user.name}</h4>
                         <p>${statusText}${hasLocation ? ' • ' + formatDistance(locationTime) + ' ago' : ''}</p>
                     </div>
-                    <div class="status-indicator ${isOnline ? 'online' : 'offline'}"></div>
+                    <div class="status-indicator ${isOnline ? 'online' : ''}"></div>
                 `;
                 userCard.addEventListener('click', () => selectUser(user));
                 userList.appendChild(userCard);
@@ -858,7 +825,7 @@
 
             // Add new markers
             users.forEach(user => {
-                if (user.id === currentUserId) return; // Skip our own marker
+                if (user.id === currentUserId) return;
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const isOnline = onlineUsers[user.id] || user.status === 'online';
@@ -866,12 +833,12 @@
                 if (hasLocation && showUserLocations) {
                     const location = user.user_locations[0];
                     const lastUpdated = new Date(location.last_updated);
-                    const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000; // 5 minutes
+                    const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000;
                     
-                    // Create custom marker with user avatar and status
+                    // Create custom marker
                     const marker = L.marker([location.latitude, location.longitude], {
                         icon: L.divIcon({
-                            className: 'user-marker ' + (isOnline && isRecent ? 'online' : 'offline'),
+                            className: `user-marker ${isOnline && isRecent ? 'online' : 'offline'}`,
                             html: `
                                 <div class="user-marker-tooltip">
                                     ${user.name}${!isRecent ? ' (last seen ' + formatDistance(lastUpdated) + ' ago)' : ''}
@@ -888,10 +855,9 @@
                         title: user.name
                     }).addTo(map);
                     
-                    // Store reference to marker
                     userMarkers[user.id] = marker;
                     
-                    // Add click handler to center on user
+                    // Add click handler
                     marker.on('click', () => {
                         map.flyTo([location.latitude, location.longitude], 15, {
                             duration: 0.5
@@ -1026,11 +992,6 @@
             } catch (error) {
                 console.error('Failed to send message:', error);
                 showError('Failed to send message: ' + error.message);
-                
-                if (error.message.includes('row-level security')) {
-                    console.log("RLS Policy Violation - Current User:", user);
-                    console.log("Attempted to send to:", receiverId);
-                }
             } finally {
                 hideSendLoading();
             }
@@ -1082,11 +1043,10 @@
                 const indicator = card.querySelector('.status-indicator');
                 if (indicator) {
                     indicator.classList.toggle('online', isOnline);
-                    indicator.classList.toggle('offline', !isOnline);
                     
                     const statusText = card.querySelector('p');
                     if (statusText) {
-                        statusText.textContent = isOnline ? 'Online' : 'Offline';
+                        statusText.textContent = isOnline ? 'Online' : formatLastOnline(userDataCache[userId]?.lastonline);
                     }
                 }
             });
@@ -1263,6 +1223,8 @@
                     map.flyTo([lastPosition.lat, lastPosition.lng], 15, {
                         duration: 0.5
                     });
+                } else {
+                    map.setView([0, 0], 2);
                 }
             });
             
@@ -1272,7 +1234,6 @@
                 document.getElementById('toggleUserLocationsButton').classList.toggle('active', showUserLocations);
                 
                 if (showUserLocations) {
-                    // Reload users to show their locations
                     loadUsers();
                 } else {
                     // Remove all user markers except our own
@@ -1286,7 +1247,7 @@
             });
         }
 
-        // Initialize realtime functionality with enhanced features
+        // Initialize realtime functionality
         async function initializeRealtime() {
             updateConnectionStatus("Connecting to real-time service...");
             
@@ -1348,7 +1309,7 @@
                         event: 'INSERT',
                         schema: 'public',
                         table: 'messages',
-                        filter: `or(receiver_id=eq.${currentUserId},sender_id=eq.${currentUserId})`
+                        filter: `or(receiver_id.eq.${currentUserId},sender_id.eq.${currentUserId})`
                     }, (payload) => {
                         if (selectedUser && 
                             (payload.new.sender_id === selectedUser.id || 
@@ -1373,9 +1334,8 @@
                         event: '*',
                         schema: 'public',
                         table: 'user_locations',
-                        filter: `user_id=neq.${currentUserId}`
+                        filter: `user_id.neq.${currentUserId}`
                     }, (payload) => {
-                        // Only update if we're showing user locations
                         if (showUserLocations) {
                             const user = userDataCache[payload.new.user_id];
                             if (!user) return;
@@ -1384,15 +1344,12 @@
                             const existingMarker = userMarkers[payload.new.user_id];
                             
                             if (existingMarker) {
-                                // Update existing marker position
                                 existingMarker.setLatLng([payload.new.latitude, payload.new.longitude]);
                                 
-                                // Update marker style based on online status
                                 const icon = existingMarker.getIcon();
                                 icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
                                 existingMarker.setIcon(icon);
                             } else {
-                                // Create new marker if we don't have one
                                 const marker = L.marker([payload.new.latitude, payload.new.longitude], {
                                     icon: L.divIcon({
                                         className: `user-marker ${isOnline ? 'online' : 'offline'}`,
