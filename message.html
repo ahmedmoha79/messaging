@@ -1200,11 +1200,11 @@
                 
                 // Get unread message counts
                 const { data: unreadCounts, error: unreadError } = await supabaseClient
-                    .from('messages')
-                    .select('sender_id, count')
-                    .eq('receiver_id', currentUserId)
-                    .eq('is_read', false)
-                    .group('sender_id');
+                .from('messages')
+                .select('sender_id, count(*)')
+                .eq('receiver_id', currentUserId)
+                .eq('is_read', false)
+                .group('sender_id', { count: { exact: true } });
                 
                 if (!unreadError) {
                     unreadCounts.forEach(item => {
