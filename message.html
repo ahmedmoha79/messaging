@@ -363,10 +363,11 @@
         }
         
         /* Map Marker */
-        .emoji-marker {
-            font-size: 32px;
+        .person-marker {
+            font-size: 24px;
             text-shadow: 0 0 8px white, 0 0 8px white;
             filter: drop-shadow(0 0 4px black);
+            transform: translateY(-10px);
         }
         
         /* User Location Marker */
@@ -532,17 +533,18 @@
         let userMarkers = {};
         let showUserLocations = true;
         let watchId = null;
+        let userDataCache = {};
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize Supabase client
+                // Initialize Supabase client with proper headers
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                  global: {
-                   headers: {
-                    'Accept': 'application/json'
-                     'Content-type': 'application/json'
-                      }
+                    global: {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
                     },
                     auth: {
                         persistSession: true,
@@ -592,7 +594,7 @@
 
                 currentUserId = session?.user?.id;
 
-                // Verify user
+                // Verify user and get profile data
                 const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
                 if (authError) throw authError;
                 if (!user) throw new Error("User verification failed");
@@ -609,6 +611,16 @@
                 await loadUsers();
                 setupEventListeners();
                 initializeRealtime();
+
+                // Set up auth state change listener
+                supabaseClient.auth.onAuthStateChange((event, session) => {
+                    if (event === 'SIGNED_OUT') {
+                        window.location.href = 'login.html';
+                    } else if (event === 'TOKEN_REFRESHED') {
+                        console.log('Token refreshed, reinitializing realtime');
+                        initializeRealtime();
+                    }
+                });
 
             } catch (error) {
                 console.error("Initialization error:", error);
@@ -636,11 +648,6 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap',
                 detectRetina: true
-            }).addTo(map);
-
-            // Add a dark mode tile layer option
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '© CartoDB'
             }).addTo(map);
 
             // Start watching position with optimized settings
@@ -671,11 +678,11 @@
                 
                 if (marker) marker.remove();
                 
-                // Create a more sophisticated marker
+                // Create a person marker instead of lollipop
                 marker = L.marker([lat, lng], {
                     icon: L.divIcon({
-                        className: 'emoji-marker',
-                        html: '📍',
+                        className: 'person-marker',
+                        html: '🧑‍💼',
                         iconSize: [32, 32],
                         iconAnchor: [16, 32]
                     }),
@@ -757,21 +764,36 @@
             try {
                 showLoading();
                 
-                // Get users with their latest location data
-                const { data: usersWithLocations, error } = await supabaseClient
+                // First get all users (simplified query)
+                const { data: users, error: usersError } = await supabaseClient
                     .from('users')
-                    .select(`
-                        *,
-                        user_locations (
-                            latitude,
-                            longitude,
-                            last_updated
-                        )
-                    `)
+                    .select('id, name, lastonline, status')
                     .neq('id', currentUserId)
                     .order('lastonline', { ascending: false });
                 
-                if (error) throw error;
+                if (usersError) throw usersError;
+                
+                // Then get locations for these users
+                const { data: locations, error: locationsError } = await supabaseClient
+                    .from('user_locations')
+                    .select('user_id, latitude, longitude, last_updated')
+                    .in('user_id', users.map(u => u.id));
+                
+                if (locationsError) throw locationsError;
+                
+                // Combine the data
+                const usersWithLocations = users.map(user => {
+                    const location = locations.find(loc => loc.user_id === user.id);
+                    return {
+                        ...user,
+                        user_locations: location ? [location] : []
+                    };
+                });
+                
+                // Cache user data for marker tooltips
+                usersWithLocations.forEach(user => {
+                    userDataCache[user.id] = user;
+                });
                 
                 renderUserList(usersWithLocations);
                 
@@ -796,7 +818,7 @@
 
             users.forEach(user => {
                 const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
-                let isOnline = onlineUsers[user.id] || false;
+                let isOnline = onlineUsers[user.id] || user.status === 'online';
                 let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 
                 // Check if user has location data
@@ -839,7 +861,7 @@
                 if (user.id === currentUserId) return; // Skip our own marker
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
-                const isOnline = onlineUsers[user.id] || false;
+                const isOnline = onlineUsers[user.id] || user.status === 'online';
                 
                 if (hasLocation && showUserLocations) {
                     const location = user.user_locations[0];
@@ -1277,10 +1299,9 @@
                 // Presence channel for online status
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
-                      broadcast: {ack: true}, 
+                        broadcast: { ack: true },
                         presence: { 
                             key: currentUserId,
-                            // Only send presence updates every 30 seconds to reduce load
                             heartbeatIntervalMs: 30000
                         } 
                     }
@@ -1346,18 +1367,21 @@
                         }
                     });
 
-                // User locations channel - NEW for real-time location updates
+                // User locations channel
                 const locationsChannel = supabaseClient.channel('locations-channel')
                     .on('postgres_changes', {
-                        event: 'UPDATE',
+                        event: '*',
                         schema: 'public',
-                        table: 'user_locations'
+                        table: 'user_locations',
+                        filter: `user_id=neq.${currentUserId}`
                     }, (payload) => {
                         // Only update if we're showing user locations
-                        if (showUserLocations && payload.new.user_id !== currentUserId) {
-                            // Check if we already have a marker for this user
-                            const existingMarker = userMarkers[payload.new.user_id];
+                        if (showUserLocations) {
+                            const user = userDataCache[payload.new.user_id];
+                            if (!user) return;
+                            
                             const isOnline = onlineUsers[payload.new.user_id] || false;
+                            const existingMarker = userMarkers[payload.new.user_id];
                             
                             if (existingMarker) {
                                 // Update existing marker position
@@ -1369,28 +1393,25 @@
                                 existingMarker.setIcon(icon);
                             } else {
                                 // Create new marker if we don't have one
-                                const user = Object.values(onlineUsers).find(u => u.id === payload.new.user_id);
-                                if (user) {
-                                    const marker = L.marker([payload.new.latitude, payload.new.longitude], {
-                                        icon: L.divIcon({
-                                            className: `user-marker ${isOnline ? 'online' : 'offline'}`,
-                                            html: `
-                                                <div class="user-marker-tooltip">
-                                                    ${user.name}
-                                                </div>
-                                                <div class="user-marker-inner">
-                                                    ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                                                    ${isOnline ? '<div class="user-marker-pulse"></div>' : ''}
-                                                </div>
-                                            `,
-                                            iconSize: [40, 40],
-                                            iconAnchor: [20, 40]
-                                        }),
-                                        zIndexOffset: 900
-                                    }).addTo(map);
-                                    
-                                    userMarkers[payload.new.user_id] = marker;
-                                }
+                                const marker = L.marker([payload.new.latitude, payload.new.longitude], {
+                                    icon: L.divIcon({
+                                        className: `user-marker ${isOnline ? 'online' : 'offline'}`,
+                                        html: `
+                                            <div class="user-marker-tooltip">
+                                                ${user.name}
+                                            </div>
+                                            <div class="user-marker-inner">
+                                                ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                                ${isOnline ? '<div class="user-marker-pulse"></div>' : ''}
+                                            </div>
+                                        `,
+                                        iconSize: [40, 40],
+                                        iconAnchor: [20, 40]
+                                    }),
+                                    zIndexOffset: 900
+                                }).addTo(map);
+                                
+                                userMarkers[payload.new.user_id] = marker;
                             }
                         }
                     })
