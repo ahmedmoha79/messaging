@@ -1463,11 +1463,11 @@
                 showLoading();
                 
                 // Get all users except current user with additional status info
-                const { data: users, error: usersError } = await supabaseClient
-                    .from('users')
-                    .select('id, name, lastonline, status, device_type')
-                    .neq('id', currentUserId)
-                    .order('lastonline', { ascending: false });
+const { data: users, error: usersError } = await supabaseClient
+    .from('auth.users') // ← To this
+    .select('id, raw_user_meta_data->>name as name, lastonline, status, device_type')
+    .neq('id', currentUserId)
+    .order('lastonline', { ascending: false });
                 
                 if (usersError) throw usersError;
                 
