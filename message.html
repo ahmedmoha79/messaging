@@ -737,7 +737,7 @@
                 // Get all users except current user
                 const { data: users, error: usersError } = await supabaseClient
                     .from('users')
-                    .select('id, name, lastonline, status')
+                    .select('id, name, lastonline, status, avatar_emoji')
                     .neq('id', currentUserId)
                     .order('lastonline', { ascending: false });
                 
@@ -825,7 +825,6 @@
 
             // Add new markers
             users.forEach(user => {
-                if (user.id === currentUserId) return;
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const isOnline = onlineUsers[user.id] || user.status === 'online';
@@ -844,6 +843,7 @@
                                     ${user.name}${!isRecent ? ' (last seen ' + formatDistance(lastUpdated) + ' ago)' : ''}
                                 </div>
                                 <div class="user-marker-inner">
+                                     ${user.avatar_emoji || '👤'} <!-- Use emoji if available -->
                                     ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                                     ${isOnline && isRecent ? '<div class="user-marker-pulse"></div>' : ''}
                                 </div>
@@ -1350,6 +1350,7 @@
                                 icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
                                 existingMarker.setIcon(icon);
                             } else {
+[The entire contents of the HTML file would be the same as before, with the specific marker creation code in the 'locationsChannel' realtime handler modified to match the suggested implementation, specifically this section:]
                                 const marker = L.marker([payload.new.latitude, payload.new.longitude], {
                                     icon: L.divIcon({
                                         className: `user-marker ${isOnline ? 'online' : 'offline'}`,
@@ -1412,3 +1413,23 @@
     </script>
 </body>
 </html>
+[would be replaced with:]
+
+const marker = L.marker([payload.new.latitude, payload.new.longitude], {
+    icon: L.divIcon({
+        className: `user-marker ${isOnline ? 'online' : 'offline'}`,
+        html: `
+            <div class="user-marker-tooltip">
+                ${user.name}
+            </div>
+            <div class="user-marker-inner">
+                ${user.avatar_emoji || '👤'}
+            </div>
+            ${isOnline ? '<div class="user-marker-pulse"></div>' : ''}
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40]
+    }),
+    zIndexOffset: 900,
+    title: user.name
+}).addTo(map);
