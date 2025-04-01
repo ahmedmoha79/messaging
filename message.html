@@ -1178,23 +1178,23 @@
 
         // User management
         async function loadUsers() {
-            try {
-                showLoading();
-                
-                // Get all users except current user with status info
-                const { data: users, error: usersError } = await supabaseClient
-                    .from('users')
-                    .select('id, email, name, lastonline, status')
-                    .neq('id', currentUserId)
-                    .order('lastonline', { ascending: false });
-                
-                if (usersError) throw usersError;
-                
-                // Get locations for these users
-                const { data: locations, error: locationsError } = await supabaseClient
-                    .from('user_locations')
-                    .select('user_id, latitude, longitude, last_updated, device_context')
-                    .in('user_id', users.map(u => u.id));
+    try {
+        showLoading();
+        
+        // PROPER SUPABASE CLIENT USAGE - Option 2 implementation
+        const { data: users, error: usersError } = await supabaseClient
+            .from('users')
+            .select('id, email, name, lastonline, status')
+            .neq('id', currentUserId)  // This excludes the current user
+            .order('lastonline', { ascending: false });
+        
+        if (usersError) throw usersError;
+        
+        // Rest of the existing code remains the same...
+        const { data: locations, error: locationsError } = await supabaseClient
+            .from('user_locations')
+            .select('user_id, latitude, longitude, last_updated, device_context')
+            .in('user_id', users.map(u => u.id));
                 
                 if (locationsError) throw locationsError;
                 
