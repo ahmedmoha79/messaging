@@ -538,6 +538,12 @@
             try {
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                  global: {
+                   headers: {
+                    'Accept': 'application/json'
+                     'Content-type': 'application/json'
+                      }
+                    },
                     auth: {
                         persistSession: true,
                         autoRefreshToken: true,
@@ -1271,6 +1277,7 @@
                 // Presence channel for online status
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
+                      broadcast: {ack: true}, 
                         presence: { 
                             key: currentUserId,
                             // Only send presence updates every 30 seconds to reduce load
