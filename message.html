@@ -2189,8 +2189,7 @@
                 // Handle channel connection events with exponential backoff
                 let reconnectAttempts = 0;
                 
-                presenceChannel
-                    .                     .on('close', () => {
+                presenceChannel.on('close', () => {
                         updateConnectionStatus("Disconnected", true);
                         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
                         reconnectAttempts++;
