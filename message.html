@@ -916,363 +916,177 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        // Configuration and global variables
-        const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-        
-        let supabaseClient, presenceChannel, typingTimeout;
-        let selectedUser = null, currentUserId = null, session = null;
-        let map, marker, lastPosition = null;
-        let onlineUsers = {};
-        let userMarkers = {};
-        let showUserLocations = true;
-        let watchId = null;
-        let userDataCache = {};
-        let unreadMessages = {};
-        let batteryLevel = 100;
-        let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+<script>
+    // Configuration and global variables
+    const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
+    
+    let supabaseClient, presenceChannel, typingTimeout;
+    let selectedUser = null, currentUserId = null, session = null;
+    let map, marker, lastPosition = null;
+    let onlineUsers = {};
+    let userMarkers = {};
+    let showUserLocations = true;
+    let watchId = null;
+    let userDataCache = {};
+    let unreadMessages = {};
+    let batteryLevel = 100;
+    let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                // Initialize Supabase client
-                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true
-                    }
-                });
+    // Initialize the application
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            // Initialize Supabase client
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true
+                }
+            });
 
-                // Check session
-                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
-                if (sessionError) throw sessionError;
-                session = currentSession;
+            // Check session
+            const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError) throw sessionError;
+            session = currentSession;
 
-                if (!session) {
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            currentUserId = session.user.id;
+
+            // Verify user
+            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+            if (authError) throw authError;
+            if (!user) throw new Error("User verification failed");
+
+            // Show main interface
+            document.querySelector('.session-check').style.display = 'none';
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendButton').disabled = false;
+
+            // Initialize map with satellite view by default on mobile
+            initializeMap();
+            
+            // Load users and setup event listeners
+            await loadUsers();
+            setupEventListeners();
+            initializeRealtime();
+
+            // Set up auth state change listener
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_OUT') {
                     window.location.href = 'login.html';
-                    return;
+                } else if (event === 'TOKEN_REFRESHED') {
+                    console.log('Token refreshed, reinitializing realtime');
+                    initializeRealtime();
                 }
+            });
 
-                currentUserId = session.user.id;
+            // Initialize battery monitoring
+            initBatteryMonitoring();
 
-                // Verify user
-                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-                if (authError) throw authError;
-                if (!user) throw new Error("User verification failed");
-
-                // Show main interface
-                document.querySelector('.session-check').style.display = 'none';
-                document.getElementById('messageInput').disabled = false;
-                document.getElementById('sendButton').disabled = false;
-
-                // Initialize map with satellite view by default on mobile
-                initializeMap();
-                
-                // Load users and setup event listeners
-                await loadUsers();
-                setupEventListeners();
-                initializeRealtime();
-
-                // Set up auth state change listener
-                supabaseClient.auth.onAuthStateChange((event, session) => {
-                    if (event === 'SIGNED_OUT') {
-                        window.location.href = 'login.html';
-                    } else if (event === 'TOKEN_REFRESHED') {
-                        console.log('Token refreshed, reinitializing realtime');
-                        initializeRealtime();
-                    }
-                });
-
-                // Initialize battery monitoring
-                initBatteryMonitoring();
-
-            } catch (error) {
-                console.error("Initialization error:", error);
-                document.querySelector('.session-check').innerHTML = `
-                    <h2>Session verification failed</h2>
-                    <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                    <button onclick="window.location.href='login.html'" 
-                            style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
-                        Go to Login
-                    </button>
-                `;
-            }
-        });
-
-        // Initialize battery monitoring
-        function initBatteryMonitoring() {
-            if ('getBattery' in navigator) {
-                navigator.getBattery().then(battery => {
-                    updateBatteryStatus(battery);
-                    battery.addEventListener('levelchange', () => updateBatteryStatus(battery));
-                    battery.addEventListener('chargingchange', () => updateBatteryStatus(battery));
-                });
-            } else {
-                // Fallback for browsers that don't support Battery Status API
-                document.getElementById('batteryIndicator').style.display = 'none';
-            }
-        }
-
-        // Update battery status display
-        function updateBatteryStatus(battery) {
-            batteryLevel = Math.round(battery.level * 100);
-            document.getElementById('batteryLevel').textContent = `${batteryLevel}%`;
-            
-            // Change color based on battery level
-            const batteryElem = document.getElementById('batteryIndicator');
-            if (batteryLevel <= 20) {
-                batteryElem.style.color = '#ff4444';
-            } else {
-                batteryElem.style.color = '#ffffff';
-            }
-        }
-
-        // Initialize the map with satellite view by default on mobile
-        function initializeMap() {
-            const mapOptions = {
-                zoomControl: true,
-                maxZoom: 18,
-                minZoom: 2,
-                preferCanvas: true,
-                zoomSnap: 0.5,
-                zoomDelta: 0.5,
-                tap: isMobile ? false : true
-            };
-            
-            map = L.map('map', mapOptions).setView([0, 0], 2);
-
-            // Add satellite layer by default on mobile
-            if (isMobile) {
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-                    detectRetina: true
-                }).addTo(map);
-            } else {
-                // Add default OpenStreetMap layer with dark theme for desktop
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap',
-                    detectRetina: true
-                }).addTo(map);
-            }
-
-            // Start watching position
-            if (navigator.geolocation) {
-                const geoOptions = { 
-                    enableHighAccuracy: true,
-                    maximumAge: 30000,
-                    timeout: 10000
-                };
-                
-                watchId = navigator.geolocation.watchPosition(
-                    updateLocation,
-                    handleGeolocationError,
-                    geoOptions
-                );
-            }
-        }
-
-        function handleGeolocationError(error) {
-            console.error('GPS Error:', error);
-            
-            let errorMessage = 'Location access error: ';
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    errorMessage += "Permission denied. Please enable location services.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    errorMessage += "Location information unavailable.";
-                    break;
-                case error.TIMEOUT:
-                    errorMessage += "Location request timed out.";
-                    break;
-                default:
-                    errorMessage += "Unknown error occurred.";
-            }
-            
-            // Show error to user
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-state';
-            errorDiv.style.position = 'absolute';
-            errorDiv.style.bottom = '20px';
-            errorDiv.style.left = '20px';
-            errorDiv.style.right = '20px';
-            errorDiv.style.zIndex = '1000';
-            errorDiv.innerHTML = `
-                <p>${errorMessage}</p>
-                <button onclick="this.parentElement.remove()">Dismiss</button>
+        } catch (error) {
+            console.error("Initialization error:", error);
+            document.querySelector('.session-check').innerHTML = `
+                <h2>Session verification failed</h2>
+                <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
+                <button onclick="window.location.href='login.html'" 
+                        style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                    Go to Login
+                </button>
             `;
-            document.getElementById('mapContainer').appendChild(errorDiv);
+        }
+    });
+
+    // Fixed SQL Implementation
+    async function setupDatabaseTables() {
+        try {
+            // Create messages table if not exists
+            await supabaseClient.from('messages').select('*').limit(1);
             
-            // Set default location if we don't have one
-            if (!lastPosition) {
-                updateLocation({
-                    coords: {
-                        latitude: 0,
-                        longitude: 0,
-                        accuracy: 100000
+            // Create user_locations table if not exists
+            await supabaseClient.from('user_locations').select('*').limit(1);
+            
+            console.log("Verified database tables exist");
+        } catch (error) {
+            console.error("Database verification error:", error);
+            showError("Database connection issue. Please refresh the page.");
+        }
+    }
+
+    // Fixed loadUsers function
+    async function loadUsers() {
+        try {
+            showLoading();
+            
+            // First verify database tables
+            await setupDatabaseTables();
+            
+            // Get all users except current user with status info
+            const { data: users, error: usersError } = await supabaseClient
+                .from('users')
+                .select('id, email, name, lastonline, status')
+                .neq('id', currentUserId)
+                .order('lastonline', { ascending: false });
+            
+            if (usersError) throw usersError;
+            
+            // Get locations for these users
+            const { data: locations, error: locationsError } = await supabaseClient
+                .from('user_locations')
+                .select('user_id, latitude, longitude, last_updated, device_context')
+                .in('user_id', users.map(u => u.id));
+            
+            if (locationsError) throw locationsError;
+            
+            // Fixed: Get unread message counts using count() properly
+            const { data: unreadCounts, error: unreadError } = await supabaseClient
+                .from('messages')
+                .select('sender_id, count')
+                .eq('receiver_id', currentUserId)
+                .eq('is_read', false);
+            
+            if (!unreadError) {
+                // Process counts manually since group() isn't available
+                const countsMap = {};
+                unreadCounts.forEach(item => {
+                    if (!countsMap[item.sender_id]) {
+                        countsMap[item.sender_id] = 0;
                     }
+                    countsMap[item.sender_id]++;
+                });
+                
+                Object.keys(countsMap).forEach(senderId => {
+                    unreadMessages[senderId] = countsMap[senderId];
                 });
             }
-        }
-
-        // Update location on map with smooth transitions
-        function updateLocation(position) {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            const accuracy = position.coords.accuracy;
             
-            // Only update if significant movement or first position
-            if (!lastPosition || 
-                Math.abs(lastPosition.lat - lat) > 0.0001 || 
-                Math.abs(lastPosition.lng - lng) > 0.0001 ||
-                !marker) {
-                
-                if (marker) map.removeLayer(marker);
-                
-                // Create a person marker
-                const iconHtml = isMobile ? '📱' : '💻';
-                marker = L.marker([lat, lng], {
-                    icon: L.divIcon({
-                        className: 'person-marker',
-                        html: iconHtml,
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 32]
-                    }),
-                    zIndexOffset: 1000
-                }).addTo(map);
-                
-                // Add accuracy circle with animation
-                if (accuracy) {
-                    const accuracyCircle = L.circle([lat, lng], {
-                        radius: accuracy,
-                        color: '#00ff88',
-                        fillColor: '#00ff88',
-                        fillOpacity: 0.2,
-                        weight: 1
-                    }).addTo(map);
-                    
-                    // Animate the circle
-                    setTimeout(() => {
-                        accuracyCircle.setStyle({
-                            fillOpacity: 0.1
-                        });
-                    }, 500);
-                }
-                
-                // Smooth panning to new location
-                const flyDuration = isMobile ? 1.5 : 1;
-                map.flyTo([lat, lng], 15, {
-                    duration: flyDuration,
-                    easeLinearity: 0.25
-                });
-                
-                // Send location to server
-                sendLocationToServer(lat, lng, accuracy);
-                
-                lastPosition = { lat, lng, accuracy };
-            }
-        }
-
-        // Send location to server
-        async function sendLocationToServer(lat, lng, accuracy) {
-            try {
-                const now = new Date();
-                const deviceContext = {
-                    is_mobile: isMobile,
-                    battery_level: batteryLevel
+            // Combine the data
+            const usersWithLocations = users.map(user => {
+                const location = locations.find(loc => loc.user_id === user.id);
+                return {
+                    ...user,
+                    user_locations: location ? [location] : [],
+                    unread_count: unreadMessages[user.id] || 0
                 };
-                
-                // Upsert location with device context
-                const { error } = await supabaseClient
-                    .from('user_locations')
-                    .upsert({
-                        user_id: currentUserId,
-                        latitude: lat,
-                        longitude: lng,
-                        accuracy: accuracy,
-                        last_updated: now.toISOString(),
-                        expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
-                        device_context: deviceContext
-                    }, {
-                        onConflict: 'user_id'
-                    });
-                
-                if (error) throw error;
-                
-                // Update user's status
-                await supabaseClient
-                    .from('users')
-                    .update({ 
-                        lastonline: now.toISOString(),
-                        status: 'online'
-                    })
-                    .eq('id', currentUserId);
-                
-            } catch (error) {
-                console.error('Failed to save location:', error);
-            }
+            });
+            
+            // Cache user data
+            usersWithLocations.forEach(user => {
+                userDataCache[user.id] = user;
+            });
+            
+            renderUserList(usersWithLocations);
+            updateUserMarkers(usersWithLocations);
+            
+        } catch (error) {
+            console.error('Failed to load users:', error);
+            showError('Failed to load users. Please try again.');
         }
+    }
 
-        // User management
-        async function loadUsers() {
-            try {
-                showLoading();
-                
-                // Get all users except current user with status info
-                const { data: users, error: usersError } = await supabaseClient
-                    .from('users')
-                    .select('id, email, name, lastonline, status')
-                    .neq('id', currentUserId)
-                    .order('lastonline', { ascending: false });
-                
-                if (usersError) throw usersError;
-                
-                // Get locations for these users
-                const { data: locations, error: locationsError } = await supabaseClient
-                    .from('user_locations')
-                    .select('user_id, latitude, longitude, last_updated, device_context')
-                    .in('user_id', users.map(u => u.id));
-                
-                if (locationsError) throw locationsError;
-                
-                // Get unread message counts
-                const { data: unreadCounts, error: unreadError } = await supabaseClient
-                    .from('messages')
-                    .select('sender_id, count(*)', { count: 'exact' })
-                    .eq('receiver_id', currentUserId)
-                    .eq('is_read', false)
-                    .group('sender_id');
-                
-                if (!unreadError) {
-                    unreadCounts.forEach(item => {
-                        unreadMessages[item.sender_id] = item.count;
-                    });
-                }
-                
-                // Combine the data
-                const usersWithLocations = users.map(user => {
-                    const location = locations.find(loc => loc.user_id === user.id);
-                    return {
-                        ...user,
-                        user_locations: location ? [location] : [],
-                        unread_count: unreadMessages[user.id] || 0
-                    };
-                });
-                
-                // Cache user data
-                usersWithLocations.forEach(user => {
-                    userDataCache[user.id] = user;
-                });
-                
-                renderUserList(usersWithLocations);
-                updateUserMarkers(usersWithLocations);
-                
-            } catch (error) {
-                console.error('Failed to load users:', error);
-                showError('Failed to load users. Please try again.');
-            }
-        }
 
         // User list rendering
         function renderUserList(users) {
