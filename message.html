@@ -190,28 +190,28 @@
         .logout-button:hover {
             background: rgba(255, 0, 0, 0.3);
         }
-       .user-profile-button {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 20px;
-    cursor: pointer;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 16px;
-    transition: all 0.3s ease;
-}
-
-.user-profile-button:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
-}  
+        .user-profile-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .user-profile-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }  
+        
         /* Chat Styles */
         .chat-container {
             flex: 1;
@@ -368,7 +368,94 @@
             text-shadow: 0 0 8px white, 0 0 8px white;
             filter: drop-shadow(0 0 4px black);
         }
-         
+        
+        /* User Location Marker */
+        .user-marker {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .user-marker.online {
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+        .user-marker.offline {
+            border-color: #666;
+            opacity: 0.7;
+        }
+        .user-marker-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(0, 255, 136, 0.4);
+            animation: pulse 2s infinite;
+            z-index: -1;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.7; }
+            70% { transform: scale(1.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+        .user-marker-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            white-space: nowrap;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .user-marker:hover .user-marker-tooltip {
+            opacity: 1;
+        }
+        
+        /* Location Controls */
+        .location-controls {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+        .location-control {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .location-control:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+        .location-control.active {
+            background: #00ff88;
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -400,9 +487,18 @@
             <button class="logout-button" id="logoutButton">
                 ⬅️ Logout
             </button>
-           <button class="user-profile-button" id="userProfileButton">
-         👤 Account
-           </button>
+            <button class="user-profile-button" id="userProfileButton">
+                👤 Account
+            </button>
+            
+            <div class="location-controls">
+                <button class="location-control" id="centerMapButton" title="Center on my location">
+                    🎯
+                </button>
+                <button class="location-control active" id="toggleUserLocationsButton" title="Toggle team locations">
+                    👥
+                </button>
+            </div>
         </div>
         
         <div class="chat-view" id="chatView">
@@ -433,6 +529,9 @@
         let selectedUser = null, currentUserId = null, session = null;
         let map, marker, lastPosition = null;
         let onlineUsers = {};
+        let userMarkers = {};
+        let showUserLocations = true;
+        let watchId = null;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -485,7 +584,7 @@
                     return;
                 }
 
-                currentUserId = session?.user?.id; // More defensive
+                currentUserId = session?.user?.id;
 
                 // Verify user
                 const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
@@ -497,7 +596,7 @@
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendButton').disabled = false;
 
-                // Initialize map
+                // Initialize map with more detailed settings
                 initializeMap();
                 
                 // Load users and setup event listeners
@@ -518,74 +617,118 @@
             }
         });
 
-        // Initialize the map
+        // Initialize the map with enhanced settings
         function initializeMap() {
             map = L.map('map', {
                 zoomControl: true,
                 maxZoom: 18,
-                minZoom: 2
+                minZoom: 2,
+                preferCanvas: true // Better performance for many markers
             }).setView([0, 0], 2);
 
-            // Add default OpenStreetMap layer
+            // Add default OpenStreetMap layer with dark theme
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
+                attribution: '© OpenStreetMap',
+                detectRetina: true
             }).addTo(map);
 
-            // Start watching position
+            // Add a dark mode tile layer option
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© CartoDB'
+            }).addTo(map);
+
+            // Start watching position with optimized settings
             if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(
+                watchId = navigator.geolocation.watchPosition(
                     updateLocation,
                     err => console.error('GPS Error:', err),
-                    { enableHighAccuracy: true }
+                    { 
+                        enableHighAccuracy: true,
+                        maximumAge: 30000, // Accept cached position up to 30 seconds old
+                        timeout: 10000 // Timeout after 10 seconds
+                    }
                 );
             }
         }
 
-        // Update location on map
+        // Update location on map with enhanced features
         function updateLocation(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
             
-            if (!lastPosition || lastPosition.lat !== lat || lastPosition.lng !== lng) {
+            // Only update if significant movement or first position
+            if (!lastPosition || 
+                Math.abs(lastPosition.lat - lat) > 0.0001 || 
+                Math.abs(lastPosition.lng - lng) > 0.0001 ||
+                !marker) {
+                
                 if (marker) marker.remove();
                 
+                // Create a more sophisticated marker
                 marker = L.marker([lat, lng], {
                     icon: L.divIcon({
                         className: 'emoji-marker',
                         html: '📍',
                         iconSize: [32, 32],
                         iconAnchor: [16, 32]
-                    })
+                    }),
+                    zIndexOffset: 1000
                 }).addTo(map);
                 
-                map.setView([lat, lng], 15);
+                // Add accuracy circle
+                if (accuracy) {
+                    L.circle([lat, lng], {
+                        radius: accuracy,
+                        color: '#00ff88',
+                        fillColor: '#00ff88',
+                        fillOpacity: 0.2,
+                        weight: 1
+                    }).addTo(map);
+                }
                 
-                // Send location to server
-                sendLocationToServer(lat, lng);
+                // Smooth panning to new location
+                map.flyTo([lat, lng], 15, {
+                    duration: 1,
+                    easeLinearity: 0.25
+                });
                 
-                lastPosition = { lat, lng };
+                // Send location to server with optimized frequency
+                sendLocationToServer(lat, lng, accuracy);
+                
+                lastPosition = { lat, lng, accuracy };
             }
         }
 
-        // Send location to server
-        async function sendLocationToServer(lat, lng) {
+        // Send location to server with optimized payload
+        async function sendLocationToServer(lat, lng, accuracy) {
             try {
                 const deviceId = getDeviceId();
+                const now = new Date();
+                
+                // Upsert location to minimize database writes
                 const { data, error } = await supabaseClient
-                    .from('gps_locations')
-                    .insert([{
-                        device_id: deviceId,
+                    .from('user_locations')
+                    .upsert({
+                        user_id: currentUserId,
                         latitude: lat,
                         longitude: lng,
-                        user_id: currentUserId
-                    }]);
+                        accuracy: accuracy,
+                        last_updated: now.toISOString(),
+                        expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString() // 5 minute TTL
+                    }, {
+                        onConflict: 'user_id'
+                    });
                 
                 if (error) throw error;
                 
                 // Update user's last online time
                 await supabaseClient
                     .from('users')
-                    .update({ lastonline: new Date().toISOString() })
+                    .update({ 
+                        lastonline: now.toISOString(),
+                        status: 'online'
+                    })
                     .eq('id', currentUserId);
                 
             } catch (error) {
@@ -603,20 +746,31 @@
             return deviceId;
         }
 
-        // User management
+        // User management with location data
         async function loadUsers() {
             try {
                 showLoading();
                 
-                const { data: users, error } = await supabaseClient
+                // Get users with their latest location data
+                const { data: usersWithLocations, error } = await supabaseClient
                     .from('users')
-                    .select('*')
+                    .select(`
+                        *,
+                        user_locations (
+                            latitude,
+                            longitude,
+                            last_updated
+                        )
+                    `)
                     .neq('id', currentUserId)
                     .order('lastonline', { ascending: false });
                 
                 if (error) throw error;
                 
-                renderUserList(users);
+                renderUserList(usersWithLocations);
+                
+                // Update user markers on map
+                updateUserMarkers(usersWithLocations);
                 
             } catch (error) {
                 console.error('Failed to load users:', error);
@@ -624,6 +778,7 @@
             }
         }
 
+        // Render user list with enhanced status information
         function renderUserList(users) {
             const userList = document.getElementById('userList');
             userList.innerHTML = '';
@@ -638,6 +793,10 @@
                 let isOnline = onlineUsers[user.id] || false;
                 let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 
+                // Check if user has location data
+                const hasLocation = user.user_locations && user.user_locations.length > 0;
+                const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
+                
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${isOnline ? 'online' : ''}`;
                 userCard.dataset.userId = user.id;
@@ -648,7 +807,7 @@
                         class="user-avatar" alt="${user.name}">
                     <div class="user-info">
                         <h4>${user.name}</h4>
-                        <p>${statusText}</p>
+                        <p>${statusText}${hasLocation ? ' • ' + formatDistance(locationTime) + ' ago' : ''}</p>
                     </div>
                     <div class="status-indicator ${isOnline ? 'online' : 'offline'}"></div>
                 `;
@@ -657,6 +816,72 @@
             });
 
             setupSearch();
+        }
+
+        // Update user markers on the map
+        function updateUserMarkers(users) {
+            // Clear existing markers except our own
+            Object.keys(userMarkers).forEach(userId => {
+                if (userId !== currentUserId && userMarkers[userId]) {
+                    map.removeLayer(userMarkers[userId]);
+                    delete userMarkers[userId];
+                }
+            });
+
+            // Add new markers
+            users.forEach(user => {
+                if (user.id === currentUserId) return; // Skip our own marker
+                
+                const hasLocation = user.user_locations && user.user_locations.length > 0;
+                const isOnline = onlineUsers[user.id] || false;
+                
+                if (hasLocation && showUserLocations) {
+                    const location = user.user_locations[0];
+                    const lastUpdated = new Date(location.last_updated);
+                    const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000; // 5 minutes
+                    
+                    // Create custom marker with user avatar and status
+                    const marker = L.marker([location.latitude, location.longitude], {
+                        icon: L.divIcon({
+                            className: 'user-marker ' + (isOnline && isRecent ? 'online' : 'offline'),
+                            html: `
+                                <div class="user-marker-tooltip">
+                                    ${user.name}${!isRecent ? ' (last seen ' + formatDistance(lastUpdated) + ' ago)' : ''}
+                                </div>
+                                <div class="user-marker-inner">
+                                    ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                    ${isOnline && isRecent ? '<div class="user-marker-pulse"></div>' : ''}
+                                </div>
+                            `,
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 40]
+                        }),
+                        zIndexOffset: 900,
+                        title: user.name
+                    }).addTo(map);
+                    
+                    // Store reference to marker
+                    userMarkers[user.id] = marker;
+                    
+                    // Add click handler to center on user
+                    marker.on('click', () => {
+                        map.flyTo([location.latitude, location.longitude], 15, {
+                            duration: 0.5
+                        });
+                    });
+                }
+            });
+        }
+
+        // Helper to format time distance
+        function formatDistance(date) {
+            if (!date) return 'unknown';
+            
+            const diff = (Date.now() - new Date(date)) / 1000;
+            if (diff < 60) return `${Math.floor(diff)}s`;
+            if (diff < 3600) return `${Math.floor(diff/60)}m`;
+            if (diff < 86400) return `${Math.floor(diff/3600)}h`;
+            return `${Math.floor(diff/86400)}d`;
         }
 
         function setupSearch() {
@@ -712,59 +937,77 @@
                 
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
+                // Mark messages as read
+                await markMessagesAsRead(userId);
+                
             } catch (error) {
                 console.error('Failed to load messages:', error);
                 showError('Failed to load messages. Please try again.');
             }
         }
 
-        async function sendMessage(receiverId, content) {
-    // 1. Add authentication check FIRST
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (!user || authError) {
-        alert("⚠️ You're not properly logged in. Please refresh the page and log in again.");
-        console.error("Auth error:", authError);
-        return;
-    }
-    console.log("Sending message as user:", user.id); // Debug log
-
-    try {
-        showSendLoading();
-        
-        // 2. Use user.id instead of currentUserId
-        const { data: message, error } = await supabaseClient
-            .from('messages')
-            .insert([{
-                sender_id: user.id,  // CHANGED FROM currentUserId
-                receiver_id: receiverId,
-                content: content
-            }])
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        // 3. Update lastonline using user.id
-        addMessageToChat(content, true, new Date().toISOString());
-        
-        await supabaseClient
-            .from('users')
-            .update({ lastonline: new Date().toISOString() })
-            .eq('id', user.id);  // CHANGED FROM currentUserId
-        
-    } catch (error) {
-        console.error('Failed to send message:', error);
-        showError('Failed to send message: ' + error.message);
-        
-        // 4. Additional debug for RLS errors
-        if (error.message.includes('row-level security')) {
-            console.log("RLS Policy Violation - Current User:", user);
-            console.log("Attempted to send to:", receiverId);
+        async function markMessagesAsRead(userId) {
+            try {
+                const { error } = await supabaseClient
+                    .from('messages')
+                    .update({ 
+                        is_read: true,
+                        read_at: new Date().toISOString()
+                    })
+                    .eq('receiver_id', currentUserId)
+                    .eq('sender_id', userId)
+                    .eq('is_read', false);
+                
+                if (error) throw error;
+            } catch (error) {
+                console.error('Failed to mark messages as read:', error);
+            }
         }
-    } finally {
-        hideSendLoading();
-    }
-}
+
+        async function sendMessage(receiverId, content) {
+            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+            if (!user || authError) {
+                alert("⚠️ You're not properly logged in. Please refresh the page and log in again.");
+                console.error("Auth error:", authError);
+                return;
+            }
+
+            try {
+                showSendLoading();
+                
+                const { data: message, error } = await supabaseClient
+                    .from('messages')
+                    .insert([{
+                        sender_id: user.id,
+                        receiver_id: receiverId,
+                        content: content,
+                        status: 'delivered'
+                    }])
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+                
+                addMessageToChat(content, true, new Date().toISOString());
+                
+                await supabaseClient
+                    .from('users')
+                    .update({ lastonline: new Date().toISOString() })
+                    .eq('id', user.id);
+                
+            } catch (error) {
+                console.error('Failed to send message:', error);
+                showError('Failed to send message: ' + error.message);
+                
+                if (error.message.includes('row-level security')) {
+                    console.log("RLS Policy Violation - Current User:", user);
+                    console.log("Attempted to send to:", receiverId);
+                }
+            } finally {
+                hideSendLoading();
+            }
+        }
+
         function addMessageToChat(content, isSent, timestamp) {
             const messagesContainer = document.getElementById('chatMessages');
             
@@ -804,7 +1047,7 @@
                 onlineUsers[userId] = true;
             });
             
-            // Update UI
+            // Update UI in user list
             document.querySelectorAll('.user-card').forEach(card => {
                 const userId = card.dataset.userId;
                 const isOnline = onlineUsers[userId] || false;
@@ -817,6 +1060,17 @@
                     if (statusText) {
                         statusText.textContent = isOnline ? 'Online' : 'Offline';
                     }
+                }
+            });
+            
+            // Update markers on map
+            Object.keys(userMarkers).forEach(userId => {
+                const marker = userMarkers[userId];
+                if (marker) {
+                    const isOnline = onlineUsers[userId] || false;
+                    const icon = marker.getIcon();
+                    icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
+                    marker.setIcon(icon);
                 }
             });
         }
@@ -947,9 +1201,9 @@
             });
             
             // User profile button
-document.getElementById('userProfileButton').addEventListener('click', () => {
-    window.location.href = 'accounts.html';
-});
+            document.getElementById('userProfileButton').addEventListener('click', () => {
+                window.location.href = 'accounts.html';
+            });
 
             // Back to map button
             document.getElementById('backToMapButton').addEventListener('click', () => {
@@ -963,6 +1217,10 @@ document.getElementById('userProfileButton').addEventListener('click', () => {
                         await supabaseClient.removeChannel(presenceChannel);
                     }
                     
+                    if (watchId && navigator.geolocation) {
+                        navigator.geolocation.clearWatch(watchId);
+                    }
+                    
                     await supabaseClient.auth.signOut();
                     localStorage.clear();
                     window.location.href = 'login.html';
@@ -970,9 +1228,37 @@ document.getElementById('userProfileButton').addEventListener('click', () => {
                     console.error('Logout error:', error);
                 }
             });
+            
+            // Center map button
+            document.getElementById('centerMapButton').addEventListener('click', () => {
+                if (lastPosition && marker) {
+                    map.flyTo([lastPosition.lat, lastPosition.lng], 15, {
+                        duration: 0.5
+                    });
+                }
+            });
+            
+            // Toggle user locations button
+            document.getElementById('toggleUserLocationsButton').addEventListener('click', () => {
+                showUserLocations = !showUserLocations;
+                document.getElementById('toggleUserLocationsButton').classList.toggle('active', showUserLocations);
+                
+                if (showUserLocations) {
+                    // Reload users to show their locations
+                    loadUsers();
+                } else {
+                    // Remove all user markers except our own
+                    Object.keys(userMarkers).forEach(userId => {
+                        if (userId !== currentUserId && userMarkers[userId]) {
+                            map.removeLayer(userMarkers[userId]);
+                            delete userMarkers[userId];
+                        }
+                    });
+                }
+            });
         }
 
-        // Initialize realtime functionality
+        // Initialize realtime functionality with enhanced features
         async function initializeRealtime() {
             updateConnectionStatus("Connecting to real-time service...");
             
@@ -982,10 +1268,13 @@ document.getElementById('userProfileButton').addEventListener('click', () => {
                     supabaseClient.removeChannel(presenceChannel);
                 }
 
+                // Presence channel for online status
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         presence: { 
-                            key: currentUserId
+                            key: currentUserId,
+                            // Only send presence updates every 30 seconds to reduce load
+                            heartbeatIntervalMs: 30000
                         } 
                     }
                 })
@@ -1025,6 +1314,7 @@ document.getElementById('userProfileButton').addEventListener('click', () => {
                         setTimeout(initializeRealtime, 5000);
                     });
 
+                // Messages channel
                 const messagesChannel = supabaseClient.channel('messages-channel')
                     .on('postgres_changes', {
                         event: 'INSERT',
@@ -1049,6 +1339,61 @@ document.getElementById('userProfileButton').addEventListener('click', () => {
                         }
                     });
 
+                // User locations channel - NEW for real-time location updates
+                const locationsChannel = supabaseClient.channel('locations-channel')
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'user_locations'
+                    }, (payload) => {
+                        // Only update if we're showing user locations
+                        if (showUserLocations && payload.new.user_id !== currentUserId) {
+                            // Check if we already have a marker for this user
+                            const existingMarker = userMarkers[payload.new.user_id];
+                            const isOnline = onlineUsers[payload.new.user_id] || false;
+                            
+                            if (existingMarker) {
+                                // Update existing marker position
+                                existingMarker.setLatLng([payload.new.latitude, payload.new.longitude]);
+                                
+                                // Update marker style based on online status
+                                const icon = existingMarker.getIcon();
+                                icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
+                                existingMarker.setIcon(icon);
+                            } else {
+                                // Create new marker if we don't have one
+                                const user = Object.values(onlineUsers).find(u => u.id === payload.new.user_id);
+                                if (user) {
+                                    const marker = L.marker([payload.new.latitude, payload.new.longitude], {
+                                        icon: L.divIcon({
+                                            className: `user-marker ${isOnline ? 'online' : 'offline'}`,
+                                            html: `
+                                                <div class="user-marker-tooltip">
+                                                    ${user.name}
+                                                </div>
+                                                <div class="user-marker-inner">
+                                                    ${user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                                    ${isOnline ? '<div class="user-marker-pulse"></div>' : ''}
+                                                </div>
+                                            `,
+                                            iconSize: [40, 40],
+                                            iconAnchor: [20, 40]
+                                        }),
+                                        zIndexOffset: 900
+                                    }).addTo(map);
+                                    
+                                    userMarkers[payload.new.user_id] = marker;
+                                }
+                            }
+                        }
+                    })
+                    .subscribe((status, error) => {
+                        if (error) {
+                            console.error('Locations channel error:', error);
+                            setTimeout(initializeRealtime, 5000);
+                        }
+                    });
+
             } catch (error) {
                 console.error("Realtime connection error:", error);
                 updateConnectionStatus("Realtime failed: " + error.message, true);
@@ -1063,9 +1408,17 @@ document.getElementById('userProfileButton').addEventListener('click', () => {
                     await supabaseClient.removeChannel(presenceChannel);
                 }
                 
+                if (watchId && navigator.geolocation) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+                
+                // Mark user as offline
                 await supabaseClient
                     .from('users')
-                    .update({ lastonline: new Date().toISOString() })
+                    .update({ 
+                        lastonline: new Date().toISOString(),
+                        status: 'offline'
+                    })
                     .eq('id', currentUserId);
             } catch (error) {
                 console.error('Cleanup error:', error);
