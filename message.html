@@ -966,7 +966,7 @@
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendButton').disabled = false;
 
-                // Initialize map
+                // Initialize map with satellite view by default on mobile
                 initializeMap();
                 
                 // Load users and setup event listeners
@@ -1028,7 +1028,7 @@
             }
         }
 
-        // Initialize the map
+        // Initialize the map with satellite view by default on mobile
         function initializeMap() {
             const mapOptions = {
                 zoomControl: true,
@@ -1042,11 +1042,19 @@
             
             map = L.map('map', mapOptions).setView([0, 0], 2);
 
-            // Add default OpenStreetMap layer with dark theme
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap',
-                detectRetina: true
-            }).addTo(map);
+            // Add satellite layer by default on mobile
+            if (isMobile) {
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                    detectRetina: true
+                }).addTo(map);
+            } else {
+                // Add default OpenStreetMap layer with dark theme for desktop
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap',
+                    detectRetina: true
+                }).addTo(map);
+            }
 
             // Start watching position
             if (navigator.geolocation) {
@@ -1066,8 +1074,38 @@
 
         function handleGeolocationError(error) {
             console.error('GPS Error:', error);
-            // Default to a reasonable location if geolocation fails
-            if (!marker) {
+            
+            let errorMessage = 'Location access error: ';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage += "Permission denied. Please enable location services.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage += "Location information unavailable.";
+                    break;
+                case error.TIMEOUT:
+                    errorMessage += "Location request timed out.";
+                    break;
+                default:
+                    errorMessage += "Unknown error occurred.";
+            }
+            
+            // Show error to user
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-state';
+            errorDiv.style.position = 'absolute';
+            errorDiv.style.bottom = '20px';
+            errorDiv.style.left = '20px';
+            errorDiv.style.right = '20px';
+            errorDiv.style.zIndex = '1000';
+            errorDiv.innerHTML = `
+                <p>${errorMessage}</p>
+                <button onclick="this.parentElement.remove()">Dismiss</button>
+            `;
+            document.getElementById('mapContainer').appendChild(errorDiv);
+            
+            // Set default location if we don't have one
+            if (!lastPosition) {
                 updateLocation({
                     coords: {
                         latitude: 0,
@@ -1178,33 +1216,33 @@
 
         // User management
         async function loadUsers() {
-    try {
-        showLoading();
-        
-        // PROPER SUPABASE CLIENT USAGE - Option 2 implementation
-        const { data: users, error: usersError } = await supabaseClient
-            .from('users')
-            .select('id, email, name, lastonline, status')
-            .neq('id', currentUserId)  // This excludes the current user
-            .order('lastonline', { ascending: false });
-        
-        if (usersError) throw usersError;
-        
-        // Rest of the existing code remains the same...
-        const { data: locations, error: locationsError } = await supabaseClient
-            .from('user_locations')
-            .select('user_id, latitude, longitude, last_updated, device_context')
-            .in('user_id', users.map(u => u.id));
+            try {
+                showLoading();
+                
+                // Get all users except current user with status info
+                const { data: users, error: usersError } = await supabaseClient
+                    .from('users')
+                    .select('id, email, name, lastonline, status')
+                    .neq('id', currentUserId)
+                    .order('lastonline', { ascending: false });
+                
+                if (usersError) throw usersError;
+                
+                // Get locations for these users
+                const { data: locations, error: locationsError } = await supabaseClient
+                    .from('user_locations')
+                    .select('user_id, latitude, longitude, last_updated, device_context')
+                    .in('user_id', users.map(u => u.id));
                 
                 if (locationsError) throw locationsError;
                 
                 // Get unread message counts
                 const { data: unreadCounts, error: unreadError } = await supabaseClient
-                .from('messages')
-                .select('sender_id, count(*)', { count: 'exact' })
-                .eq('receiver_id', currentUserId)
-                .eq('is_read', false)
-                .group('sender_id');
+                    .from('messages')
+                    .select('sender_id, count(*)', { count: 'exact' })
+                    .eq('receiver_id', currentUserId)
+                    .eq('is_read', false)
+                    .group('sender_id');
                 
                 if (!unreadError) {
                     unreadCounts.forEach(item => {
@@ -1413,7 +1451,10 @@
                     .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`)
                     .order('created_at', { ascending: true });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Message load error:', error);
+                    throw error;
+                }
                 
                 messagesContainer.innerHTML = '';
                 if (messages.length === 0) {
@@ -2141,68 +2182,91 @@
                 }
             }
             
-            /* Prevent body scrolling when sidebar is open on mobile */
+            /* Prevent body scrolling
+               /* Prevent body scrolling on mobile when sidebar is open */
             body.sidebar-open {
                 overflow: hidden;
-                position: fixed;
-                width: 100%;
-                height: 100%;
+            }
+            
+            /* Map controls positioning for mobile */
+            .map-controls-mobile {
+                position: absolute;
+                bottom: 20px;
+                right: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                z-index: 1000;
+            }
+            
+            /* Disable text selection on buttons */
+            button {
+                user-select: none;
+                -webkit-user-select: none;
+            }
+            
+            /* Better touch targets for mobile */
+            @media (max-width: 480px) {
+                .sidebar-toggle, 
+                .back-to-map,
+                .logout-button,
+                .user-profile-button {
+                    padding: 12px 18px;
+                    font-size: 14px;
+                }
+                
+                .location-control {
+                    width: 44px;
+                    height: 44px;
+                    font-size: 20px;
+                }
             }
         `;
         document.head.appendChild(mobileStyles);
 
-        // Handle sidebar state for mobile
-        const sidebar = document.getElementById('sidebar');
-        sidebar.addEventListener('transitionend', () => {
-            if (isMobile) {
-                document.body.classList.toggle('sidebar-open', !sidebar.classList.contains('collapsed'));
-            }
-        });
+        // SQL Implementation for Database Setup
+        const setupDatabase = async () => {
+            try {
+                // Create tables if they don't exist
+                await supabaseClient.rpc(`
+                    CREATE TABLE IF NOT EXISTS public.messages (
+                        id bigserial PRIMARY KEY,
+                        sender_id uuid NOT NULL REFERENCES public.users(id),
+                        receiver_id uuid NOT NULL REFERENCES public.users(id),
+                        content text NOT NULL,
+                        created_at timestamptz DEFAULT now(),
+                        is_read boolean DEFAULT false,
+                        status text DEFAULT 'sent',
+                        read_at timestamptz,
+                        updated_at timestamptz DEFAULT now(),
+                        delivered_at timestamptz,
+                        message_type text DEFAULT 'text',
+                        metadata jsonb
+                    );
+                    
+                    CREATE TABLE IF NOT EXISTS public.user_locations (
+                        user_id uuid PRIMARY KEY REFERENCES public.users(id),
+                        latitude double precision NOT NULL,
+                        longitude double precision NOT NULL,
+                        accuracy double precision,
+                        last_updated timestamptz NOT NULL DEFAULT now(),
+                        expires_at timestamptz NOT NULL DEFAULT (now() + interval '5 minutes'),
+                        device_context jsonb
+                    );
+                    
+                    CREATE INDEX IF NOT EXISTS idx_messages_sender_receiver ON public.messages(sender_id, receiver_id);
+                    CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at);
+                `);
 
-        // Enhanced error handling for GPS
-        function handleGeolocationError(error) {
-            console.error('Geolocation error:', error);
-            
-            let errorMessage = 'Location access error: ';
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    errorMessage += "Permission denied. Please enable location services.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    errorMessage += "Location information unavailable.";
-                    break;
-                case error.TIMEOUT:
-                    errorMessage += "Location request timed out.";
-                    break;
-                default:
-                    errorMessage += "Unknown error occurred.";
+                // Set up RLS policies (already shown in your policies table)
+                console.log("Database setup complete");
+            } catch (error) {
+                console.error("Database setup error:", error);
             }
-            
-            // Show error to user
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-state';
-            errorDiv.style.position = 'absolute';
-            errorDiv.style.bottom = '20px';
-            errorDiv.style.left = '20px';
-            errorDiv.style.right = '20px';
-            errorDiv.style.zIndex = '1000';
-            errorDiv.innerHTML = `
-                <p>${errorMessage}</p>
-                <button onclick="this.parentElement.remove()">Dismiss</button>
-            `;
-            document.getElementById('mapContainer').appendChild(errorDiv);
-            
-            // Set default location if we don't have one
-            if (!lastPosition) {
-                updateLocation({
-                    coords: {
-                        latitude: 0,
-                        longitude: 0,
-                        accuracy: 100000
-                    }
-                });
-            }
-        }
+        };
+
+        // Initialize database on first load
+        setupDatabase();
     </script>
 </body>
 </html>
