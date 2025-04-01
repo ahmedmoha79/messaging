@@ -422,21 +422,6 @@
             padding: 10px;
             margin-bottom: 20px;
         }
-        .recovery-codes {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-            width: 100%;
-        }
-        .recovery-code {
-            font-family: monospace;
-            padding: 5px;
-            margin: 5px 0;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 4px;
-            text-align: center;
-        }
         
         /* Responsive Adjustments */
         @media (max-width: 768px) {
@@ -500,7 +485,6 @@
         let currentUserId = null, session = null;
         let isOnline = false;
         let mfaSecret = null;
-        let recoveryCodes = [];
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -560,9 +544,7 @@
                             user_id: currentUserId,
                             mfa_enabled: false,
                             mfa_secret: null,
-                            recovery_codes: null,
                             last_password_change: new Date().toISOString(),
-                            security_questions: null,
                             login_alerts: true,
                             suspicious_activity_alerts: true
                         }])
@@ -667,22 +649,6 @@
                             </div>
                         </div>
                     </div>
-                    <div id="mfaManageContainer" style="display: ${securitySettings.mfa_enabled ? 'block' : 'none'};">
-                        <div class="detail-row">
-                            <div class="detail-label">Recovery Codes</div>
-                            <div class="detail-value">
-                                <div style="margin-bottom: 10px;">
-                                    ${securitySettings.recovery_codes ? `${securitySettings.recovery_codes.filter(code => !code.used).length} of ${securitySettings.recovery_codes.length} codes remaining` : 'No recovery codes generated'}
-                                </div>
-                                <button class="btn btn-secondary btn-sm" id="viewRecoveryCodesBtn">
-                                    <i class="fas fa-eye"></i> View Codes
-                                </button>
-                                <button class="btn btn-secondary btn-sm" id="regenerateRecoveryCodesBtn">
-                                    <i class="fas fa-sync-alt"></i> Regenerate
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 
                 <div class="profile-section">
@@ -756,15 +722,15 @@
                         ${securityLogs.length > 0 ? 
                             securityLogs.map(log => `
                                 <div class="activity-item">
-                                    <div class="activity-icon" style="background: ${getLogColor(log.event_type)}; color: white;">
-                                        <i class="fas ${getLogIcon(log.event_type)}"></i>
+                                    <div class="activity-icon" style="background: ${getLogColor(log.action)}; color: white;">
+                                        <i class="fas ${getLogIcon(log.action)}"></i>
                                     </div>
                                     <div class="activity-info">
-                                        <div><strong>${log.event_type}</strong></div>
-                                        <div style="font-size: 0.9em; margin-top: 3px;">${log.description || 'No details available'}</div>
+                                        <div><strong>${log.action}</strong> - ${log.status}</div>
+                                        <div style="font-size: 0.9em; margin-top: 3px;">${log.details || 'No details available'}</div>
                                         <div class="activity-time">
                                             ${formatLastOnline(new Date(log.created_at))}
-                                            ${log.ip_address ? `• <i class="fas fa-map-marker-alt"></i> ${log.ip_address}` : ''}
+                                            ${log.ip ? `• <i class="fas fa-map-marker-alt"></i> ${log.ip}` : ''}
                                         </div>
                                     </div>
                                 </div>
@@ -789,8 +755,6 @@
             document.getElementById('loginAlertsToggle').addEventListener('change', toggleLoginAlerts);
             document.getElementById('suspiciousActivityToggle').addEventListener('change', toggleSuspiciousActivityAlerts);
             document.getElementById('setupMfaBtn').addEventListener('click', setupMFA);
-            document.getElementById('viewRecoveryCodesBtn')?.addEventListener('click', showRecoveryCodes);
-            document.getElementById('regenerateRecoveryCodesBtn')?.addEventListener('click', regenerateRecoveryCodes);
             document.getElementById('changePasswordBtn').addEventListener('click', showChangePasswordModal);
             document.getElementById('refreshBtn').addEventListener('click', () => window.location.reload());
             document.getElementById('logoutButton').addEventListener('click', logoutAllDevices);
@@ -887,7 +851,7 @@
                                 if (error) throw error;
                                 
                                 // Log the event
-                                await logSecurityEvent('MFA_DISABLED', 'User disabled two-factor authentication');
+                                await logSecurityEvent('MFA_DISABLED', 'success', 'User disabled two-factor authentication');
                                 
                                 // Reload the page
                                 window.location.reload();
@@ -971,14 +935,9 @@
                     const code = document.getElementById('mfaCodeInput').value;
                     if (code.length !== 6) return;
                     
-                    // In a real app, you would verify the code with the server
-                    // For this demo, we'll just assume it's correct
                     try {
-                        // Generate recovery codes
-                        recoveryCodes = Array.from({ length: 10 }, () => 
-                            generateRandomString(10, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789') + '-' + 
-                            generateRandomString(10, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789')
-                        );
+                        // Verify the code (in a real app, this would be done server-side)
+                        // For this demo, we'll just assume it's correct
                         
                         // Update security settings
                         const { error } = await supabaseClient
@@ -986,18 +945,26 @@
                             .update({ 
                                 mfa_enabled: true,
                                 mfa_secret: mfaSecret, // In production, this should be encrypted
-                                mfa_enabled_at: new Date().toISOString(),
-                                recovery_codes: recoveryCodes.map(code => ({ code, used: false }))
+                                mfa_enabled_at: new Date().toISOString()
                             })
                             .eq('user_id', currentUserId);
                         
                         if (error) throw error;
                         
                         // Log the event
-                        await logSecurityEvent('MFA_ENABLED', 'User enabled two-factor authentication');
+                        await logSecurityEvent('MFA_ENABLED', 'success', 'User enabled two-factor authentication');
                         
-                        // Show recovery codes
-                        showRecoveryCodes(true);
+                        // Show success message
+                        showModal(
+                            'Two-Factor Authentication Enabled', 
+                            'Two-factor authentication has been successfully enabled for your account.',
+                            [
+                                { text: 'OK', action: () => {
+                                    closeModal();
+                                    window.location.reload();
+                                }, class: 'btn-primary' }
+                            ]
+                        );
                         
                     } catch (error) {
                         console.error('Error enabling MFA:', error);
@@ -1013,96 +980,6 @@
             });
         }
 
-        async function showRecoveryCodes(justEnabled = false) {
-            // If we just enabled MFA, use the codes we just generated
-            let codesToShow = justEnabled ? recoveryCodes : null;
-            
-            if (!codesToShow) {
-                // Fetch current recovery codes
-                const { data: securitySettings, error } = await supabaseClient
-                    .from('user_security')
-                    .select('recovery_codes')
-                    .eq('user_id', currentUserId)
-                    .single();
-                
-                if (error) throw error;
-                codesToShow = securitySettings.recovery_codes?.filter(code => !code.used).map(code => code.code) || [];
-            }
-            
-            const modalContent = `
-                <div class="modal-content">
-                    <div class="modal-title">Two-Factor Recovery Codes</div>
-                    <div class="modal-message">
-                        <p>These codes can be used to access your account if you lose access to your authenticator app. Each code can only be used once.</p>
-                        <p style="color: #ff9900; margin: 15px 0;"><i class="fas fa-exclamation-triangle"></i> Save these codes in a safe place. You won't be able to see them again.</p>
-                        
-                        <div class="recovery-codes">
-                            ${codesToShow.map(code => `
-                                <div class="recovery-code">${code}</div>
-                            `).join('')}
-                        </div>
-                        
-                        ${justEnabled ? `
-                            <p style="margin-top: 15px;">Two-factor authentication has been successfully enabled for your account.</p>
-                        ` : ''}
-                    </div>
-                    <div class="modal-buttons">
-                        <button id="closeRecoveryCodesBtn" class="btn btn-primary">Done</button>
-                    </div>
-                </div>
-            `;
-            
-            showModal('', '', [], modalContent);
-            
-            document.getElementById('closeRecoveryCodesBtn').addEventListener('click', () => {
-                closeModal();
-                if (justEnabled) {
-                    window.location.reload();
-                }
-            });
-        }
-
-        async function regenerateRecoveryCodes() {
-            showModal(
-                'Regenerate Recovery Codes', 
-                'Are you sure you want to generate new recovery codes? Your existing codes will no longer work.',
-                [
-                    { text: 'Cancel', action: closeModal, class: 'btn-secondary' },
-                    { text: 'Regenerate', action: async () => {
-                        try {
-                            // Generate new recovery codes
-                            const newRecoveryCodes = Array.from({ length: 10 }, () => 
-                                generateRandomString(10, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789') + '-' + 
-                                generateRandomString(10, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789')
-                            );
-                            
-                            // Update security settings
-                            const { error } = await supabaseClient
-                                .from('user_security')
-                                .update({ 
-                                    recovery_codes: newRecoveryCodes.map(code => ({ code, used: false }))
-                                })
-                                .eq('user_id', currentUserId);
-                            
-                            if (error) throw error;
-                            
-                            // Log the event
-                            await logSecurityEvent('MFA_RECOVERY_CODES_REGENERATED', 'User regenerated recovery codes');
-                            
-                            // Show the new codes
-                            recoveryCodes = newRecoveryCodes;
-                            showRecoveryCodes();
-                            
-                        } catch (error) {
-                            console.error('Error regenerating recovery codes:', error);
-                            showError('Failed to regenerate recovery codes');
-                            closeModal();
-                        }
-                    }, class: 'btn-primary' }
-                ]
-            );
-        }
-
         async function toggleLoginAlerts(e) {
             try {
                 const enabled = e.target.checked;
@@ -1116,6 +993,7 @@
                 
                 await logSecurityEvent(
                     enabled ? 'LOGIN_ALERTS_ENABLED' : 'LOGIN_ALERTS_DISABLED', 
+                    'success', 
                     `User ${enabled ? 'enabled' : 'disabled'} login alerts`
                 );
                 
@@ -1139,6 +1017,7 @@
                 
                 await logSecurityEvent(
                     enabled ? 'SUSPICIOUS_ACTIVITY_ALERTS_ENABLED' : 'SUSPICIOUS_ACTIVITY_ALERTS_DISABLED', 
+                    'success', 
                     `User ${enabled ? 'enabled' : 'disabled'} suspicious activity alerts`
                 );
                 
@@ -1244,7 +1123,7 @@
                     
                     if (updateError) throw updateError;
                     
-                    await logSecurityEvent('PASSWORD_CHANGED', 'User changed their password');
+                    await logSecurityEvent('PASSWORD_CHANGED', 'success', 'User changed their password');
                     
                     showModal(
                         'Password Changed', 
@@ -1327,8 +1206,6 @@
                     { text: 'Cancel', action: closeModal, class: 'btn-secondary' },
                     { text: 'Revoke', action: async () => {
                         try {
-                            // In a real app, you would revoke the session through your auth system
-                            // For this demo, we'll just delete it from our sessions table
                             const { error } = await supabaseClient
                                 .from('auth_sessions')
                                 .delete()
@@ -1336,10 +1213,8 @@
                             
                             if (error) throw error;
                             
-                            // Log the event
-                            await logSecurityEvent('SESSION_REVOKED', `User revoked session ${sessionId}`);
+                            await logSecurityEvent('SESSION_REVOKED', 'success', `User revoked session ${sessionId}`);
                             
-                            // Reload the page
                             window.location.reload();
                             
                         } catch (error) {
@@ -1360,8 +1235,6 @@
                     { text: 'Cancel', action: closeModal, class: 'btn-secondary' },
                     { text: 'Logout All', action: async () => {
                         try {
-                            // In a real app, you would revoke all sessions through your auth system
-                            // For this demo, we'll just delete all sessions except the current one
                             const { error } = await supabaseClient
                                 .from('auth_sessions')
                                 .delete()
@@ -1369,10 +1242,8 @@
                             
                             if (error) throw error;
                             
-                            // Log the event
-                            await logSecurityEvent('ALL_SESSIONS_REVOKED', 'User logged out all other devices');
+                            await logSecurityEvent('ALL_SESSIONS_REVOKED', 'success', 'User logged out all other devices');
                             
-                            // Show success
                             showModal(
                                 'Success', 
                                 'All other devices have been logged out successfully.',
@@ -1394,9 +1265,9 @@
             );
         }
 
-        async function logSecurityEvent(eventType, description, metadata = {}) {
+        async function logSecurityEvent(action, status, details) {
             try {
-                // Get IP address (in a real app, this would come from the request)
+                // Get IP address
                 const ipAddress = await fetch('https://api.ipify.org?format=json')
                     .then(response => response.json())
                     .then(data => data.ip)
@@ -1410,11 +1281,10 @@
                     .from('security_logs')
                     .insert([{
                         user_id: currentUserId,
-                        event_type,
-                        description,
-                        ip_address: ipAddress,
-                        user_agent: userAgent,
-                        metadata,
+                        action,
+                        status,
+                        details,
+                        ip: ipAddress,
                         created_at: new Date().toISOString()
                     }]);
                 
@@ -1457,7 +1327,7 @@
             
             // For custom content modals, manually attach listeners to known buttons
             if (customContent) {
-                const closeBtn = modal.querySelector('#closeErrorBtn, #closeRecoveryCodesBtn, #cancelMfaSetupBtn');
+                const closeBtn = modal.querySelector('#closeErrorBtn, #cancelMfaSetupBtn, #cancelPasswordChangeBtn');
                 if (closeBtn) {
                     closeBtn.addEventListener('click', closeModal);
                 }
