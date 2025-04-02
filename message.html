@@ -600,6 +600,44 @@
             color: #000;
         }
 
+        /* Heatmap Controls - New Style */
+        .heatmap-controls {
+            position: absolute;
+            bottom: 80px;
+            right: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+        }
+
+        .heatmap-toggle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(5px);
+        }
+
+        .heatmap-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .heatmap-toggle.active {
+            background: #ff4500;
+            color: white;
+        }
+
         /* App Header - New Component */
         .app-header {
             position: fixed;
@@ -906,6 +944,11 @@
                 right: 24px;
             }
 
+            .heatmap-controls {
+                bottom: 100px;
+                right: 24px;
+            }
+
             .user-card {
                 padding: 12px 16px;
                 margin: 0 12px 8px;
@@ -937,6 +980,12 @@
             }
 
             .map-control {
+                width: 44px;
+                height: 44px;
+                font-size: 18px;
+            }
+
+            .heatmap-toggle {
                 width: 44px;
                 height: 44px;
                 font-size: 18px;
@@ -1012,6 +1061,13 @@
                     💬
                 </button>
             </div>
+            
+            <!-- Heatmap Controls -->
+            <div class="heatmap-controls">
+                <button class="heatmap-toggle" id="toggleHeatmapButton" title="Toggle heatmap view">
+                    🔥
+                </button>
+            </div>
         </div>
         
         <!-- Chat View -->
@@ -1059,10 +1115,12 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script>
         // Configuration and global variables
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
+        const HEATMAP_API_URL = "http://localhost:8000/api/heatmap";
         
         let supabaseClient, presenceChannel, typingTimeout;
         let selectedUser = null, currentUserId = null, session = null;
@@ -1076,6 +1134,8 @@
         let batteryLevel = 100;
         let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         let currentDeviceType = isMobile ? 'mobile' : 'desktop';
+        let heatmapLayer = null;
+        let showHeatmap = false;
 
         // Helper functions
         function getInitials(name) {
@@ -1183,16 +1243,21 @@
                 // Initialize the map with default view
                 map = L.map('map').setView([0, 0], 2);
                 
-                // Add tile layer (using OpenStreetMap as default)
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(map);
-
-                // For mobile devices, use satellite view by default
-                if (isMobile) {
-                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                // Add base map layers
+                const baseLayers = {
+                    "Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    }),
+                    "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                    }).addTo(map);
+                    })
+                };
+
+                // Add default layer (satellite for mobile, street for desktop)
+                if (isMobile) {
+                    baseLayers["Satellite"].addTo(map);
+                } else {
+                    baseLayers["Street Map"].addTo(map);
                 }
 
                 // Initialize user's location marker with device type
@@ -1216,6 +1281,37 @@
             } catch (error) {
                 console.error("Map initialization failed:", error);
                 throw error;
+            }
+        }
+
+        async function loadHeatmapData() {
+            try {
+                const response = await fetch(HEATMAP_API_URL);
+                if (!response.ok) throw new Error('Failed to fetch heatmap data');
+                const heatmapData = await response.json();
+
+                // Remove existing heatmap if any
+                if (heatmapLayer) {
+                    map.removeLayer(heatmapLayer);
+                }
+
+                // Convert Plotly heatmap data to Leaflet-compatible format
+                const heatmapPoints = heatmapData.data[0].z.flatMap((row, y) => 
+                    row.map((value, x) => ({
+                        lat: heatmapData.data[0].y[y],
+                        lng: heatmapData.data[0].x[x],
+                        intensity: value
+                    }))
+                ).filter(point => point.intensity > 0);
+
+                // Create heatmap layer
+                heatmapLayer = L.heatLayer(
+                    heatmapPoints.map(p => [p.lat, p.lng, p.intensity * 10]), // Adjust multiplier for visibility
+                    { radius: 25, blur: 15, maxZoom: 17 }
+                ).addTo(map);
+
+            } catch (error) {
+                console.error('Heatmap load error:', error);
             }
         }
 
@@ -1583,8 +1679,14 @@
         }
 
         function showChatListView() {
-            document.getElementById('sidebar').classList.add('active');
-            document.body.classList.add('sidebar-open');
+            if (isMobile) {
+                document.getElementById('sidebar').classList.add('active');
+                document.body.classList.add('sidebar-open');
+            } else {
+                // For desktop, just show the sidebar (which is always visible) and hide chat view
+                document.getElementById('chatView').classList.remove('active');
+                document.getElementById('mapContainer').classList.remove('hidden');
+            }
         }
 
         async function loadMessages(userId) {
@@ -2106,6 +2208,26 @@
                     });
                 }
             });
+            
+            // Add this new event listener for the heatmap toggle button
+            document.getElementById('toggleHeatmapButton').addEventListener('click', async () => {
+                showHeatmap = !showHeatmap;
+                const button = document.getElementById('toggleHeatmapButton');
+                button.classList.toggle('active', showHeatmap);
+                
+                // Add visual feedback
+                button.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    button.style.transform = '';
+                }, 200);
+                
+                if (showHeatmap) {
+                    await loadHeatmapData();
+                } else if (heatmapLayer) {
+                    map.removeLayer(heatmapLayer);
+                    heatmapLayer = null;
+                }
+            });
         }
 
         // Clean up on page unload
@@ -2117,6 +2239,10 @@
                 
                 if (watchId && navigator.geolocation) {
                     navigator.geolocation.clearWatch(watchId);
+                }
+                
+                if (heatmapLayer) {
+                    map.removeLayer(heatmapLayer);
                 }
                 
                 // Update user status to offline
