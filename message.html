@@ -6,7 +6,6 @@
     <title>Logistics Secure Messaging</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
-        /* Base Styles - Optimized for Mobile First */
         :root {
             --primary: #00ff88;
             --primary-dark: #00cc66;
@@ -50,7 +49,6 @@
             touch-action: manipulation;
         }
 
-        /* App Layout */
         .app-container {
             display: flex;
             height: 100vh;
@@ -59,7 +57,6 @@
             overflow: hidden;
         }
 
-        /* Connection Status - Simplified */
         .connection-status {
             position: fixed;
             top: 10px;
@@ -91,7 +88,6 @@
             color: var(--online);
         }
 
-        /* Sidebar - Mobile Optimized */
         .sidebar {
             position: fixed;
             top: 0;
@@ -174,7 +170,6 @@
             display: none;
         }
 
-        /* User Card - Enhanced */
         .user-card {
             display: flex;
             align-items: center;
@@ -308,7 +303,6 @@
             animation: pulse 1.5s infinite;
         }
 
-        /* Map Container - Improved */
         .map-container {
             flex: 1;
             position: relative;
@@ -322,7 +316,6 @@
             background: #1a1a1a;
         }
 
-        /* Chat View - Redesigned */
         .chat-view {
             position: fixed;
             top: 0;
@@ -516,7 +509,6 @@
             box-shadow: none !important;
         }
 
-        /* Typing Indicator - Improved */
         .typing-indicator {
             position: absolute;
             bottom: calc(100% + 8px);
@@ -562,7 +554,6 @@
             animation: typingPulse 1.4s infinite 0.4s both;
         }
 
-        /* Map Controls - Redesigned */
         .map-controls {
             position: absolute;
             bottom: 20px;
@@ -600,45 +591,6 @@
             color: #000;
         }
 
-        /* Heatmap Controls - New Style */
-        .heatmap-controls {
-            position: absolute;
-            bottom: 80px;
-            right: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            z-index: 1000;
-        }
-
-        .heatmap-toggle {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: 20px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(5px);
-        }
-
-        .heatmap-toggle:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
-        }
-
-        .heatmap-toggle.active {
-            background: #ff4500;
-            color: white;
-        }
-
-        /* App Header - New Component */
         .app-header {
             position: fixed;
             top: 0;
@@ -677,6 +629,10 @@
             justify-content: center;
         }
 
+        .mobile-only {
+            display: none;
+        }
+
         .battery-indicator-header {
             font-size: 14px;
             display: flex;
@@ -687,7 +643,6 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* User Marker - Enhanced */
         .user-marker {
             position: relative;
             width: 44px;
@@ -747,14 +702,12 @@
             opacity: 1;
         }
 
-        /* Current User Marker - Special Styling */
         .current-user-marker {
             border-width: 3px;
             width: 48px;
             height: 48px;
         }
 
-        /* Loading States */
         .loading-state {
             display: flex;
             flex-direction: column;
@@ -774,7 +727,6 @@
             animation: spin 1s linear infinite;
         }
 
-        /* Animations */
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -794,17 +746,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes slideIn {
-            from { transform: translateX(-100%); }
-            to { transform: translateX(0); }
-        }
-
-        @keyframes slideOut {
-            from { transform: translateX(0); }
-            to { transform: translateX(-100%); }
-        }
-
-        /* Mobile Notifications */
         .mobile-notification {
             position: fixed;
             top: 12px;
@@ -864,7 +805,6 @@
             text-overflow: ellipsis;
         }
 
-        /* Session Check */
         .session-check {
             position: fixed;
             top: 0;
@@ -885,7 +825,6 @@
             margin-bottom: 20px;
         }
 
-        /* Error State */
         .error-state {
             display: flex;
             flex-direction: column;
@@ -913,7 +852,6 @@
             box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
         }
 
-        /* Responsive Adjustments */
         @media (min-width: 768px) {
             .app-container {
                 flex-direction: row;
@@ -944,11 +882,6 @@
                 right: 24px;
             }
 
-            .heatmap-controls {
-                bottom: 100px;
-                right: 24px;
-            }
-
             .user-card {
                 padding: 12px 16px;
                 margin: 0 12px 8px;
@@ -957,9 +890,18 @@
             .message-content {
                 max-width: 65%;
             }
+
+            .mobile-only {
+                display: none !important;
+            }
         }
 
-        /* Special adjustments for very small screens */
+        @media (max-width: 767px) {
+            .mobile-only {
+                display: block;
+            }
+        }
+
         @media (max-width: 360px) {
             .user-card {
                 padding: 10px 12px;
@@ -984,33 +926,23 @@
                 height: 44px;
                 font-size: 18px;
             }
-
-            .heatmap-toggle {
-                width: 44px;
-                height: 44px;
-                font-size: 18px;
-            }
         }
 
-        /* Prevent body scrolling when sidebar is open */
         body.sidebar-open {
             overflow: hidden;
         }
     </style>
 </head>
 <body>
-    <!-- Session Check Overlay -->
     <div class="session-check">
         <h2>Checking your session...</h2>
         <div class="loading-spinner"></div>
     </div>
 
-    <!-- Connection Status -->
     <div class="connection-status">Connecting...</div>
     
-    <!-- App Header (Mobile Only) -->
     <div class="app-header">
-        <button class="header-button" id="menuButton">
+        <button class="header-button mobile-only" id="menuButton">
             ☰
         </button>
         <div class="app-title">Team Locations</div>
@@ -1018,15 +950,13 @@
             <div class="battery-indicator-header" id="batteryIndicatorHeader">
                 <span id="batteryLevelHeader">100%</span>
             </div>
-            <button class="header-button" id="accountButton">
+            <button class="header-button mobile-only" id="accountButton">
                 👤
             </button>
         </div>
     </div>
 
-    <!-- Main App Container -->
     <div class="app-container">
-        <!-- Sidebar - User List -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-title">Team Members</div>
@@ -1045,11 +975,9 @@
             </div>
         </div>
         
-        <!-- Map View -->
         <div class="map-container" id="mapContainer">
             <div id="map"></div>
             
-            <!-- Map Controls -->
             <div class="map-controls">
                 <button class="map-control" id="centerMapButton" title="Center on my location">
                     🎯
@@ -1061,16 +989,8 @@
                     💬
                 </button>
             </div>
-            
-            <!-- Heatmap Controls -->
-            <div class="heatmap-controls">
-                <button class="heatmap-toggle" id="toggleHeatmapButton" title="Toggle heatmap view">
-                    🔥
-                </button>
-            </div>
         </div>
         
-        <!-- Chat View -->
         <div class="chat-view" id="chatView">
             <div class="chat-header">
                 <button class="back-button" id="backToChatListButton">
@@ -1099,7 +1019,6 @@
         </div>
     </div>
 
-    <!-- Mobile Notification Container -->
     <div class="mobile-notification" id="mobileNotification">
         <div class="notification-content">
             <div class="notification-avatar" id="notificationAvatar">
@@ -1112,15 +1031,12 @@
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script>
-        // Configuration and global variables
+        // Configuration
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-        const HEATMAP_API_URL = "http://localhost:8000/api/heatmap";
         
         let supabaseClient, presenceChannel, typingTimeout;
         let selectedUser = null, currentUserId = null, session = null;
@@ -1134,15 +1050,13 @@
         let batteryLevel = 100;
         let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         let currentDeviceType = isMobile ? 'mobile' : 'desktop';
-        let heatmapLayer = null;
-        let showHeatmap = false;
 
         // Helper functions
         function getInitials(name) {
             if (!name) return '?';
             const parts = name.split(' ');
             if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-            return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+            return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '').toUpperCase();
         }
 
         function stringToColor(str) {
@@ -1240,10 +1154,8 @@
         // Map functions
         function initializeMap() {
             try {
-                // Initialize the map with default view
                 map = L.map('map').setView([0, 0], 2);
                 
-                // Add base map layers
                 const baseLayers = {
                     "Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -1253,14 +1165,12 @@
                     })
                 };
 
-                // Add default layer (satellite for mobile, street for desktop)
                 if (isMobile) {
                     baseLayers["Satellite"].addTo(map);
                 } else {
                     baseLayers["Street Map"].addTo(map);
                 }
 
-                // Initialize user's location marker with device type
                 marker = L.marker([0, 0], {
                     icon: L.divIcon({
                         className: 'user-marker online current-user-marker',
@@ -1275,43 +1185,11 @@
                     zIndexOffset: 1000
                 }).addTo(map);
 
-                // Start tracking user's location
                 startLocationTracking();
                 
             } catch (error) {
                 console.error("Map initialization failed:", error);
                 throw error;
-            }
-        }
-
-        async function loadHeatmapData() {
-            try {
-                const response = await fetch(HEATMAP_API_URL);
-                if (!response.ok) throw new Error('Failed to fetch heatmap data');
-                const heatmapData = await response.json();
-
-                // Remove existing heatmap if any
-                if (heatmapLayer) {
-                    map.removeLayer(heatmapLayer);
-                }
-
-                // Convert Plotly heatmap data to Leaflet-compatible format
-                const heatmapPoints = heatmapData.data[0].z.flatMap((row, y) => 
-                    row.map((value, x) => ({
-                        lat: heatmapData.data[0].y[y],
-                        lng: heatmapData.data[0].x[x],
-                        intensity: value
-                    }))
-                ).filter(point => point.intensity > 0);
-
-                // Create heatmap layer
-                heatmapLayer = L.heatLayer(
-                    heatmapPoints.map(p => [p.lat, p.lng, p.intensity * 10]), // Adjust multiplier for visibility
-                    { radius: 25, blur: 15, maxZoom: 17 }
-                ).addTo(map);
-
-            } catch (error) {
-                console.error('Heatmap load error:', error);
             }
         }
 
@@ -1322,10 +1200,8 @@
                         const { latitude, longitude, accuracy } = position.coords;
                         lastPosition = { lat: latitude, lng: longitude };
                         
-                        // Update marker position
                         marker.setLatLng([latitude, longitude]);
                         
-                        // Update user location in database
                         try {
                             const { error } = await supabaseClient
                                 .from('user_locations')
@@ -1344,7 +1220,6 @@
                             
                             if (error) throw error;
                             
-                            // Update user's last online status and device type
                             await supabaseClient
                                 .from('users')
                                 .update({ 
@@ -1373,7 +1248,6 @@
         // Database functions
         async function setupDatabaseTables() {
             try {
-                // Verify tables exist by querying them
                 await supabaseClient.from('messages').select('*').limit(1);
                 await supabaseClient.from('user_locations').select('*').limit(1);
                 await supabaseClient.from('users').select('*').limit(1);
@@ -1389,19 +1263,16 @@
             try {
                 showLoading();
                 
-                // First verify database tables
                 await setupDatabaseTables();
                 
-                // Get all users except current user with status info
                 const { data: users, error: usersError } = await supabaseClient
                     .from('users')
-                    .select('id, email, name, lastonline, status, device_type')
+                    .select('id, email, name, lastonline, status, device_type, full_name')
                     .neq('id', currentUserId)
                     .order('lastonline', { ascending: false });
                 
                 if (usersError) throw usersError;
                 
-                // Get locations for these users
                 const { data: locations, error: locationsError } = await supabaseClient
                     .from('user_locations')
                     .select('user_id, latitude, longitude, last_updated, device_context')
@@ -1409,7 +1280,6 @@
                 
                 if (locationsError) throw locationsError;
                 
-                // Get unread message counts
                 const { data: unreadCounts, error: unreadError } = await supabaseClient
                     .from('messages')
                     .select('sender_id')
@@ -1417,7 +1287,6 @@
                     .eq('is_read', false);
                 
                 if (!unreadError) {
-                    // Process counts manually
                     const countsMap = {};
                     unreadCounts.forEach(item => {
                         if (!countsMap[item.sender_id]) {
@@ -1431,7 +1300,6 @@
                     });
                 }
                 
-                // Combine the data
                 const usersWithLocations = users.map(user => {
                     const location = locations.find(loc => loc.user_id === user.id);
                     return {
@@ -1442,7 +1310,6 @@
                     };
                 });
                 
-                // Cache user data
                 usersWithLocations.forEach(user => {
                     userDataCache[user.id] = user;
                 });
@@ -1472,7 +1339,6 @@
                 const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
                 const batteryLevel = user.battery_level;
                 
-                // Determine status text
                 let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
                 if (hasLocation) {
                     statusText += ` • ${formatDistance(locationTime)} ago`;
@@ -1482,11 +1348,11 @@
                 userCard.className = `user-card ${user.unread_count > 0 ? 'has-unread' : ''}`;
                 userCard.dataset.userId = user.id;
                 userCard.innerHTML = `
-                    <div class="user-avatar" style="background: ${stringToColor(user.name)}">
-                        ${getInitials(user.name)}
+                    <div class="user-avatar" style="background: ${stringToColor(user.full_name || user.name)}">
+                        ${getInitials(user.full_name || user.name)}
                     </div>
                     <div class="user-info">
-                        <h4>${user.name}</h4>
+                        <h4>${user.full_name || user.name}</h4>
                         <p>${statusText}</p>
                     </div>
                     <div class="user-status">
@@ -1503,7 +1369,6 @@
                 userList.appendChild(userCard);
             });
 
-            // Setup search functionality
             document.getElementById('searchInput').addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 document.querySelectorAll('.user-card').forEach(card => {
@@ -1514,7 +1379,6 @@
         }
 
         function updateUserMarkers(users) {
-            // Clear existing markers except our own
             Object.keys(userMarkers).forEach(userId => {
                 if (userId !== currentUserId && userMarkers[userId]) {
                     map.removeLayer(userMarkers[userId]);
@@ -1522,7 +1386,6 @@
                 }
             });
 
-            // Add new markers
             users.forEach(user => {
                 if (user.id === currentUserId) return;
                 
@@ -1536,13 +1399,12 @@
                     const lastUpdated = new Date(location.last_updated);
                     const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000;
                     
-                    // Create custom marker with battery info
                     const marker = L.marker([location.latitude, location.longitude], {
                         icon: L.divIcon({
                             className: `user-marker ${isOnline && isRecent ? 'online' : 'offline'}`,
                             html: `
                                 <div class="user-marker-tooltip">
-                                    ${user.name} (${deviceType})${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
+                                    ${user.full_name || user.name} (${deviceType})${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
                                     ${batteryLevel ? ` • Battery: ${batteryLevel}%` : ''}
                                 </div>
                                 <div class="user-marker-inner">
@@ -1554,12 +1416,11 @@
                             iconAnchor: [22, 44]
                         }),
                         zIndexOffset: 900,
-                        title: user.name
+                        title: user.full_name || user.name
                     }).addTo(map);
                     
                     userMarkers[user.id] = marker;
                     
-                    // Add click handler with smooth animation
                     marker.on('click', () => {
                         map.flyTo([location.latitude, location.longitude], 15, {
                             duration: 0.5,
@@ -1571,13 +1432,11 @@
         }
 
         function updateOnlineStatus(userStates) {
-            // Update our online users tracking
             onlineUsers = {};
             Object.keys(userStates).forEach(userId => {
                 onlineUsers[userId] = true;
             });
             
-            // Update UI in user list
             document.querySelectorAll('.user-card').forEach(card => {
                 const userId = card.dataset.userId;
                 const userData = userDataCache[userId];
@@ -1602,7 +1461,6 @@
                 }
             });
             
-            // Update markers on map
             Object.keys(userMarkers).forEach(userId => {
                 const marker = userMarkers[userId];
                 if (marker) {
@@ -1618,7 +1476,6 @@
                 }
             });
 
-            // Update chat partner status if in chat
             if (selectedUser) {
                 const userData = userDataCache[selectedUser.id];
                 const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
@@ -1643,30 +1500,25 @@
             
             selectedUser = { 
                 id: user.id, 
-                name: user.name,
-                avatarColor: stringToColor(user.name),
-                initials: getInitials(user.name)
+                name: user.full_name || user.name,
+                avatarColor: stringToColor(user.full_name || user.name),
+                initials: getInitials(user.full_name || user.name)
             };
             
-            // Update chat header
-            document.getElementById('chatPartnerName').textContent = user.name;
+            document.getElementById('chatPartnerName').textContent = selectedUser.name;
             document.getElementById('chatPartnerAvatar').textContent = selectedUser.initials;
             document.getElementById('chatPartnerAvatar').style.background = selectedUser.avatarColor;
             
-            // Load messages
             await loadMessages(user.id);
             
-            // Show chat view
             document.getElementById('chatView').classList.add('active');
             document.getElementById('mapContainer').classList.add('hidden');
             
-            // Hide sidebar if on mobile
             if (isMobile) {
                 document.getElementById('sidebar').classList.remove('active');
                 document.body.classList.remove('sidebar-open');
             }
             
-            // Clear unread count for this user
             if (unreadMessages[user.id]) {
                 delete unreadMessages[user.id];
                 document.querySelector(`[data-user-id="${user.id}"]`)?.classList.remove('has-unread');
@@ -1683,7 +1535,6 @@
                 document.getElementById('sidebar').classList.add('active');
                 document.body.classList.add('sidebar-open');
             } else {
-                // For desktop, just show the sidebar (which is always visible) and hide chat view
                 document.getElementById('chatView').classList.remove('active');
                 document.getElementById('mapContainer').classList.remove('hidden');
             }
@@ -1717,7 +1568,6 @@
                 
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
-                // Mark messages as read
                 await markMessagesAsRead(userId);
                 
             } catch (error) {
@@ -1824,9 +1674,8 @@
             
             const indicator = document.createElement('div');
             indicator.className = 'typing-indicator active';
-            indicator.innerHTML = `<span>${userData.name} is typing...</span>`;
+            indicator.innerHTML = `<span>${userData.full_name || userData.name} is typing...</span>`;
             
-            // Remove existing indicator if any
             const existingIndicator = document.querySelector('.typing-indicator');
             if (existingIndicator) existingIndicator.remove();
             
@@ -1844,12 +1693,10 @@
             updateConnectionStatus("Connecting to real-time service...");
             
             try {
-                // Remove existing channels if they exist
                 if (presenceChannel) {
                     supabaseClient.removeChannel(presenceChannel);
                 }
 
-                // Presence channel for online status
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         broadcast: { ack: true },
@@ -1883,7 +1730,6 @@
                     }
                 });
 
-                // Handle channel connection events with exponential backoff
                 let reconnectAttempts = 0;
                 
                 presenceChannel.on('close', () => {
@@ -1897,7 +1743,6 @@
                         updateConnectionStatus("Error: " + err.message, true);
                     });
 
-                // Messages channel
                 const messagesChannel = supabaseClient.channel('messages-channel')
                     .on(
                         'postgres_changes',
@@ -1910,19 +1755,16 @@
                         (payload) => {
                             const newMessage = payload.new;
                             
-                            // Update unread count
                             if (!unreadMessages[newMessage.sender_id]) {
                                 unreadMessages[newMessage.sender_id] = 0;
                             }
                             unreadMessages[newMessage.sender_id]++;
                             
-                            // Update UI
                             const userCard = document.querySelector(`[data-user-id="${newMessage.sender_id}"]`);
                             if (userCard) {
                                 userCard.classList.add('has-unread');
                             }
                             
-                            // If currently chatting with this user, show message and mark as read
                             if (selectedUser && selectedUser.id === newMessage.sender_id) {
                                 addMessageToChat(
                                     newMessage.content, 
@@ -1932,14 +1774,12 @@
                                 );
                                 markMessagesAsRead(newMessage.sender_id);
                             } else {
-                                // Show notification for new message
                                 showNotification(newMessage.sender_id, newMessage.content);
                             }
                         }
                     )
                     .subscribe();
 
-                // Locations channel for real-time location updates
                 const locationsChannel = supabaseClient.channel('locations-channel')
                     .on(
                         'postgres_changes',
@@ -1952,10 +1792,8 @@
                             const locationData = payload.new;
                             const userId = locationData.user_id;
                             
-                            // Skip our own updates
                             if (userId === currentUserId) return;
                             
-                            // Update user data cache
                             if (userDataCache[userId]) {
                                 if (!userDataCache[userId].user_locations) {
                                     userDataCache[userId].user_locations = [];
@@ -1971,16 +1809,13 @@
                                     userDataCache[userId].user_locations.push(locationData);
                                 }
 
-                                // Update battery level in cache
                                 userDataCache[userId].battery_level = locationData.device_context?.battery_level || null;
                             }
                             
-                            // Update marker if showing locations
                             if (showUserLocations) {
                                 updateUserMarkers([userDataCache[userId]]);
                             }
                             
-                            // Update status text in user list
                             const userCard = document.querySelector(`[data-user-id="${userId}"]`);
                             if (userCard) {
                                 const statusText = userCard.querySelector('p');
@@ -1997,7 +1832,6 @@
                                     statusText.textContent += ` • ${formatDistance(new Date(locationData.last_updated))} ago`;
                                 }
 
-                                // Update battery indicator
                                 if (batteryIndicator && locationData.device_context?.battery_level) {
                                     const batteryLevel = locationData.device_context.battery_level;
                                     batteryIndicator.textContent = `${batteryLevel}%`;
@@ -2019,12 +1853,11 @@
             const user = userDataCache[userId];
             if (!user) return;
 
-            // Check if notifications are allowed
             if (Notification.permission === 'granted') {
-                new Notification(`New message from ${user.name}`, {
+                new Notification(`New message from ${user.full_name || user.name}`, {
                     body: messageContent.length > 50 ? 
                         messageContent.substring(0, 50) + '...' : messageContent,
-                    icon: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=random'
+                    icon: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.full_name || user.name) + '&background=random'
                 });
             } else if (Notification.permission !== 'denied') {
                 Notification.requestPermission().then(permission => {
@@ -2034,27 +1867,24 @@
                 });
             }
             
-            // Show in-app notification for mobile
             if (isMobile) {
                 const notification = document.getElementById('mobileNotification');
                 const avatar = document.getElementById('notificationAvatar');
                 const name = document.getElementById('notificationName');
                 const message = document.getElementById('notificationMessage');
                 
-                avatar.textContent = getInitials(user.name);
-                avatar.style.background = stringToColor(user.name);
-                name.textContent = user.name;
+                avatar.textContent = getInitials(user.full_name || user.name);
+                avatar.style.background = stringToColor(user.full_name || user.name);
+                name.textContent = user.full_name || user.name;
                 message.textContent = messageContent.length > 30 ? 
                     messageContent.substring(0, 30) + '...' : messageContent;
                 
                 notification.classList.add('active');
                 
-                // Remove after delay
                 setTimeout(() => {
                     notification.classList.remove('active');
                 }, 5000);
                 
-                // Click handler to open chat
                 notification.addEventListener('click', () => {
                     notification.classList.remove('active');
                     if (userDataCache[userId]) {
@@ -2077,7 +1907,6 @@
                     updateBatteryStatus();
                 });
             } else if ('battery' in navigator) {
-                // Fallback for older browsers
                 navigator.battery.addEventListener('levelchange', () => {
                     batteryLevel = Math.round(navigator.battery.level * 100);
                     updateBatteryDisplay();
@@ -2087,7 +1916,6 @@
 
         // Event listeners
         function setupEventListeners() {
-            // Message sending
             document.getElementById('sendButton').addEventListener('click', async () => {
                 const input = document.getElementById('messageInput');
                 const content = input.value.trim();
@@ -2104,7 +1932,6 @@
                 input.focus();
             });
 
-            // Enter key for sending (with shift+enter for new line)
             document.getElementById('messageInput').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -2112,7 +1939,6 @@
                 }
             });
 
-            // Typing indicator
             let isTyping = false;
             let lastTypingTime = 0;
             let typingTimer;
@@ -2145,34 +1971,28 @@
                 }, 1000);
             });
 
-            // Menu button (mobile)
             document.getElementById('menuButton').addEventListener('click', () => {
                 document.getElementById('sidebar').classList.add('active');
                 document.body.classList.add('sidebar-open');
             });
 
-            // Close sidebar button
             document.getElementById('closeSidebar').addEventListener('click', () => {
                 document.getElementById('sidebar').classList.remove('active');
                 document.body.classList.remove('sidebar-open');
             });
 
-            // Open chat list from map
             document.getElementById('openChatListButton').addEventListener('click', () => {
                 showChatListView();
             });
 
-            // Back to chat list from chat view
             document.getElementById('backToChatListButton').addEventListener('click', () => {
                 showChatListView();
             });
 
-            // Account button
             document.getElementById('accountButton').addEventListener('click', () => {
                 window.location.href = 'accounts.html';
             });
 
-            // Center map button with animation
             document.getElementById('centerMapButton').addEventListener('click', () => {
                 if (lastPosition && marker) {
                     map.flyTo([lastPosition.lat, lastPosition.lng], 15, {
@@ -2184,13 +2004,11 @@
                 }
             });
             
-            // Toggle user locations button
             document.getElementById('toggleUserLocationsButton').addEventListener('click', () => {
                 showUserLocations = !showUserLocations;
                 const button = document.getElementById('toggleUserLocationsButton');
                 button.classList.toggle('active', showUserLocations);
                 
-                // Add visual feedback
                 button.style.transform = 'scale(0.95)';
                 setTimeout(() => {
                     button.style.transform = '';
@@ -2199,7 +2017,6 @@
                 if (showUserLocations) {
                     loadUsers();
                 } else {
-                    // Remove all user markers except our own
                     Object.keys(userMarkers).forEach(userId => {
                         if (userId !== currentUserId && userMarkers[userId]) {
                             map.removeLayer(userMarkers[userId]);
@@ -2208,29 +2025,8 @@
                     });
                 }
             });
-            
-            // Add this new event listener for the heatmap toggle button
-            document.getElementById('toggleHeatmapButton').addEventListener('click', async () => {
-                showHeatmap = !showHeatmap;
-                const button = document.getElementById('toggleHeatmapButton');
-                button.classList.toggle('active', showHeatmap);
-                
-                // Add visual feedback
-                button.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    button.style.transform = '';
-                }, 200);
-                
-                if (showHeatmap) {
-                    await loadHeatmapData();
-                } else if (heatmapLayer) {
-                    map.removeLayer(heatmapLayer);
-                    heatmapLayer = null;
-                }
-            });
         }
 
-        // Clean up on page unload
         window.addEventListener('beforeunload', async () => {
             try {
                 if (presenceChannel) {
@@ -2241,11 +2037,6 @@
                     navigator.geolocation.clearWatch(watchId);
                 }
                 
-                if (heatmapLayer) {
-                    map.removeLayer(heatmapLayer);
-                }
-                
-                // Update user status to offline
                 await supabaseClient
                     .from('users')
                     .update({ 
@@ -2259,10 +2050,8 @@
             }
         });
 
-        // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
                         persistSession: true,
@@ -2270,7 +2059,6 @@
                     }
                 });
 
-                // Check session
                 const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
                 if (sessionError) throw sessionError;
                 session = currentSession;
@@ -2282,25 +2070,20 @@
 
                 currentUserId = session.user.id;
 
-                // Verify user
                 const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
                 if (authError) throw authError;
                 if (!user) throw new Error("User verification failed");
 
-                // Show main interface
                 document.querySelector('.session-check').style.display = 'none';
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendButton').disabled = false;
 
-                // Initialize map with satellite view by default on mobile
                 initializeMap();
                 
-                // Load users and setup event listeners
                 await loadUsers();
                 setupEventListeners();
                 initializeRealtime();
 
-                // Set up auth state change listener
                 supabaseClient.auth.onAuthStateChange((event, session) => {
                     if (event === 'SIGNED_OUT') {
                         window.location.href = 'login.html';
@@ -2310,7 +2093,6 @@
                     }
                 });
 
-                // Initialize battery monitoring
                 initBatteryMonitoring();
 
             } catch (error) {
