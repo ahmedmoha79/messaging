@@ -13,7 +13,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "plotly.js": "^2.14.0",
-    "turf": "^6.5.0",
+    "@turf/turf": "^6.5.0"
     "geolib": "^3.3.3",
     "heatmap.js": "^2.0.5",
     "leaflet.heat": "^0.2.0"
