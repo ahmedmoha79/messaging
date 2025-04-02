@@ -2,159 +2,206 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Logistics Secure Messaging</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
-        /* Base Styles */
+        /* Base Styles - Optimized for Mobile First */
+        :root {
+            --primary: #00ff88;
+            --primary-dark: #00cc66;
+            --primary-light: #00ff8855;
+            --danger: #ff4444;
+            --danger-light: #ff444433;
+            --background: #0a0a0a;
+            --surface: #121212;
+            --surface-light: #1e1e1e;
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --text-tertiary: #666666;
+            --border: rgba(255, 255, 255, 0.1);
+            --online: #00ff88;
+            --offline: #666666;
+            --battery-high: #00ff88;
+            --battery-medium: #ffcc00;
+            --battery-low: #ff4444;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
         }
-        
+
         body {
-            background: #0a0a0a;
-            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
             height: 100vh;
             overflow: hidden;
             touch-action: manipulation;
         }
-        
-        /* Connection Status */
-        .connection-status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            z-index: 1000;
-            background: #ff444455;
-            color: #ff4444;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .connection-status.connected {
-            background: #00ff8855;
-            color: #00ff88;
-        }
-        
-        /* App Container */
+
+        /* App Layout */
         .app-container {
             display: flex;
             height: 100vh;
             width: 100vw;
             position: relative;
+            overflow: hidden;
         }
-        
-        /* Sidebar Styles */
-        .sidebar {
-            width: 350px;
-            background: rgba(0, 0, 0, 0.85);
+
+        /* Connection Status - Simplified */
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.7);
+            color: var(--danger);
             backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .connection-status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .connection-status.connected {
+            color: var(--online);
+        }
+
+        /* Sidebar - Mobile Optimized */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--surface);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-out;
             display: flex;
             flex-direction: column;
-            z-index: 100;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-right: 1px solid var(--border);
+            overflow: hidden;
         }
-        
-        .sidebar.collapsed {
-            transform: translateX(-100%);
+
+        .sidebar.active {
+            transform: translateX(0);
         }
-        
-        /* User List Styles */
+
+        .sidebar-header {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 10;
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .close-sidebar {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px;
+            margin-right: -8px;
+        }
+
         .search-bar {
+            padding: 12px 16px;
+            background: var(--surface);
             position: sticky;
             top: 0;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 20;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
         }
-        
+
         .search-input {
             width: 100%;
-            padding: 12px 20px;
+            padding: 12px 16px;
             background: rgba(255, 255, 255, 0.05);
             border: none;
-            border-radius: 8px;
-            color: white;
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
             font-size: 14px;
-            transition: all 0.3s ease;
+            transition: var(--transition);
         }
-        
+
         .search-input:focus {
             outline: none;
             background: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.3);
+            box-shadow: 0 0 0 2px var(--primary-light);
         }
-        
+
         .user-list {
             flex: 1;
             overflow-y: auto;
-            padding: 10px 0;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(0, 255, 136, 0.3) transparent;
+            padding: 8px 0;
+            scrollbar-width: none;
         }
-        
+
         .user-list::-webkit-scrollbar {
-            width: 6px;
+            display: none;
         }
-        
-        .user-list::-webkit-scrollbar-thumb {
-            background-color: rgba(0, 255, 136, 0.3);
-            border-radius: 3px;
-        }
-        
-        .user-list::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        
+
+        /* User Card - Enhanced */
         .user-card {
             display: flex;
             align-items: center;
-            padding: 15px;
-            margin: 0 15px 8px;
-            border-radius: 10px;
+            padding: 12px 16px;
+            margin: 0 8px 8px;
+            border-radius: var(--radius-md);
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            background: rgba(255, 255, 255, 0.02);
+            transition: var(--transition);
+            background: var(--surface-light);
             position: relative;
             overflow: hidden;
         }
-        
+
         .user-card:hover {
             background: rgba(255, 255, 255, 0.05);
-            transform: translateY(-1px);
         }
-        
+
         .user-card.active {
             background: linear-gradient(90deg, rgba(42, 42, 42, 0.8) 0%, rgba(26, 26, 26, 0.8) 100%);
-            border-left: 4px solid #00ff88;
-            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.1);
+            border-left: 4px solid var(--primary);
         }
-        
-        .user-card.active::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.5), transparent);
-        }
-        
+
         .user-avatar {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
-            margin-right: 15px;
+            margin-right: 12px;
             object-fit: cover;
             flex-shrink: 0;
             background: rgba(0, 0, 0, 0.3);
@@ -165,45 +212,52 @@
             font-weight: bold;
             color: white;
         }
-        
+
         .user-info {
             flex: 1;
             min-width: 0;
         }
-        
+
         .user-info h4 {
             font-size: 15px;
             font-weight: 600;
-            margin-bottom: 3px;
+            margin-bottom: 4px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
+
         .user-info p {
             font-size: 13px;
-            opacity: 0.8;
+            color: var(--text-secondary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-        
+
+        .user-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
         .status-indicator {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            margin-left: 15px;
-            background: #666;
-            flex-shrink: 0;
+            background: var(--offline);
             position: relative;
-            transition: all 0.3s ease;
         }
-        
+
         .status-indicator.online {
-            background: #00ff88;
-            box-shadow: 0 0 10px #00ff8855;
+            background: var(--online);
+            box-shadow: 0 0 8px var(--primary-light);
         }
-        
+
         .status-indicator.online::after {
             content: '';
             position: absolute;
@@ -212,377 +266,566 @@
             right: 0;
             bottom: 0;
             border-radius: 50%;
-            background: #00ff88;
+            background: var(--online);
             animation: pulse 2s infinite;
             opacity: 0.4;
             z-index: -1;
         }
-        
-        /* Map Styles */
+
+        .battery-indicator {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .battery-indicator.high {
+            color: var(--battery-high);
+        }
+
+        .battery-indicator.medium {
+            color: var(--battery-medium);
+        }
+
+        .battery-indicator.low {
+            color: var(--battery-low);
+        }
+
+        .new-message-notification {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: none;
+        }
+
+        .user-card.has-unread .new-message-notification {
+            display: block;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Map Container - Improved */
         .map-container {
             flex: 1;
             position: relative;
-            display: block;
+            height: 100%;
+            width: 100%;
         }
-        
-        .map-container.hidden {
-            display: none;
-        }
-        
+
         #map {
             height: 100%;
             width: 100%;
             background: #1a1a1a;
         }
-        
-        /* Chat View Styles */
+
+        /* Chat View - Redesigned */
         .chat-view {
-            flex: 1;
-            position: relative;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--surface);
+            z-index: 900;
             display: none;
             flex-direction: column;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(5px);
         }
-        
+
         .chat-view.active {
             display: flex;
         }
-        
-        /* Control Buttons */
-        .sidebar-toggle, 
-        .back-to-map,
-        .logout-button,
-        .user-profile-button,
-        .location-control {
+
+        .chat-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 10;
+        }
+
+        .back-button {
+            background: none;
             border: none;
+            color: var(--text-primary);
+            font-size: 24px;
             cursor: pointer;
+            padding: 4px;
+            margin-right: 4px;
+        }
+
+        .chat-partner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .chat-partner-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .sidebar-toggle {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            font-weight: bold;
             color: white;
-            padding: 10px 15px;
-            border-radius: 20px;
-            z-index: 1000;
-            gap: 8px;
-        }
-        
-        .sidebar-toggle:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateY(-1px);
-        }
-        
-        .back-to-map {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 20px;
-            z-index: 1000;
-            gap: 8px;
-        }
-        
-        .back-to-map:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateY(-1px);
-        }
-        
-        .logout-button {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 0, 0, 0.2);
-            color: #ff4444;
-            padding: 10px 15px;
-            border-radius: 20px;
-            z-index: 1000;
-            gap: 8px;
-        }
-        
-        .logout-button:hover {
-            background: rgba(255, 0, 0, 0.3);
-            transform: translateY(-1px);
-        }
-        
-        .user-profile-button {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 20px;
-            z-index: 1000;
-            gap: 8px;
             font-size: 16px;
         }
-        
-        .user-profile-button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.05) translateY(-1px);
-        }
-        
-        /* Chat Styles */
-        .chat-container {
+
+        .chat-partner-info {
             flex: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
+            min-width: 0;
         }
-        
-        .chat-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.9);
-            position: sticky;
-            top: 0;
-            z-index: 20;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            backdrop-filter: blur(10px);
-        }
-        
-        .chat-header h2 {
-            font-size: 18px;
+
+        .chat-partner-name {
+            font-size: 16px;
             font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
+
+        .chat-partner-status {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chat-partner-status .status-indicator {
+            width: 8px;
+            height: 8px;
+        }
+
         .chat-messages {
             flex: 1;
-            padding: 20px;
+            padding: 16px;
             overflow-y: auto;
             scroll-behavior: smooth;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(0, 255, 136, 0.3) transparent;
+            scrollbar-width: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
-        
+
         .chat-messages::-webkit-scrollbar {
-            width: 6px;
+            display: none;
         }
-        
-        .chat-messages::-webkit-scrollbar-thumb {
-            background-color: rgba(0, 255, 136, 0.3);
-            border-radius: 3px;
-        }
-        
-        .chat-messages::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        
+
         .message {
             display: flex;
-            margin-bottom: 20px;
-            animation: messageAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            animation: messageAppear 0.3s ease-out forwards;
         }
-        
-        @keyframes messageAppear {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
+
         .message-content {
-            max-width: 70%;
-            padding: 12px 18px;
-            border-radius: 15px;
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
             position: relative;
             word-break: break-word;
             line-height: 1.4;
+            font-size: 15px;
         }
-        
+
         .message.sent {
             justify-content: flex-end;
         }
-        
+
         .message.sent .message-content {
-            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+            background: linear-gradient(135deg, var(--primary) 0%, #00ccff 100%);
             color: #000;
-            border-top-right-radius: 5px;
+            border-bottom-right-radius: 4px;
         }
-        
+
         .message.received .message-content {
             background: rgba(255, 255, 255, 0.1);
-            border-top-left-radius: 5px;
+            border-bottom-left-radius: 4px;
         }
-        
+
+        .message-time {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            display: block;
+            text-align: right;
+            margin-top: 4px;
+        }
+
         .message-input-container {
-            padding: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: flex-end;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.8);
             position: sticky;
             bottom: 0;
             backdrop-filter: blur(10px);
         }
-        
+
         .message-input {
             flex: 1;
-            padding: 15px 20px;
+            padding: 12px 16px;
             background: rgba(255, 255, 255, 0.05);
             border: none;
-            border-radius: 8px;
-            color: white;
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
             resize: none;
-            min-height: 50px;
-            max-height: 150px;
-            transition: all 0.3s ease;
+            min-height: 48px;
+            max-height: 120px;
+            font-size: 15px;
+            transition: var(--transition);
         }
-        
+
         .message-input:focus {
             outline: none;
             background: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.3);
+            box-shadow: 0 0 0 2px var(--primary-light);
         }
-        
+
         .send-button {
-            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+            background: linear-gradient(135deg, var(--primary) 0%, #00ccff 100%);
             border: none;
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             color: #000;
-            padding: 15px 25px;
-            font-weight: bold;
+            padding: 12px 16px;
+            font-weight: 600;
             cursor: pointer;
-            min-height: 50px;
-            transition: all 0.3s ease;
+            min-height: 48px;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        
+
         .send-button:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
         }
-        
+
         .send-button:disabled {
             opacity: 0.7;
             transform: none !important;
             box-shadow: none !important;
         }
-        
+
+        /* Typing Indicator - Improved */
         .typing-indicator {
             position: absolute;
-            top: -25px;
-            left: 20px;
-            font-size: 0.9em;
-            color: #00ff88;
+            bottom: calc(100% + 8px);
+            left: 16px;
+            font-size: 13px;
+            color: var(--primary);
             opacity: 0;
             transition: opacity 0.3s ease;
             background: rgba(0, 0, 0, 0.7);
-            padding: 4px 10px;
-            border-radius: 12px;
+            padding: 6px 12px;
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
+            backdrop-filter: blur(5px);
         }
-        
-        .typing-indicator::before {
-            content: '';
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            background: #00ff88;
-            border-radius: 50%;
-            animation: typingPulse 1.4s infinite both;
+
+        .typing-indicator.active {
+            opacity: 1;
         }
-        
-        .typing-indicator::after {
-            content: '';
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            background: #00ff88;
-            border-radius: 50%;
-            animation: typingPulse 1.4s infinite 0.2s both;
-            margin-right: 4px;
-        }
-        
+
+        .typing-indicator::before,
+        .typing-indicator::after,
         .typing-indicator span::after {
             content: '';
             display: inline-block;
             width: 6px;
             height: 6px;
-            background: #00ff88;
+            background: var(--primary);
             border-radius: 50%;
+            margin-right: 4px;
+        }
+
+        .typing-indicator::before {
+            animation: typingPulse 1.4s infinite both;
+        }
+
+        .typing-indicator::after {
+            animation: typingPulse 1.4s infinite 0.2s both;
+        }
+
+        .typing-indicator span::after {
             animation: typingPulse 1.4s infinite 0.4s both;
         }
-        
-        @keyframes typingPulse {
-            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-            30% { opacity: 1; transform: translateY(-3px); }
+
+        /* Map Controls - Redesigned */
+        .map-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
         }
-        
-        .message-time {
-            font-size: 0.7em;
+
+        .map-control {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(5px);
+        }
+
+        .map-control:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .map-control.active {
+            background: var(--primary);
+            color: #000;
+        }
+
+        /* App Header - New Component */
+        .app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .app-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-button {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .battery-indicator-header {
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* User Marker - Enhanced */
+        .user-marker {
+            position: relative;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            transition: var(--transition);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+        }
+
+        .user-marker.online {
+            border-color: var(--online);
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
+        }
+
+        .user-marker.offline {
+            border-color: var(--offline);
             opacity: 0.7;
-            display: block;
-            text-align: right;
-            margin-top: 5px;
         }
-        
-        /* Loading and Error States */
+
+        .user-marker-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(0, 255, 136, 0.3);
+            animation: pulse 2s infinite;
+            z-index: -1;
+        }
+
+        .user-marker-tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            white-space: nowrap;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(5px);
+            box-shadow: var(--shadow);
+        }
+
+        .user-marker:hover .user-marker-tooltip {
+            opacity: 1;
+        }
+
+        /* Current User Marker - Special Styling */
+        .current-user-marker {
+            border-width: 3px;
+            width: 48px;
+            height: 48px;
+        }
+
+        /* Loading States */
         .loading-state {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-            color: #ffffff;
+            padding: 40px 20px;
+            color: var(--text-primary);
+            gap: 16px;
         }
-        
+
         .loading-spinner {
             width: 40px;
             height: 40px;
             border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #00ff88;
+            border-left-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 10px;
         }
-        
+
+        /* Animations */
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-        
-        .error-state {
+
+        @keyframes pulse {
+            0%, 60%, 100% { opacity: 0.3; transform: scale(1); }
+            30% { opacity: 1; transform: scale(1.1); }
+        }
+
+        @keyframes typingPulse {
+            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+            30% { opacity: 1; transform: translateY(-3px); }
+        }
+
+        @keyframes messageAppear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); }
+            to { transform: translateX(-100%); }
+        }
+
+        /* Mobile Notifications */
+        .mobile-notification {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            z-index: 2000;
+            transform: translateY(-120%);
+            opacity: 0;
+            transition: var(--transition);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+        }
+
+        .mobile-notification.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .notification-content {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .notification-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-            color: #ff4444;
-        }
-        
-        .error-state button {
-            margin-top: 10px;
-            padding: 8px 16px;
-            background: #00ff88;
-            border: none;
-            border-radius: 4px;
-            color: #000;
             font-weight: bold;
-            transition: all 0.3s ease;
+            color: white;
+            flex-shrink: 0;
         }
-        
-        .error-state button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(0, 255, 136, 0.3);
+
+        .notification-text {
+            flex: 1;
+            min-width: 0;
         }
-        
+
+        .notification-text strong {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .notification-text p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         /* Session Check */
         .session-check {
             position: fixed;
@@ -590,278 +833,160 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
+            background: var(--background);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 2000;
-            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
         }
-        
-        /* Map Marker */
-        .person-marker {
-            font-size: 24px;
-            text-shadow: 0 0 8px white, 0 0 8px white;
-            filter: drop-shadow(0 0 4px black);
-            transform: translateY(-10px);
+
+        .session-check h2 {
+            margin-bottom: 20px;
         }
-        
-        /* User Location Marker */
-        .user-marker {
-            position: relative;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-        }
-        
-        .user-marker.online {
-            border-color: #00ff88;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
-        }
-        
-        .user-marker.offline {
-            border-color: #666;
-            opacity: 0.7;
-        }
-        
-        .user-marker-pulse {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: rgba(0, 255, 136, 0.4);
-            animation: pulse 2s infinite;
-            z-index: -1;
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 0.7; }
-            70% { transform: scale(1.5); opacity: 0; }
-            100% { transform: scale(1); opacity: 0; }
-        }
-        
-        .user-marker-tooltip {
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            white-space: nowrap;
-            font-size: 12px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            backdrop-filter: blur(5px);
-        }
-        
-        .user-marker:hover .user-marker-tooltip {
-            opacity: 1;
-        }
-        
-        /* Location Controls */
-        .location-controls {
-            position: absolute;
-            bottom: 80px;
-            right: 20px;
+
+        /* Error State */
+        .error-state {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            z-index: 1000;
-        }
-        
-        .location-control {
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 18px;
+            padding: 40px 20px;
+            color: var(--danger);
+            gap: 16px;
+            text-align: center;
         }
-        
-        .location-control:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1) translateY(-1px);
-        }
-        
-        .location-control.active {
-            background: #00ff88;
+
+        .error-state button {
+            padding: 12px 24px;
+            background: var(--primary);
+            border: none;
+            border-radius: var(--radius-md);
             color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
         }
-        
-        /* Battery indicator */
-        .battery-indicator {
-            position: absolute;
-            top: 20px;
-            left: 70px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            backdrop-filter: blur(10px);
+
+        .error-state button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
         }
-        
-        /* Mobile Specific Styles */
-        @media (max-width: 768px) {
+
+        /* Responsive Adjustments */
+        @media (min-width: 768px) {
+            .app-container {
+                flex-direction: row;
+            }
+
             .sidebar {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                z-index: 500;
-                transform: translateX(-100%);
+                position: relative;
+                width: 320px;
+                transform: none;
+                z-index: 100;
             }
-            
-            .sidebar.collapsed {
-                transform: translateX(0);
+
+            .sidebar-header {
+                display: none;
             }
-            
-            .sidebar-toggle {
-                display: flex;
+
+            .chat-view {
+                position: relative;
+                z-index: 200;
             }
-            
+
+            .app-header {
+                display: none;
+            }
+
+            .map-controls {
+                bottom: 24px;
+                right: 24px;
+            }
+
             .user-card {
-                padding: 12px;
-                margin: 0 10px 6px;
+                padding: 12px 16px;
+                margin: 0 12px 8px;
             }
-            
-            .user-avatar {
-                width: 36px;
-                height: 36px;
-                margin-right: 12px;
-                font-size: 16px;
-            }
-            
-            .user-info h4 {
-                font-size: 14px;
-            }
-            
-            .user-info p {
-                font-size: 12px;
-            }
-            
-            .chat-header {
-                padding: 15px;
-            }
-            
-            .chat-header h2 {
-                font-size: 16px;
-            }
-            
-            .chat-messages {
-                padding: 15px;
-            }
-            
+
             .message-content {
-                max-width: 80%;
-                padding: 10px 15px;
+                max-width: 65%;
             }
-            
-            .message-input-container {
-                padding: 15px;
+        }
+
+        /* Special adjustments for very small screens */
+        @media (max-width: 360px) {
+            .user-card {
+                padding: 10px 12px;
             }
-            
-            .message-input {
-                padding: 12px 15px;
-                min-height: 45px;
-            }
-            
-            .send-button {
-                padding: 12px 20px;
-                min-height: 45px;
-            }
-            
-            .location-controls {
-                bottom: 70px;
-                right: 15px;
-            }
-            
-            .location-control {
-                width: 36px;
-                height: 36px;
+
+            .user-avatar {
+                width: 40px;
+                height: 40px;
                 font-size: 16px;
             }
-            
-            .battery-indicator {
-                top: 20px;
-                left: 60px;
-                font-size: 11px;
-                padding: 5px 10px;
+
+            .message-input-container {
+                padding: 10px 12px;
+            }
+
+            .message-input, .send-button {
+                min-height: 44px;
+            }
+
+            .map-control {
+                width: 44px;
+                height: 44px;
+                font-size: 18px;
             }
         }
-        
-        /* Animation for new message notification */
-        @keyframes newMessagePulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        
-        .new-message-notification {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            width: 12px;
-            height: 12px;
-            background: #00ff88;
-            border-radius: 50%;
-            animation: newMessagePulse 1.5s infinite;
-            display: none;
-        }
-        
-        .user-card.has-unread .new-message-notification {
-            display: block;
-        }
-        
-        /* Custom scrollbar for mobile */
-        @media (pointer: coarse) {
-            .user-list::-webkit-scrollbar,
-            .chat-messages::-webkit-scrollbar {
-                width: 8px;
-            }
-            
-            .user-list::-webkit-scrollbar-thumb,
-            .chat-messages::-webkit-scrollbar-thumb {
-                background-color: rgba(0, 255, 136, 0.5);
-            }
+
+        /* Prevent body scrolling when sidebar is open */
+        body.sidebar-open {
+            overflow: hidden;
         }
     </style>
 </head>
 <body>
+    <!-- Session Check Overlay -->
     <div class="session-check">
         <h2>Checking your session...</h2>
         <div class="loading-spinner"></div>
     </div>
 
+    <!-- Connection Status -->
     <div class="connection-status">Connecting...</div>
     
+    <!-- App Header (Mobile Only) -->
+    <div class="app-header">
+        <button class="header-button" id="menuButton">
+            ☰
+        </button>
+        <div class="app-title">Team Locations</div>
+        <div class="header-actions">
+            <div class="battery-indicator-header" id="batteryIndicatorHeader">
+                <span id="batteryLevelHeader">100%</span>
+            </div>
+            <button class="header-button" id="accountButton">
+                👤
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
     <div class="app-container">
+        <!-- Sidebar - User List -->
         <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Team Members</div>
+                <button class="close-sidebar" id="closeSidebar">
+                    ✕
+                </button>
+            </div>
             <div class="search-bar">
-                <input type="text" class="search-input" placeholder="Search team members...">
+                <input type="text" class="search-input" placeholder="Search team members..." id="searchInput">
             </div>
             <div class="user-list" id="userList">
                 <div class="loading-state">
@@ -871,49 +996,67 @@
             </div>
         </div>
         
+        <!-- Map View -->
         <div class="map-container" id="mapContainer">
             <div id="map"></div>
-            <button class="sidebar-toggle" id="sidebarToggle">
-                👥 Users
-            </button>
-            <button class="logout-button" id="logoutButton">
-                ⬅️ Logout
-            </button>
-            <button class="user-profile-button" id="userProfileButton">
-                👤 Account
-            </button>
             
-            <div class="battery-indicator" id="batteryIndicator">
-                <span id="batteryLevel">100%</span>
-            </div>
-            
-            <div class="location-controls">
-                <button class="location-control" id="centerMapButton" title="Center on my location">
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <button class="map-control" id="centerMapButton" title="Center on my location">
                     🎯
                 </button>
-                <button class="location-control active" id="toggleUserLocationsButton" title="Toggle team locations">
+                <button class="map-control active" id="toggleUserLocationsButton" title="Toggle team locations">
                     👥
+                </button>
+                <button class="map-control" id="openChatListButton" title="Open chat list">
+                    💬
                 </button>
             </div>
         </div>
         
+        <!-- Chat View -->
         <div class="chat-view" id="chatView">
-            <button class="back-to-map" id="backToMapButton">
-                ← Back to Map
-            </button>
-            <div class="chat-container">
-                <div class="chat-header">
-                    <h2 id="chatPartnerName">Select a user to start chatting</h2>
+            <div class="chat-header">
+                <button class="back-button" id="backToChatListButton">
+                    ←
+                </button>
+                <div class="chat-partner">
+                    <div class="chat-partner-avatar" id="chatPartnerAvatar">
+                        ?
+                    </div>
+                    <div class="chat-partner-info">
+                        <div class="chat-partner-name" id="chatPartnerName">Select a user</div>
+                        <div class="chat-partner-status">
+                            <div class="status-indicator"></div>
+                            <span id="chatPartnerStatus">Offline</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="chat-messages" id="chatMessages"></div>
-                <div class="message-input-container">
-                    <textarea class="message-input" id="messageInput" placeholder="Type your message..." disabled></textarea>
-                    <button class="send-button" id="sendButton" disabled>Send</button>
-                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="message-input-container">
+                <textarea class="message-input" id="messageInput" placeholder="Type your message..." disabled></textarea>
+                <button class="send-button" id="sendButton" disabled>
+                    <span>Send</span>
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Mobile Notification Container -->
+    <div class="mobile-notification" id="mobileNotification">
+        <div class="notification-content">
+            <div class="notification-avatar" id="notificationAvatar">
+                ?
+            </div>
+            <div class="notification-text">
+                <strong id="notificationName">User</strong>
+                <p id="notificationMessage">Message content</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -932,6 +1075,7 @@
         let unreadMessages = {};
         let batteryLevel = 100;
         let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let currentDeviceType = isMobile ? 'mobile' : 'desktop';
 
         // Helper functions
         function getInitials(name) {
@@ -974,6 +1118,21 @@
             return `${Math.floor(diff/1440)}d ago`;
         }
 
+        function getBatteryColor(level) {
+            if (level > 70) return 'high';
+            if (level > 30) return 'medium';
+            return 'low';
+        }
+
+        function getDeviceEmoji(deviceType) {
+            switch (deviceType) {
+                case 'mobile': return '📱';
+                case 'tablet': return '📱';
+                case 'desktop': return '💻';
+                default: return '❓';
+            }
+        }
+
         function showLoading() {
             document.getElementById('userList').innerHTML = `
                 <div class="loading-state">
@@ -984,25 +1143,24 @@
         }
 
         function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-state';
-            errorDiv.innerHTML = `
-                <p>${message}</p>
-                <button onclick="window.location.reload()">Retry</button>
+            document.getElementById('userList').innerHTML = `
+                <div class="error-state">
+                    <p>${message}</p>
+                    <button onclick="window.location.reload()">Retry</button>
+                </div>
             `;
-            document.getElementById('userList').appendChild(errorDiv);
         }
 
         function showSendLoading() {
             const btn = document.getElementById('sendButton');
             btn.disabled = true;
-            btn.textContent = 'Sending...';
+            btn.innerHTML = '<div class="loading-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>';
         }
 
         function hideSendLoading() {
             const btn = document.getElementById('sendButton');
             btn.disabled = false;
-            btn.textContent = 'Send';
+            btn.innerHTML = '<span>Send</span>';
         }
 
         function updateConnectionStatus(message, isError = false) {
@@ -1011,11 +1169,17 @@
             status.classList.toggle('connected', !isError);
         }
 
+        function updateBatteryDisplay() {
+            const batteryIndicator = document.getElementById('batteryIndicatorHeader');
+            const batteryLevelText = document.getElementById('batteryLevelHeader');
+            
+            batteryLevelText.textContent = `${batteryLevel}%`;
+            batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
+        }
+
         // Map functions
         function initializeMap() {
             try {
-                console.log("Initializing map...");
-                
                 // Initialize the map with default view
                 map = L.map('map').setView([0, 0], 2);
                 
@@ -1031,17 +1195,17 @@
                     }).addTo(map);
                 }
 
-                // Initialize user's location marker
+                // Initialize user's location marker with device type
                 marker = L.marker([0, 0], {
                     icon: L.divIcon({
-                        className: 'user-marker online',
+                        className: 'user-marker online current-user-marker',
                         html: `
-                            <div class="user-marker-tooltip">Your location</div>
-                            <div class="user-marker-inner">📍</div>
+                            <div class="user-marker-tooltip">Your location (${currentDeviceType})</div>
+                            <div class="user-marker-inner">${getDeviceEmoji(currentDeviceType)}</div>
                             <div class="user-marker-pulse"></div>
                         `,
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 40]
+                        iconSize: [48, 48],
+                        iconAnchor: [24, 48]
                     }),
                     zIndexOffset: 1000
                 }).addTo(map);
@@ -1049,7 +1213,6 @@
                 // Start tracking user's location
                 startLocationTracking();
                 
-                console.log("Map initialized successfully");
             } catch (error) {
                 console.error("Map initialization failed:", error);
                 throw error;
@@ -1078,18 +1241,20 @@
                                     last_updated: new Date().toISOString(),
                                     device_context: {
                                         is_mobile: isMobile,
-                                        battery_level: batteryLevel
+                                        battery_level: batteryLevel,
+                                        device_type: currentDeviceType
                                     }
                                 });
                             
                             if (error) throw error;
                             
-                            // Update user's last online status
+                            // Update user's last online status and device type
                             await supabaseClient
                                 .from('users')
                                 .update({ 
                                     lastonline: new Date().toISOString(),
-                                    status: 'online'
+                                    status: 'online',
+                                    device_type: currentDeviceType
                                 })
                                 .eq('id', currentUserId);
                                 
@@ -1117,7 +1282,6 @@
                 await supabaseClient.from('user_locations').select('*').limit(1);
                 await supabaseClient.from('users').select('*').limit(1);
                 
-                console.log("Verified database tables exist");
             } catch (error) {
                 console.error("Database verification error:", error);
                 showError("Database connection issue. Please refresh the page.");
@@ -1135,7 +1299,7 @@
                 // Get all users except current user with status info
                 const { data: users, error: usersError } = await supabaseClient
                     .from('users')
-                    .select('id, email, name, lastonline, status')
+                    .select('id, email, name, lastonline, status, device_type')
                     .neq('id', currentUserId)
                     .order('lastonline', { ascending: false });
                 
@@ -1177,7 +1341,8 @@
                     return {
                         ...user,
                         user_locations: location ? [location] : [],
-                        unread_count: unreadMessages[user.id] || 0
+                        unread_count: unreadMessages[user.id] || 0,
+                        battery_level: location?.device_context?.battery_level || null
                     };
                 });
                 
@@ -1207,9 +1372,9 @@
             users.forEach(user => {
                 const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
                 const isOnline = onlineUsers[user.id] || (user.status === 'online' && lastOnline && (Date.now() - lastOnline.getTime()) < 300000);
-                
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
+                const batteryLevel = user.battery_level;
                 
                 // Determine status text
                 let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
@@ -1228,18 +1393,22 @@
                         <h4>${user.name}</h4>
                         <p>${statusText}</p>
                     </div>
-                    <div class="status-indicator ${isOnline ? 'online' : ''}"></div>
+                    <div class="user-status">
+                        <div class="status-indicator ${isOnline ? 'online' : ''}"></div>
+                        ${batteryLevel ? `
+                            <div class="battery-indicator ${getBatteryColor(batteryLevel)}">
+                                ${batteryLevel}%
+                            </div>
+                        ` : ''}
+                    </div>
                     <div class="new-message-notification"></div>
                 `;
                 userCard.addEventListener('click', () => selectUser(user));
                 userList.appendChild(userCard);
             });
 
-            setupSearch();
-        }
-
-        function setupSearch() {
-            document.querySelector('.search-input').addEventListener('input', (e) => {
+            // Setup search functionality
+            document.getElementById('searchInput').addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 document.querySelectorAll('.user-card').forEach(card => {
                     const name = card.querySelector('h4').textContent.toLowerCase();
@@ -1263,27 +1432,30 @@
                 
                 const hasLocation = user.user_locations && user.user_locations.length > 0;
                 const isOnline = onlineUsers[user.id] || (user.status === 'online' && user.lastonline && (Date.now() - new Date(user.lastonline).getTime()) < 300000);
+                const deviceType = user.device_type || 'unknown';
+                const batteryLevel = user.battery_level;
                 
                 if (hasLocation && showUserLocations) {
                     const location = user.user_locations[0];
                     const lastUpdated = new Date(location.last_updated);
                     const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000;
                     
-                    // Create custom marker
+                    // Create custom marker with battery info
                     const marker = L.marker([location.latitude, location.longitude], {
                         icon: L.divIcon({
                             className: `user-marker ${isOnline && isRecent ? 'online' : 'offline'}`,
                             html: `
                                 <div class="user-marker-tooltip">
-                                    ${user.name}${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
+                                    ${user.name} (${deviceType})${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
+                                    ${batteryLevel ? ` • Battery: ${batteryLevel}%` : ''}
                                 </div>
                                 <div class="user-marker-inner">
-                                    ${isMobile ? '📱' : '💻'}
+                                    ${getDeviceEmoji(deviceType)}
                                     ${isOnline && isRecent ? '<div class="user-marker-pulse"></div>' : ''}
                                 </div>
                             `,
-                            iconSize: [40, 40],
-                            iconAnchor: [20, 40]
+                            iconSize: [44, 44],
+                            iconAnchor: [22, 44]
                         }),
                         zIndexOffset: 900,
                         title: user.name
@@ -1314,7 +1486,9 @@
                 const userId = card.dataset.userId;
                 const userData = userDataCache[userId];
                 const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
-                const isOnline = onlineUsers[userId] || (userData?.status === 'online' && lastOnline && (Date.now() - lastOnline.getTime()) < 300000);
+                const isOnline = onlineUsers[userId] || 
+                    (userData?.status === 'online' && lastOnline && 
+                    (Date.now() - lastOnline.getTime()) < 300000);
                 
                 const indicator = card.querySelector('.status-indicator');
                 if (indicator) {
@@ -1338,43 +1512,79 @@
                 if (marker) {
                     const userData = userDataCache[userId];
                     const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
-                    const isOnline = onlineUsers[userId] || (userData?.status === 'online' && lastOnline && (Date.now() - lastOnline.getTime()) < 300000);
+                    const isOnline = onlineUsers[userId] || 
+                        (userData?.status === 'online' && lastOnline && 
+                        (Date.now() - lastOnline.getTime()) < 300000);
                     
                     const icon = marker.getIcon();
                     icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
                     marker.setIcon(icon);
                 }
             });
+
+            // Update chat partner status if in chat
+            if (selectedUser) {
+                const userData = userDataCache[selectedUser.id];
+                const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
+                const isOnline = onlineUsers[selectedUser.id] || 
+                    (userData?.status === 'online' && lastOnline && 
+                    (Date.now() - lastOnline.getTime()) < 300000);
+                
+                const statusIndicator = document.querySelector('.chat-partner-status .status-indicator');
+                const statusText = document.getElementById('chatPartnerStatus');
+                
+                if (statusIndicator && statusText) {
+                    statusIndicator.classList.toggle('online', isOnline);
+                    statusText.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                }
+            }
         }
 
         // Chat functions
         async function selectUser(user) {
             document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
-            document.querySelector(`[data-user-id="${user.id}"]`).classList.add('active');
+            document.querySelector(`[data-user-id="${user.id}"]`)?.classList.add('active');
             
-            selectedUser = { id: user.id, name: user.name };
+            selectedUser = { 
+                id: user.id, 
+                name: user.name,
+                avatarColor: stringToColor(user.name),
+                initials: getInitials(user.name)
+            };
+            
+            // Update chat header
             document.getElementById('chatPartnerName').textContent = user.name;
+            document.getElementById('chatPartnerAvatar').textContent = selectedUser.initials;
+            document.getElementById('chatPartnerAvatar').style.background = selectedUser.avatarColor;
+            
+            // Load messages
             await loadMessages(user.id);
             
-            // Switch to chat view
-            document.getElementById('mapContainer').classList.add('hidden');
+            // Show chat view
             document.getElementById('chatView').classList.add('active');
-            if (isMobile) document.getElementById('sidebar').classList.add('collapsed');
+            document.getElementById('mapContainer').classList.add('hidden');
+            
+            // Hide sidebar if on mobile
+            if (isMobile) {
+                document.getElementById('sidebar').classList.remove('active');
+                document.body.classList.remove('sidebar-open');
+            }
             
             // Clear unread count for this user
             if (unreadMessages[user.id]) {
                 delete unreadMessages[user.id];
-                document.querySelector(`[data-user-id="${user.id}"]`).classList.remove('has-unread');
+                document.querySelector(`[data-user-id="${user.id}"]`)?.classList.remove('has-unread');
             }
         }
 
-        if (isMobile) {
-        document.getElementById('sidebar').classList.add('collapsed');
-    }
         function showMapView() {
             document.getElementById('mapContainer').classList.remove('hidden');
             document.getElementById('chatView').classList.remove('active');
-           if (isMobile) document.getElementById('sidebar').classList.add('collapsed');
+        }
+
+        function showChatListView() {
+            document.getElementById('sidebar').classList.add('active');
+            document.body.classList.add('sidebar-open');
         }
 
         async function loadMessages(userId) {
@@ -1410,7 +1620,12 @@
                 
             } catch (error) {
                 console.error('Failed to load messages:', error);
-                showError('Failed to load messages. Please try again.');
+                messagesContainer.innerHTML = `
+                    <div class="error-state">
+                        <p>Failed to load messages</p>
+                        <button onclick="loadMessages('${userId}')">Retry</button>
+                    </div>
+                `;
             }
         }
 
@@ -1450,7 +1665,7 @@
                         receiver_id: receiverId,
                         content: content,
                         status: 'delivered',
-                        device_type: isMobile ? 'mobile' : 'desktop'
+                        device_type: currentDeviceType
                     }])
                     .select()
                     .single();
@@ -1468,7 +1683,7 @@
                 
             } catch (error) {
                 console.error('Failed to send message:', error);
-                showError('Failed to send message: ' + error.message);
+                alert('Failed to send message: ' + error.message);
             } finally {
                 hideSendLoading();
             }
@@ -1502,28 +1717,24 @@
         }
 
         function showTypingIndicator(userId) {
-            const partner = document.querySelector(`[data-user-id="${userId}"] h4`);
-            if (partner) {
-                // Remove existing indicator if any
-                const existingIndicator = document.querySelector('.typing-indicator');
-                if (existingIndicator) existingIndicator.remove();
-                
-                const indicator = document.createElement('div');
-                indicator.className = 'typing-indicator';
-                indicator.innerHTML = `<span>${partner.textContent} is typing...</span>`;
-                document.getElementById('chatMessages').appendChild(indicator);
-                
-                // Fade in
-                setTimeout(() => {
-                    indicator.style.opacity = '1';
-                }, 10);
-                
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
-                    indicator.style.opacity = '0';
-                    setTimeout(() => indicator.remove(), 300);
-                }, 2000);
-            }
+            const userData = userDataCache[userId];
+            if (!userData) return;
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator active';
+            indicator.innerHTML = `<span>${userData.name} is typing...</span>`;
+            
+            // Remove existing indicator if any
+            const existingIndicator = document.querySelector('.typing-indicator');
+            if (existingIndicator) existingIndicator.remove();
+            
+            document.getElementById('chatMessages').appendChild(indicator);
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                indicator.classList.remove('active');
+                setTimeout(() => indicator.remove(), 300);
+            }, 2000);
         }
 
         // Realtime functionality
@@ -1657,6 +1868,9 @@
                                 } else {
                                     userDataCache[userId].user_locations.push(locationData);
                                 }
+
+                                // Update battery level in cache
+                                userDataCache[userId].battery_level = locationData.device_context?.battery_level || null;
                             }
                             
                             // Update marker if showing locations
@@ -1668,6 +1882,8 @@
                             const userCard = document.querySelector(`[data-user-id="${userId}"]`);
                             if (userCard) {
                                 const statusText = userCard.querySelector('p');
+                                const batteryIndicator = userCard.querySelector('.battery-indicator');
+                                
                                 if (statusText) {
                                     const lastOnline = userDataCache[userId]?.lastonline ? 
                                         new Date(userDataCache[userId].lastonline) : null;
@@ -1677,6 +1893,13 @@
                                     
                                     statusText.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
                                     statusText.textContent += ` • ${formatDistance(new Date(locationData.last_updated))} ago`;
+                                }
+
+                                // Update battery indicator
+                                if (batteryIndicator && locationData.device_context?.battery_level) {
+                                    const batteryLevel = locationData.device_context.battery_level;
+                                    batteryIndicator.textContent = `${batteryLevel}%`;
+                                    batteryIndicator.className = `battery-indicator ${getBatteryColor(batteryLevel)}`;
                                 }
                             }
                         }
@@ -1691,16 +1914,16 @@
         }
 
         function showNotification(userId, messageContent) {
+            const user = userDataCache[userId];
+            if (!user) return;
+
             // Check if notifications are allowed
             if (Notification.permission === 'granted') {
-                const user = userDataCache[userId];
-                if (user) {
-                    new Notification(`New message from ${user.name}`, {
-                        body: messageContent.length > 50 ? 
-                            messageContent.substring(0, 50) + '...' : messageContent,
-                        icon: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=random'
-                    });
-                }
+                new Notification(`New message from ${user.name}`, {
+                    body: messageContent.length > 50 ? 
+                        messageContent.substring(0, 50) + '...' : messageContent,
+                    icon: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=random'
+                });
             } else if (Notification.permission !== 'denied') {
                 Notification.requestPermission().then(permission => {
                     if (permission === 'granted') {
@@ -1709,45 +1932,32 @@
                 });
             }
             
-            // Also show in-app notification for mobile
+            // Show in-app notification for mobile
             if (isMobile) {
-                const notification = document.createElement('div');
-                notification.className = 'mobile-notification';
-                notification.innerHTML = `
-                    <div class="notification-content">
-                        <div class="notification-avatar" style="background: ${stringToColor(userDataCache[userId]?.name || '?')}">
-                            ${getInitials(userDataCache[userId]?.name || '?')}
-                        </div>
-                        <div class="notification-text">
-                            <strong>${userDataCache[userId]?.name || 'Unknown'}</strong>
-                            <p>${messageContent.length > 30 ? messageContent.substring(0, 30) + '...' : messageContent}</p>
-                        </div>
-                    </div>
-                `;
+                const notification = document.getElementById('mobileNotification');
+                const avatar = document.getElementById('notificationAvatar');
+                const name = document.getElementById('notificationName');
+                const message = document.getElementById('notificationMessage');
                 
-                document.body.appendChild(notification);
+                avatar.textContent = getInitials(user.name);
+                avatar.style.background = stringToColor(user.name);
+                name.textContent = user.name;
+                message.textContent = messageContent.length > 30 ? 
+                    messageContent.substring(0, 30) + '...' : messageContent;
                 
-                // Animate in
-                setTimeout(() => {
-                    notification.style.transform = 'translateY(0)';
-                    notification.style.opacity = '1';
-                }, 10);
+                notification.classList.add('active');
                 
                 // Remove after delay
                 setTimeout(() => {
-                    notification.style.transform = 'translateY(-100%)';
-                    notification.style.opacity = '0';
-                    setTimeout(() => notification.remove(), 300);
+                    notification.classList.remove('active');
                 }, 5000);
                 
                 // Click handler to open chat
                 notification.addEventListener('click', () => {
+                    notification.classList.remove('active');
                     if (userDataCache[userId]) {
                         selectUser(userDataCache[userId]);
-                        showMapView();
-                        document.getElementById('sidebar').classList.add('collapsed');
                     }
-                    notification.remove();
                 });
             }
         }
@@ -1758,11 +1968,17 @@
                 navigator.getBattery().then(battery => {
                     function updateBatteryStatus() {
                         batteryLevel = Math.round(battery.level * 100);
-                        document.getElementById('batteryLevel').textContent = `${batteryLevel}%`;
+                        updateBatteryDisplay();
                     }
                     
                     battery.addEventListener('levelchange', updateBatteryStatus);
                     updateBatteryStatus();
+                });
+            } else if ('battery' in navigator) {
+                // Fallback for older browsers
+                navigator.battery.addEventListener('levelchange', () => {
+                    batteryLevel = Math.round(navigator.battery.level * 100);
+                    updateBatteryDisplay();
                 });
             }
         }
@@ -1827,55 +2043,33 @@
                 }, 1000);
             });
 
-            // Sidebar toggle
-            document.getElementById('sidebarToggle').addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.getElementById('sidebar').classList.toggle('collapsed');
+            // Menu button (mobile)
+            document.getElementById('menuButton').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.add('active');
+                document.body.classList.add('sidebar-open');
             });
-            
-            // Close sidebar when clicking outside on mobile
-            if (isMobile) {
-                document.addEventListener('click', (e) => {
-                    const sidebar = document.getElementById('sidebar');
-                    const sidebarToggle = document.getElementById('sidebarToggle');
-                    
-                    if (!sidebar.contains(e.target) && e.target !== sidebarToggle && !sidebar.classList.contains('collapsed')) {
-                        sidebar.classList.add('collapsed');
-                    }
-                });
-            }
-            
-            // User profile button
-            document.getElementById('userProfileButton').addEventListener('click', () => {
+
+            // Close sidebar button
+            document.getElementById('closeSidebar').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.remove('active');
+                document.body.classList.remove('sidebar-open');
+            });
+
+            // Open chat list from map
+            document.getElementById('openChatListButton').addEventListener('click', () => {
+                showChatListView();
+            });
+
+            // Back to chat list from chat view
+            document.getElementById('backToChatListButton').addEventListener('click', () => {
+                showChatListView();
+            });
+
+            // Account button
+            document.getElementById('accountButton').addEventListener('click', () => {
                 window.location.href = 'accounts.html';
             });
 
-            // Back to map button
-            document.getElementById('backToMapButton').addEventListener('click', () => {
-                showMapView();
-            });
-
-            // Logout button with confirmation
-            document.getElementById('logoutButton').addEventListener('click', async () => {
-                if (confirm('Are you sure you want to log out?')) {
-                    try {
-                        if (presenceChannel) {
-                            await supabaseClient.removeChannel(presenceChannel);
-                        }
-                        
-                        if (watchId && navigator.geolocation) {
-                            navigator.geolocation.clearWatch(watchId);
-                        }
-                        
-                        await supabaseClient.auth.signOut();
-                        localStorage.clear();
-                        window.location.href = 'login.html';
-                    } catch (error) {
-                        console.error('Logout error:', error);
-                    }
-                }
-            });
-            
             // Center map button with animation
             document.getElementById('centerMapButton').addEventListener('click', () => {
                 if (lastPosition && marker) {
@@ -1939,151 +2133,6 @@
             }
         });
 
-        // Mobile-specific touch handlers
-        if (isMobile) {
-            // Prevent zooming on double-tap
-            let lastTap = 0;
-            document.addEventListener('touchend', (e) => {
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTap;
-                if (tapLength < 300 && tapLength > 0) {
-                    e.preventDefault();
-                }
-                lastTap = currentTime;
-            }, { passive: false });
-
-            // Better touch handling for map
-            document.getElementById('map').addEventListener('touchstart', (e) => {
-                if (e.touches.length > 1) {
-                    e.preventDefault(); // Prevent zoom gesture
-                }
-            }, { passive: false });
-
-            // Adjust viewport for mobile devices
-            const setViewport = () => {
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (window.orientation === 90 || window.orientation === -90) {
-                    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-                } else {
-                    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-                }
-            };
-
-            window.addEventListener('orientationchange', setViewport);
-            setViewport();
-        }
-
-        // Additional mobile CSS
-        const mobileStyles = document.createElement('style');
-        mobileStyles.textContent = `
-            .mobile-notification {
-                position: fixed;
-                top: 10px;
-                left: 10px;
-                right: 10px;
-                background: rgba(0, 0, 0, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-                padding: 12px;
-                z-index: 2000;
-                transform: translateY(-100%);
-                opacity: 0;
-                transition: all 0.3s ease;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            }
-            
-            .notification-content {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-            }
-            
-            .notification-avatar {
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: bold;
-                color: white;
-                flex-shrink: 0;
-            }
-            
-            .notification-text {
-                flex: 1;
-                min-width: 0;
-            }
-            
-            .notification-text p {
-                margin-top: 4px;
-                opacity: 0.8;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            @media (max-width: 480px) {
-                .sidebar {
-                    width: 100%;
-                }
-                
-                .user-card {
-                    padding: 10px;
-                }
-                
-                .message-content {
-                    max-width: 85%;
-                }
-                
-                .location-controls {
-                    bottom: 60px;
-                    right: 10px;
-                }
-            }
-            
-            /* Prevent body scrolling on mobile when sidebar is open */
-            body.sidebar-open {
-                overflow: hidden;
-            }
-            
-            /* Map controls positioning for mobile */
-            .map-controls-mobile {
-                position: absolute;
-                bottom: 20px;
-                right: 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                z-index: 1000;
-            }
-            
-            /* Disable text selection on buttons */
-            button {
-                user-select: none;
-                -webkit-user-select: none;
-            }
-            
-            /* Better touch targets for mobile */
-            @media (max-width: 480px) {
-                .sidebar-toggle, 
-                .back-to-map,
-                .logout-button,
-                .user-profile-button {
-                    padding: 12px 18px;
-                    font-size: 14px;
-                }
-                
-                .location-control {
-                    width: 44px;
-                    height: 44px;
-                    font-size: 20px;
-                }
-            }
-        `;
-        document.head.appendChild(mobileStyles);
-
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -2142,10 +2191,9 @@
                 console.error("Initialization error:", error);
                 document.querySelector('.session-check').innerHTML = `
                     <h2>Initialization Error</h2>
-                    <p style="color: #ff4444; margin: 20px 0;">${error.message}</p>
-                    <p style="color: #ccc; font-size: 0.9em;">${error.stack}</p>
+                    <p style="color: var(--danger); margin: 20px 0;">${error.message}</p>
                     <button onclick="window.location.href='login.html'" 
-                            style="padding: 10px 20px; background: #00ff88; border: none; border-radius: 5px; font-weight: bold;">
+                            style="padding: 12px 24px; background: var(--primary); border: none; border-radius: var(--radius-md); font-weight: 600;">
                         Go to Login
                     </button>
                 `;
