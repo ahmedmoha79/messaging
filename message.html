@@ -1282,6 +1282,7 @@
             const parts = name.split(' ');
             if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
             return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+// Added an extra closing parenthesis here -----------------^
         }
 
         function stringToColor(str) {
@@ -1390,37 +1391,16 @@
                 status.style.transform = 'translateY(0)';
             }, 10);
         }
-function updateBatteryDisplay() {
-    // Update header battery indicator
-    const batteryIndicator = document.getElementById('batteryIndicatorHeader');
-    const batteryLevelText = document.getElementById('batteryLevelHeader');
-    const batteryIcon = batteryIndicator.querySelector('i');
-    
-    batteryLevelText.textContent = `${batteryLevel}%`;
-    batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
-    batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
 
-    // Update YOUR OWN marker's tooltip (critical fix)
-    if (marker) {
-        const icon = marker.getIcon();
-        icon.options.html = `
-            <div class="user-marker-tooltip">
-                <div class="tooltip-name">Your location</div>
-                <div class="tooltip-status">
-                    <i class="fas fa-circle"></i>
-                    <span>Online (${currentDeviceType})</span>
-                </div>
-                <div class="tooltip-battery">
-                    <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
-                    <span>${batteryLevel}% battery</span>
-                </div>
-            </div>
-            <div class="user-marker-inner">${getDeviceEmoji(currentDeviceType)}</div>
-            <div class="user-marker-pulse"></div>
-        `;
-        marker.setIcon(icon);
-    }
-}
+        function updateBatteryDisplay() {
+            const batteryIndicator = document.getElementById('batteryIndicatorHeader');
+            const batteryLevelText = document.getElementById('batteryLevelHeader');
+            const batteryIcon = batteryIndicator.querySelector('i');
+            
+            batteryLevelText.textContent = `${batteryLevel}%`;
+            batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
+            batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
+        }
 
         // Map functions
         function initializeMap() {
@@ -1546,11 +1526,11 @@ function updateBatteryDisplay() {
                         accuracy,
                         last_updated: new Date().toISOString(),
                         device_context: {
-    is_mobile: isMobile,
-    battery_level: batteryLevel, // <-- ADD THIS LINE
-    device_type: currentDeviceType,
-    last_online: new Date().toISOString()
-}
+                            is_mobile: isMobile,
+                            battery_level: batteryLevel,
+                            device_type: currentDeviceType,
+                            last_online: new Date().toISOString()
+                        }
                     });
                 
                 if (error) throw error;
@@ -1578,11 +1558,10 @@ if (userDataCache[currentUserId]) {
                     accuracy,
                     last_updated: new Date().toISOString(),
                     device_context: {
-    is_mobile: isMobile,
-    battery_level: batteryLevel,
-    device_type: currentDeviceType,
-    last_online: new Date().toISOString()
-}
+                        is_mobile: isMobile,
+                        battery_level: batteryLevel,
+                        device_type: currentDeviceType
+                    }
                 };
             }
         }
@@ -2361,66 +2340,88 @@ if (userDataCache[currentUserId]) {
             }
         }
 
- // Battery monitoring
-       function initBatteryMonitoring() {
+        // Battery monitoring
+        function initBatteryMonitoring() {
+    // Don't start until we have a valid user ID
+    if (!currentUserId) {
+        console.warn("Battery monitoring delayed - no user ID yet");
+        setTimeout(initBatteryMonitoring, 1000);
+        return;
+    }
+
     if ('getBattery' in navigator) {
         navigator.getBattery().then(battery => {
-            function updateBatteryStatus() {
-                batteryLevel = Math.round(battery.level * 100);
-                updateBatteryDisplay();
-                
-                // Force-update Supabase with battery level (critical fix)
-                if (presenceChannel) {
-                    presenceChannel.track({
-                        online_at: new Date().toISOString(),
-                        user_id: currentUserId,
-                        battery_level: batteryLevel,
-                        device_type: currentDeviceType
-                    });
-                }
-                
-                // Update location record too (new addition)
-                if (lastPosition) {
-                    supabaseClient
-                        .from('user_locations')
-                        .upsert({
+            const updateBatteryStatus = () => {
+                try {
+                    batteryLevel = Math.round(battery.level * 100);
+                    updateBatteryDisplay();
+                    
+                    // Only update presence if channel exists
+                    if (presenceChannel?.subscriptionState === 'SUBSCRIBED') {
+                        presenceChannel.track({
+                            online_at: new Date().toISOString(),
                             user_id: currentUserId,
-                            device_context: {
-                                battery_level: batteryLevel,
-                                last_updated: new Date().toISOString()
-                            }
-                        });
+                            battery_level: batteryLevel,
+                            device_type: currentDeviceType
+                        }).catch(e => console.error("Presence update failed:", e));
+                    }
+                    
+                    // Only update location if we have position
+                    if (lastPosition) {
+                        supabaseClient
+                            .from('user_locations')
+                            .upsert({
+                                user_id: currentUserId,
+                                latitude: lastPosition.lat,
+                                longitude: lastPosition.lng,
+                                accuracy: 0,
+                                last_updated: new Date().toISOString(),
+                                device_context: {
+                                    is_mobile: isMobile,
+                                    battery_level: batteryLevel,
+                                    device_type: currentDeviceType,
+                                    last_online: new Date().toISOString()
+                                }
+                            })
+                            .then(() => {})
+                            .catch(e => console.error("Battery location update failed:", e));
+                    }
+                } catch (e) {
+                    console.error("Battery update error:", e);
                 }
-            }
+            };
             
             battery.addEventListener('levelchange', updateBatteryStatus);
-            updateBatteryStatus(); // Initial update
+            updateBatteryStatus();
+            
+        }).catch(e => {
+            console.error("Battery API error - using simulation:", e);
+            startBatterySimulation();
         });
     } else {
-        // Fallback for browsers without Battery API
-        console.log("Battery API not available");
-        setInterval(() => {
-            batteryLevel = Math.max(0, batteryLevel - 1);
-            if (batteryLevel <= 0) batteryLevel = 100;
-            updateBatteryDisplay();
-        }, 60000);
+        startBatterySimulation();
     }
-} else if ('battery' in navigator) {
-                // Fallback for older browsers
-                navigator.battery.addEventListener('levelchange', () => {
-                    batteryLevel = Math.round(navigator.battery.level * 100);
-                    updateBatteryDisplay();
-                });
-            } else {
-                // Fallback for browsers without battery API
-                setInterval(() => {
-                    // Simulate battery drain for demo purposes
-                    batteryLevel = Math.max(0, batteryLevel - 1);
-                    if (batteryLevel <= 0) batteryLevel = 100;
-                    updateBatteryDisplay();
-                }, 60000);
-            }
+}
+
+function startBatterySimulation() {
+    console.log("Using simulated battery");
+    const simulate = () => {
+        batteryLevel = Math.max(0, batteryLevel - 1);
+        if (batteryLevel <= 0) batteryLevel = 100;
+        updateBatteryDisplay();
+        
+        if (presenceChannel?.subscriptionState === 'SUBSCRIBED' && currentUserId) {
+            presenceChannel.track({
+                online_at: new Date().toISOString(),
+                user_id: currentUserId,
+                battery_level: batteryLevel,
+                device_type: currentDeviceType
+            }).catch(e => console.error("Simulated presence update failed:", e));
         }
+    };
+    setInterval(simulate, 60000);
+    simulate(); // Initial update
+}
 
         // Event listeners
         function setupEventListeners() {
