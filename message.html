@@ -1316,7 +1316,7 @@
             const seconds = Math.floor((Date.now() - new Date(date)) / 1000);
             
             if (seconds < 60) return 'Online';
-            if (seconds < 300) return 'Online'; // Consider online if seen within 5 minutes
+            if (seconds < 180) return 'Online'; // Consider online if seen within 5 minutes
             return formatTimeAgo(date);
         }
 
@@ -1534,6 +1534,10 @@
                     });
                 
                 if (error) throw error;
+               // Update battery level in cache for current user - ADD THIS LINE
+if (userDataCache[currentUserId]) {
+    userDataCache[currentUserId].battery_level = batteryLevel;
+}
                 
                 // Update user's last online status and device type
                 await supabaseClient
