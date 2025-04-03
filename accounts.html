@@ -59,14 +59,38 @@
             text-align: center;
             position: relative;
         }
-        .profile-avatar {
+        .profile-avatar-container {
+            position: relative;
             width: 120px;
             height: 120px;
+            margin-bottom: 20px;
+        }
+        .profile-avatar {
+            width: 100%;
+            height: 100%;
             border-radius: 50%;
             object-fit: cover;
             border: 3px solid #00ff88;
-            margin-bottom: 20px;
             box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+        .avatar-edit-icon {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .avatar-edit-icon:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: scale(1.1);
         }
         .profile-name {
             font-size: 2em;
@@ -323,6 +347,61 @@
             justify-content: center;
         }
         
+        /* Avatar Upload Modal */
+        .avatar-upload-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .avatar-upload-content {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+        .avatar-preview {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 20px auto;
+            border: 3px solid #00ff88;
+            display: none;
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+            color: #000;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        .file-input-label:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        #avatarUpload {
+            display: none;
+        }
+        .upload-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        
         /* Responsive Adjustments */
         @media (max-width: 768px) {
             .account-container {
@@ -333,7 +412,7 @@
             .profile-header {
                 margin-bottom: 20px;
             }
-            .profile-avatar {
+            .profile-avatar-container {
                 width: 100px;
                 height: 100px;
             }
@@ -355,6 +434,13 @@
             .name-input {
                 width: 100%;
             }
+            .avatar-upload-content {
+                padding: 20px;
+            }
+            .avatar-preview {
+                width: 120px;
+                height: 120px;
+            }
         }
     </style>
 </head>
@@ -372,6 +458,27 @@
         </div>
     </div>
 
+    <!-- Avatar Upload Modal -->
+    <div id="avatarUploadModal" class="avatar-upload-modal">
+        <div class="avatar-upload-content">
+            <h2>Update Profile Picture</h2>
+            <label for="avatarUpload" class="file-input-label">
+                <i class="fas fa-upload"></i> Choose Image
+            </label>
+            <input type="file" id="avatarUpload" accept="image/*">
+            <img id="avatarPreview" class="avatar-preview" alt="Preview">
+            <div class="upload-buttons">
+                <button class="btn btn-secondary" id="cancelUploadBtn">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button class="btn btn-primary" id="confirmUploadBtn" disabled>
+                    <i class="fas fa-check"></i> Confirm
+                </button>
+            </div>
+            <p id="uploadStatus" style="margin-top: 15px; font-size: 0.9em;"></p>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         // Configuration
@@ -384,6 +491,7 @@
         let isEditingName = false;
         let originalName = '';
         let currentName = '';
+        let selectedAvatarFile = null;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -427,6 +535,7 @@
                 // Load account data
                 await loadAccountData();
                 initializeRealtime();
+                setupAvatarUpload();
 
             } catch (error) {
                 console.error("Initialization error:", error);
@@ -439,33 +548,48 @@
             try {
                 // Fetch account information
                 let { data: account, error: accountError } = await supabaseClient
-    .from('users')
-    .select('*')
-    .eq('id', currentUserId)
-    .single();
+                    .from('users')
+                    .select(`
+                        id,
+                        email,
+                        name,
+                        created_at,
+                        lastonline,
+                        avatar_url,
+                        role,
+                        status,
+                        avatar_emoji,
+                        mfa_enabled,
+                        last_password_change
+                    `)
+                    .eq('id', currentUserId)
+                    .single();
                 
-                // If profile doesn't exist, create one
+                // If user doesn't exist, create one
                 if (accountError && accountError.code === 'PGRST116') {
-                    const { data: newProfile, error: createError } = await supabaseClient
-                        .from('profiles')
+                    const { data: newUser, error: createError } = await supabaseClient
+                        .from('users')
                         .insert([{
                             id: currentUserId,
                             email: session.user.email,
-                            full_name: session.user.email.split('@')[0],
-                            created_at: new Date().toISOString()
+                            name: session.user.email.split('@')[0],
+                            created_at: new Date().toISOString(),
+                            lastonline: new Date().toISOString(),
+                            role: 'user',
+                            status: 'online'
                         }])
                         .select()
                         .single();
 
                     if (createError) throw createError;
-                    account = newProfile;
+                    account = newUser;
                 } else if (accountError) {
                     throw accountError;
                 }
                 
-                // Fetch recent activity
+                // Fetch recent activity from security_logs
                 const { data: activity, error: activityError } = await supabaseClient
-                    .from('account_activity')
+                    .from('security_logs')
                     .select('*')
                     .eq('user_id', currentUserId)
                     .order('created_at', { ascending: false })
@@ -484,23 +608,28 @@
 
         function renderAccountPage(account, activity) {
             const accountContent = document.getElementById('accountContent');
-            originalName = account.full_name || '';
+            originalName = account.name || '';
             currentName = originalName;
             
             // Format dates
             const createdAt = account.created_at ? new Date(account.created_at) : null;
-            const lastActive = account.last_updated ? new Date(account.last_updated) : null;
+            const lastActive = account.lastonline ? new Date(account.lastonline) : null;
             
             accountContent.innerHTML = `
                 <div class="profile-header">
-                    <img id="profileAvatar" src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.full_name || 'User')}&background=random`}" 
-                        class="profile-avatar" alt="${account.full_name || 'User'}">
+                    <div class="profile-avatar-container">
+                        <img id="profileAvatar" src="${account.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name || 'User')}&background=random`}" 
+                            class="profile-avatar" alt="${account.name || 'User'}">
+                        <div class="avatar-edit-icon" id="editAvatarBtn">
+                            <i class="fas fa-pencil-alt"></i>
+                        </div>
+                    </div>
                     <h1 class="profile-name">
-                        <span id="nameDisplay">${account.full_name || 'User'}</span>
+                        <span id="nameDisplay">${account.name || 'User'}</span>
                         <i class="fas fa-pencil-alt edit-icon" id="editNameIcon"></i>
                     </h1>
                     <div class="edit-name-container" id="editNameContainer" style="display: none;">
-                        <input type="text" class="name-input" id="nameInput" value="${account.full_name || ''}" maxlength="50">
+                        <input type="text" class="name-input" id="nameInput" value="${account.name || ''}" maxlength="50">
                         <button class="btn btn-primary" id="saveNameBtn" disabled>
                             <i class="fas fa-check"></i> Save
                         </button>
@@ -521,8 +650,8 @@
                         <i class="fas fa-info-circle"></i> Account Information
                     </div>
                     <div class="detail-row">
-                        <div class="detail-label">Full Name</div>
-                        <div class="detail-value">${account.full_name || 'Not provided'}</div>
+                        <div class="detail-label">Name</div>
+                        <div class="detail-value">${account.name || 'Not provided'}</div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Email</div>
@@ -548,11 +677,11 @@
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Two-Factor Auth</div>
-                        <div class="detail-value">Disabled</div>
+                        <div class="detail-value">${account.mfa_enabled ? 'Enabled' : 'Disabled'}</div>
                     </div>
                     <div class="detail-row">
-                        <div class="detail-label">Last Login</div>
-                        <div class="detail-value">${lastActive ? formatLastOnline(lastActive) : 'Never'}</div>
+                        <div class="detail-label">Last Password Change</div>
+                        <div class="detail-value">${account.last_password_change ? formatLastOnline(new Date(account.last_password_change)) : 'Never'}</div>
                     </div>
                 </div>
                 
@@ -589,9 +718,13 @@
             document.getElementById('saveNameBtn').addEventListener('click', saveName);
             document.getElementById('nameInput').addEventListener('input', checkNameAvailability);
             
+            document.getElementById('editAvatarBtn').addEventListener('click', () => {
+                document.getElementById('avatarUploadModal').style.display = 'flex';
+            });
+            
             document.getElementById('securitySettingsBtn').addEventListener('click', () => {
-           window.location.href = 'secure.html';
-        });
+                window.location.href = 'secure.html';
+            });
             
             document.getElementById('logoutButton').addEventListener('click', async () => {
                 try {
@@ -606,6 +739,159 @@
                     console.error('Logout error:', error);
                     alert('Failed to logout. Please try again.');
                 }
+            });
+        }
+
+        function setupAvatarUpload() {
+            const avatarUpload = document.getElementById('avatarUpload');
+            const avatarPreview = document.getElementById('avatarPreview');
+            const confirmUploadBtn = document.getElementById('confirmUploadBtn');
+            const cancelUploadBtn = document.getElementById('cancelUploadBtn');
+            const uploadStatus = document.getElementById('uploadStatus');
+            const avatarUploadModal = document.getElementById('avatarUploadModal');
+
+            // Handle file selection
+            avatarUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+                        uploadStatus.textContent = 'File size must be less than 2MB';
+                        uploadStatus.style.color = '#ff4444';
+                        confirmUploadBtn.disabled = true;
+                        return;
+                    }
+                    
+                    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                    if (!validTypes.includes(file.type)) {
+                        uploadStatus.textContent = 'Only JPG, PNG, GIF or WEBP files are allowed';
+                        uploadStatus.style.color = '#ff4444';
+                        confirmUploadBtn.disabled = true;
+                        return;
+                    }
+                    
+                    selectedAvatarFile = file;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        avatarPreview.src = event.target.result;
+                        avatarPreview.style.display = 'block';
+                        confirmUploadBtn.disabled = false;
+                        uploadStatus.textContent = '';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Handle upload confirmation
+            confirmUploadBtn.addEventListener('click', async () => {
+                if (!selectedAvatarFile) return;
+                
+                confirmUploadBtn.disabled = true;
+                confirmUploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+                uploadStatus.textContent = 'Uploading...';
+                uploadStatus.style.color = '#00ff88';
+                
+                try {
+                    // Generate unique filename with user folder
+                    const fileExt = selectedAvatarFile.name.split('.').pop();
+                    const fileName = `avatar.${fileExt}`;
+                    const filePath = `${currentUserId}/${fileName}`;
+                    
+                    // First delete any existing avatar to avoid conflicts
+                    try {
+                        const { error: deleteError } = await supabaseClient
+                            .storage
+                            .from('avatars')
+                            .remove([filePath]);
+                        
+                        // We don't care if the delete fails - it might not exist
+                    } catch (deleteError) {
+                        console.log('No existing avatar to delete');
+                    }
+                    
+                    // Upload the new avatar
+                    const { data: uploadData, error: uploadError } = await supabaseClient
+                        .storage
+                        .from('avatars')
+                        .upload(filePath, selectedAvatarFile, {
+                            cacheControl: '3600',
+                            upsert: true,
+                            contentType: selectedAvatarFile.type
+                        });
+                    
+                    if (uploadError) throw uploadError;
+                    
+                    // Get public URL with cache busting
+                    const { data: { publicUrl } } = supabaseClient
+                        .storage
+                        .from('avatars')
+                        .getPublicUrl(filePath);
+                    
+                    // Update user record with new avatar URL
+                    const { error: updateError } = await supabaseClient
+                        .from('users')
+                        .update({ 
+                            avatar_url: publicUrl,
+                            lastonline: new Date().toISOString()
+                        })
+                        .eq('id', currentUserId);
+                    
+                    if (updateError) throw updateError;
+                    
+                    // Log the activity
+                    await supabaseClient
+                        .from('security_logs')
+                        .insert([{
+                            user_id: currentUserId,
+                            action: 'Updated profile picture',
+                            status: 'success',
+                            created_at: new Date().toISOString()
+                        }]);
+                    
+                    // Update the avatar display with cache busting
+                    document.getElementById('profileAvatar').src = `${publicUrl}?t=${Date.now()}`;
+                    
+                    // Close modal and reset
+                    avatarUploadModal.style.display = 'none';
+                    avatarPreview.style.display = 'none';
+                    avatarPreview.src = '';
+                    avatarUpload.value = '';
+                    selectedAvatarFile = null;
+                    confirmUploadBtn.innerHTML = '<i class="fas fa-check"></i> Confirm';
+                    
+                    // Show success message
+                    uploadStatus.textContent = 'Profile picture updated successfully!';
+                    uploadStatus.style.color = '#00ff88';
+                    
+                } catch (error) {
+                    console.error('Error uploading avatar:', error);
+                    uploadStatus.textContent = 'Error uploading: ' + error.message;
+                    uploadStatus.style.color = '#ff4444';
+                    confirmUploadBtn.disabled = false;
+                    confirmUploadBtn.innerHTML = '<i class="fas fa-check"></i> Confirm';
+                    
+                    // Log the error
+                    await supabaseClient
+                        .from('security_logs')
+                        .insert([{
+                            user_id: currentUserId,
+                            action: 'Failed to update profile picture',
+                            status: 'failed',
+                            error: error.message,
+                            created_at: new Date().toISOString()
+                        }]);
+                }
+            });
+
+            // Handle cancel button
+            cancelUploadBtn.addEventListener('click', () => {
+                avatarUploadModal.style.display = 'none';
+                avatarPreview.style.display = 'none';
+                avatarPreview.src = '';
+                avatarUpload.value = '';
+                selectedAvatarFile = null;
+                uploadStatus.textContent = '';
+                confirmUploadBtn.disabled = true;
+                confirmUploadBtn.innerHTML = '<i class="fas fa-check"></i> Confirm';
             });
         }
 
@@ -656,9 +942,9 @@
             try {
                 // Case-insensitive check
                 const { data, error } = await supabaseClient
-                    .from('profiles')
-                    .select('full_name')
-                    .ilike('full_name', newName)
+                    .from('users')
+                    .select('name')
+                    .ilike('name', newName)
                     .neq('id', currentUserId);
                 
                 if (error) throw error;
@@ -695,9 +981,9 @@
             try {
                 // First confirm the name is still available
                 const { data: checkData, error: checkError } = await supabaseClient
-                    .from('profiles')
-                    .select('full_name')
-                    .ilike('full_name', newName)
+                    .from('users')
+                    .select('name')
+                    .ilike('name', newName)
                     .neq('id', currentUserId);
                 
                 if (checkError) throw checkError;
@@ -712,22 +998,23 @@
                 
                 // Update the name
                 const { data, error } = await supabaseClient
-                    .from('profiles')
+                    .from('users')
                     .update({ 
-                        full_name: newName,
-                        last_updated: new Date().toISOString()
+                        name: newName,
+                        lastonline: new Date().toISOString()
                     })
                     .eq('id', currentUserId)
                     .select();
                 
                 if (error) throw error;
                 
-                // Log the activity
+                // Log the activity in security_logs
                 await supabaseClient
-                    .from('account_activity')
+                    .from('security_logs')
                     .insert([{
                         user_id: currentUserId,
                         action: 'Changed display name',
+                        status: 'success',
                         created_at: new Date().toISOString()
                     }]);
                 
@@ -749,6 +1036,17 @@
                 console.error('Error saving name:', error);
                 document.getElementById('nameAvailability').textContent = 'Error saving name: ' + error.message;
                 document.getElementById('nameAvailability').className = 'name-availability unavailable';
+                
+                // Log the failed attempt
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Failed to change display name',
+                        status: 'failed',
+                        error: error.message,
+                        created_at: new Date().toISOString()
+                    }]);
             } finally {
                 saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
             }
@@ -824,6 +1122,12 @@
                         });
                         updateConnectionStatus("Connected");
                         updateOnlineStatus(true);
+                        
+                        // Update last online in database
+                        await supabaseClient
+                            .from('users')
+                            .update({ lastonline: new Date().toISOString() })
+                            .eq('id', currentUserId);
                     }
                     if (error) {
                         console.error('Presence channel error:', error);
