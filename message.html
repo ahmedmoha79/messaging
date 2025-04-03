@@ -1282,7 +1282,6 @@
             const parts = name.split(' ');
             if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
             return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
-// Added an extra closing parenthesis here -----------------^
         }
 
         function stringToColor(str) {
@@ -1391,16 +1390,37 @@
                 status.style.transform = 'translateY(0)';
             }, 10);
         }
+function updateBatteryDisplay() {
+    // Update header battery indicator
+    const batteryIndicator = document.getElementById('batteryIndicatorHeader');
+    const batteryLevelText = document.getElementById('batteryLevelHeader');
+    const batteryIcon = batteryIndicator.querySelector('i');
+    
+    batteryLevelText.textContent = `${batteryLevel}%`;
+    batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
+    batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
 
-        function updateBatteryDisplay() {
-            const batteryIndicator = document.getElementById('batteryIndicatorHeader');
-            const batteryLevelText = document.getElementById('batteryLevelHeader');
-            const batteryIcon = batteryIndicator.querySelector('i');
-            
-            batteryLevelText.textContent = `${batteryLevel}%`;
-            batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
-            batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
-        }
+    // Update YOUR OWN marker's tooltip (critical fix)
+    if (marker) {
+        const icon = marker.getIcon();
+        icon.options.html = `
+            <div class="user-marker-tooltip">
+                <div class="tooltip-name">Your location</div>
+                <div class="tooltip-status">
+                    <i class="fas fa-circle"></i>
+                    <span>Online (${currentDeviceType})</span>
+                </div>
+                <div class="tooltip-battery">
+                    <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                    <span>${batteryLevel}% battery</span>
+                </div>
+            </div>
+            <div class="user-marker-inner">${getDeviceEmoji(currentDeviceType)}</div>
+            <div class="user-marker-pulse"></div>
+        `;
+        marker.setIcon(icon);
+    }
+}
 
         // Map functions
         function initializeMap() {
@@ -1526,11 +1546,11 @@
                         accuracy,
                         last_updated: new Date().toISOString(),
                         device_context: {
-                            is_mobile: isMobile,
-                            battery_level: batteryLevel,
-                            device_type: currentDeviceType,
-                            last_online: new Date().toISOString()
-                        }
+    is_mobile: isMobile,
+    battery_level: batteryLevel, // <-- ADD THIS LINE
+    device_type: currentDeviceType,
+    last_online: new Date().toISOString()
+}
                     });
                 
                 if (error) throw error;
@@ -1558,10 +1578,11 @@ if (userDataCache[currentUserId]) {
                     accuracy,
                     last_updated: new Date().toISOString(),
                     device_context: {
-                        is_mobile: isMobile,
-                        battery_level: batteryLevel,
-                        device_type: currentDeviceType
-                    }
+    is_mobile: isMobile,
+    battery_level: batteryLevel,
+    device_type: currentDeviceType,
+    last_online: new Date().toISOString()
+}
                 };
             }
         }
@@ -2340,29 +2361,51 @@ if (userDataCache[currentUserId]) {
             }
         }
 
-        // Battery monitoring
-        function initBatteryMonitoring() {
-            if ('getBattery' in navigator) {
-                navigator.getBattery().then(battery => {
-                    function updateBatteryStatus() {
-                        batteryLevel = Math.round(battery.level * 100);
-                        updateBatteryDisplay();
-                        
-                        // Update our presence status with battery info
-                        if (presenceChannel) {
-                            presenceChannel.track({
-                                online_at: new Date().toISOString(),
-                                user_id: currentUserId,
+ // Battery monitoring
+       function initBatteryMonitoring() {
+    if ('getBattery' in navigator) {
+        navigator.getBattery().then(battery => {
+            function updateBatteryStatus() {
+                batteryLevel = Math.round(battery.level * 100);
+                updateBatteryDisplay();
+                
+                // Force-update Supabase with battery level (critical fix)
+                if (presenceChannel) {
+                    presenceChannel.track({
+                        online_at: new Date().toISOString(),
+                        user_id: currentUserId,
+                        battery_level: batteryLevel,
+                        device_type: currentDeviceType
+                    });
+                }
+                
+                // Update location record too (new addition)
+                if (lastPosition) {
+                    supabaseClient
+                        .from('user_locations')
+                        .upsert({
+                            user_id: currentUserId,
+                            device_context: {
                                 battery_level: batteryLevel,
-                                device_type: currentDeviceType
-                            });
-                        }
-                    }
-                    
-                    battery.addEventListener('levelchange', updateBatteryStatus);
-                    updateBatteryStatus();
-                });
-            } else if ('battery' in navigator) {
+                                last_updated: new Date().toISOString()
+                            }
+                        });
+                }
+            }
+            
+            battery.addEventListener('levelchange', updateBatteryStatus);
+            updateBatteryStatus(); // Initial update
+        });
+    } else {
+        // Fallback for browsers without Battery API
+        console.log("Battery API not available");
+        setInterval(() => {
+            batteryLevel = Math.max(0, batteryLevel - 1);
+            if (batteryLevel <= 0) batteryLevel = 100;
+            updateBatteryDisplay();
+        }, 60000);
+    }
+} else if ('battery' in navigator) {
                 // Fallback for older browsers
                 navigator.battery.addEventListener('levelchange', () => {
                     batteryLevel = Math.round(navigator.battery.level * 100);
