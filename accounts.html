@@ -439,10 +439,10 @@
             try {
                 // Fetch account information
                 let { data: account, error: accountError } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', currentUserId)
-                    .single();
+    .from('users')
+    .select('*')
+    .eq('id', currentUserId)
+    .single();
                 
                 // If profile doesn't exist, create one
                 if (accountError && accountError.code === 'PGRST116') {
