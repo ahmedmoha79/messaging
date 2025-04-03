@@ -5,17 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Logistics Secure Messaging</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Base Styles - Optimized for Mobile First */
         :root {
             --primary: #00ff88;
             --primary-dark: #00cc66;
-            --primary-light: #00ff8855;
+            --primary-light: rgba(0, 255, 136, 0.1);
             --danger: #ff4444;
-            --danger-light: #ff444433;
+            --danger-light: rgba(255, 68, 68, 0.1);
             --background: #0a0a0a;
             --surface: #121212;
             --surface-light: #1e1e1e;
+            --surface-lighter: #2a2a2a;
             --text-primary: #ffffff;
             --text-secondary: #aaaaaa;
             --text-tertiary: #666666;
@@ -31,6 +32,10 @@
             --radius-lg: 16px;
             --radius-xl: 24px;
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --sidebar-width: 320px;
+            --header-height: 60px;
+            --map-controls-bottom: 20px;
+            --map-controls-right: 16px;
         }
 
         * {
@@ -59,44 +64,180 @@
             overflow: hidden;
         }
 
-        /* Connection Status - Simplified */
+        /* Session Check - Professional Loading */
+        .session-check {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--background);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 40px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .session-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, #00ccff 100%);
+            border-radius: var(--radius-xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: #000;
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+
+        .session-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            background: linear-gradient(to right, var(--primary), #00ccff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .session-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            max-width: 300px;
+        }
+
+        .session-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .session-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, var(--primary), #00ccff);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        /* Connection Status - Enhanced */
         .connection-status {
             position: fixed;
             top: 10px;
             right: 10px;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+            padding: 8px 16px;
+            border-radius: var(--radius-md);
+            font-size: 13px;
             font-weight: 500;
-            z-index: 1000;
-            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            background: rgba(0, 0, 0, 0.8);
             color: var(--danger);
             backdrop-filter: blur(10px);
             box-shadow: var(--shadow);
             transition: var(--transition);
             display: flex;
             align-items: center;
-            gap: 6px;
-        }
-
-        .connection-status::before {
-            content: '';
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: currentColor;
+            gap: 8px;
+            border-left: 4px solid currentColor;
+            opacity: 0;
+            transform: translateY(-20px);
         }
 
         .connection-status.connected {
             color: var(--online);
+            border-left-color: var(--online);
+            opacity: 1;
+            transform: translateY(0);
         }
 
-        /* Sidebar - Mobile Optimized */
+        .connection-status i {
+            font-size: 14px;
+        }
+
+        /* App Header - Enhanced for Mobile */
+        .app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            padding: 0 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .app-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .app-title i {
+            color: var(--primary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-button {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .battery-indicator-header {
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .battery-indicator-header i {
+            font-size: 16px;
+        }
+
+        /* Sidebar - Enhanced for both mobile and desktop */
         .sidebar {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
+            width: var(--sidebar-width);
             height: 100%;
             background: var(--surface);
             z-index: 1000;
@@ -121,34 +262,54 @@
             border-bottom: 1px solid var(--border);
             position: relative;
             z-index: 10;
+            height: var(--header-height);
         }
 
         .sidebar-title {
             font-size: 18px;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-title i {
+            color: var(--primary);
         }
 
         .close-sidebar {
             background: none;
             border: none;
             color: var(--text-primary);
-            font-size: 24px;
+            font-size: 20px;
             cursor: pointer;
             padding: 8px;
-            margin-right: -8px;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .close-sidebar:hover {
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .search-bar {
             padding: 12px 16px;
             background: var(--surface);
             position: sticky;
-            top: 0;
+            top: var(--header-height);
             z-index: 10;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-container {
+            position: relative;
+            display: flex;
+            align-items: center;
         }
 
         .search-input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 12px 16px 12px 40px;
             background: rgba(255, 255, 255, 0.05);
             border: none;
             border-radius: var(--radius-md);
@@ -163,6 +324,13 @@
             box-shadow: 0 0 0 2px var(--primary-light);
         }
 
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
         .user-list {
             flex: 1;
             overflow-y: auto;
@@ -174,7 +342,7 @@
             display: none;
         }
 
-        /* User Card - Enhanced */
+        /* User Card - Enhanced with more details */
         .user-card {
             display: flex;
             align-items: center;
@@ -211,6 +379,7 @@
             font-size: 18px;
             font-weight: bold;
             color: white;
+            position: relative;
         }
 
         .user-info {
@@ -225,6 +394,9 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .user-info p {
@@ -243,6 +415,7 @@
             flex-direction: column;
             align-items: flex-end;
             gap: 4px;
+            margin-left: 8px;
         }
 
         .status-indicator {
@@ -308,7 +481,7 @@
             animation: pulse 1.5s infinite;
         }
 
-        /* Map Container - Improved */
+        /* Map Container - Enhanced */
         .map-container {
             flex: 1;
             position: relative;
@@ -322,7 +495,148 @@
             background: #1a1a1a;
         }
 
-        /* Chat View - Redesigned */
+        /* Map Controls - Enhanced */
+        .map-controls {
+            position: absolute;
+            bottom: var(--map-controls-bottom);
+            right: var(--map-controls-right);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+        }
+
+        .map-control {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(5px);
+        }
+
+        .map-control:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .map-control.active {
+            background: var(--primary);
+            color: #000;
+        }
+
+        /* User Marker - Enhanced with more details */
+        .user-marker {
+            position: relative;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            transition: var(--transition);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+        }
+
+        .user-marker.online {
+            border-color: var(--online);
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
+        }
+
+        .user-marker.offline {
+            border-color: var(--offline);
+            opacity: 0.7;
+        }
+
+        .user-marker-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(0, 255, 136, 0.3);
+            animation: pulse 2s infinite;
+            z-index: -1;
+        }
+
+        .user-marker-tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            white-space: nowrap;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(5px);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 180px;
+        }
+
+        .user-marker:hover .user-marker-tooltip {
+            opacity: 1;
+        }
+
+        .tooltip-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .tooltip-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .tooltip-status i {
+            font-size: 10px;
+        }
+
+        .tooltip-battery {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+
+        .tooltip-location {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Current User Marker - Special Styling */
+        .current-user-marker {
+            border-width: 3px;
+            width: 48px;
+            height: 48px;
+        }
+
+        /* Chat View - Redesigned with better layout */
         .chat-view {
             position: fixed;
             top: 0;
@@ -340,7 +654,7 @@
         }
 
         .chat-header {
-            padding: 16px;
+            padding: 12px 16px;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -348,23 +662,33 @@
             border-bottom: 1px solid var(--border);
             position: relative;
             z-index: 10;
+            height: var(--header-height);
         }
 
         .back-button {
             background: none;
             border: none;
             color: var(--text-primary);
-            font-size: 24px;
+            font-size: 20px;
             cursor: pointer;
-            padding: 4px;
-            margin-right: 4px;
+            padding: 8px;
+            border-radius: 50%;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .chat-partner {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
             flex: 1;
+            min-width: 0;
         }
 
         .chat-partner-avatar {
@@ -377,6 +701,7 @@
             font-weight: bold;
             color: white;
             font-size: 16px;
+            flex-shrink: 0;
         }
 
         .chat-partner-info {
@@ -390,6 +715,9 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .chat-partner-status {
@@ -433,6 +761,7 @@
             word-break: break-word;
             line-height: 1.4;
             font-size: 15px;
+            box-shadow: var(--shadow);
         }
 
         .message.sent {
@@ -516,7 +845,7 @@
             box-shadow: none !important;
         }
 
-        /* Typing Indicator - Improved */
+        /* Typing Indicator - Enhanced */
         .typing-indicator {
             position: absolute;
             bottom: calc(100% + 8px);
@@ -538,223 +867,28 @@
             opacity: 1;
         }
 
-        .typing-indicator::before,
-        .typing-indicator::after,
-        .typing-indicator span::after {
-            content: '';
-            display: inline-block;
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
             width: 6px;
             height: 6px;
             background: var(--primary);
             border-radius: 50%;
-            margin-right: 4px;
-        }
-
-        .typing-indicator::before {
             animation: typingPulse 1.4s infinite both;
         }
 
-        .typing-indicator::after {
-            animation: typingPulse 1.4s infinite 0.2s both;
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
         }
 
-        .typing-indicator span::after {
-            animation: typingPulse 1.4s infinite 0.4s both;
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
         }
 
-        /* Map Controls - Redesigned */
-        .map-controls {
-            position: absolute;
-            bottom: 20px;
-            right: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            z-index: 1000;
-        }
-
-        .map-control {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: 20px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(5px);
-        }
-
-        .map-control:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
-        }
-
-        .map-control.active {
-            background: var(--primary);
-            color: #000;
-        }
-
-        /* Heatmap Controls - New Style */
-        .heatmap-controls {
-            position: absolute;
-            bottom: 80px;
-            right: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            z-index: 1000;
-        }
-
-        .heatmap-toggle {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: 20px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(5px);
-        }
-
-        .heatmap-toggle:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
-        }
-
-        .heatmap-toggle.active {
-            background: #ff4500;
-            color: white;
-        }
-
-        /* App Header - New Component */
-        .app-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .app-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .header-button {
-            background: none;
-            border: none;
-            color: var(--text-primary);
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .battery-indicator-header {
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-            border-radius: var(--radius-md);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        /* User Marker - Enhanced */
-        .user-marker {
-            position: relative;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            font-weight: bold;
-            transition: var(--transition);
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-        }
-
-        .user-marker.online {
-            border-color: var(--online);
-            box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
-        }
-
-        .user-marker.offline {
-            border-color: var(--offline);
-            opacity: 0.7;
-        }
-
-        .user-marker-pulse {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: rgba(0, 255, 136, 0.3);
-            animation: pulse 2s infinite;
-            z-index: -1;
-        }
-
-        .user-marker-tooltip {
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 6px 12px;
-            border-radius: var(--radius-sm);
-            white-space: nowrap;
-            font-size: 12px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            backdrop-filter: blur(5px);
-            box-shadow: var(--shadow);
-        }
-
-        .user-marker:hover .user-marker-tooltip {
-            opacity: 1;
-        }
-
-        /* Current User Marker - Special Styling */
-        .current-user-marker {
-            border-width: 3px;
-            width: 48px;
-            height: 48px;
-        }
-
-        /* Loading States */
+        /* Loading States - Professional */
         .loading-state {
             display: flex;
             flex-direction: column;
@@ -763,6 +897,7 @@
             padding: 40px 20px;
             color: var(--text-primary);
             gap: 16px;
+            text-align: center;
         }
 
         .loading-spinner {
@@ -774,37 +909,50 @@
             animation: spin 1s linear infinite;
         }
 
-        /* Animations */
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
         }
 
-        @keyframes pulse {
-            0%, 60%, 100% { opacity: 0.3; transform: scale(1); }
-            30% { opacity: 1; transform: scale(1.1); }
+        /* Error State - Improved */
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            color: var(--danger);
+            gap: 16px;
+            text-align: center;
         }
 
-        @keyframes typingPulse {
-            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-            30% { opacity: 1; transform: translateY(-3px); }
+        .error-icon {
+            font-size: 40px;
+            color: var(--danger);
         }
 
-        @keyframes messageAppear {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .error-message {
+            font-size: 16px;
+            margin-bottom: 8px;
         }
 
-        @keyframes slideIn {
-            from { transform: translateX(-100%); }
-            to { transform: translateX(0); }
+        .error-button {
+            padding: 12px 24px;
+            background: var(--primary);
+            border: none;
+            border-radius: var(--radius-md);
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
         }
 
-        @keyframes slideOut {
-            from { transform: translateX(0); }
-            to { transform: translateX(-100%); }
+        .error-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
         }
 
-        /* Mobile Notifications */
+        /* Mobile Notification - Enhanced */
         .mobile-notification {
             position: fixed;
             top: 12px;
@@ -820,6 +968,7 @@
             transition: var(--transition);
             backdrop-filter: blur(10px);
             box-shadow: var(--shadow);
+            cursor: pointer;
         }
 
         .mobile-notification.active {
@@ -864,89 +1013,64 @@
             text-overflow: ellipsis;
         }
 
-        /* Session Check */
-        .session-check {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--background);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            padding: 20px;
-            text-align: center;
+        /* Animations */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
-        .session-check h2 {
-            margin-bottom: 20px;
+        @keyframes pulse {
+            0%, 60%, 100% { opacity: 0.3; transform: scale(1); }
+            30% { opacity: 1; transform: scale(1.1); }
         }
 
-        /* Error State */
-        .error-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
-            color: var(--danger);
-            gap: 16px;
-            text-align: center;
+        @keyframes typingPulse {
+            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+            30% { opacity: 1; transform: translateY(-3px); }
         }
 
-        .error-state button {
-            padding: 12px 24px;
-            background: var(--primary);
-            border: none;
-            border-radius: var(--radius-md);
-            color: #000;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
+        @keyframes messageAppear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        .error-state button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* Responsive Adjustments */
         @media (min-width: 768px) {
+            /* Desktop specific styles */
+            :root {
+                --sidebar-width: 360px;
+                --map-controls-bottom: 24px;
+                --map-controls-right: 24px;
+            }
+
             .app-container {
                 flex-direction: row;
             }
 
             .sidebar {
                 position: relative;
-                width: 320px;
+                width: var(--sidebar-width);
                 transform: none;
                 z-index: 100;
+                border-right: 1px solid var(--border);
             }
 
             .sidebar-header {
-                display: none;
+                display: flex;
             }
 
             .chat-view {
                 position: relative;
                 z-index: 200;
+                border-left: 1px solid var(--border);
             }
 
             .app-header {
                 display: none;
-            }
-
-            .map-controls {
-                bottom: 24px;
-                right: 24px;
-            }
-
-            .heatmap-controls {
-                bottom: 100px;
-                right: 24px;
             }
 
             .user-card {
@@ -957,10 +1081,21 @@
             .message-content {
                 max-width: 65%;
             }
+
+            /* Hide mobile-only elements */
+            .mobile-notification {
+                display: none;
+            }
         }
 
         /* Special adjustments for very small screens */
         @media (max-width: 360px) {
+            :root {
+                --header-height: 56px;
+                --map-controls-bottom: 16px;
+                --map-controls-right: 12px;
+            }
+
             .user-card {
                 padding: 10px 12px;
             }
@@ -984,12 +1119,6 @@
                 height: 44px;
                 font-size: 18px;
             }
-
-            .heatmap-toggle {
-                width: 44px;
-                height: 44px;
-                font-size: 18px;
-            }
         }
 
         /* Prevent body scrolling when sidebar is open */
@@ -1001,25 +1130,38 @@
 <body>
     <!-- Session Check Overlay -->
     <div class="session-check">
-        <h2>Loading your shit</h2>
-        <div class="loading-spinner"></div>
+        <div class="session-logo">
+            <i class="fas fa-truck"></i>
+        </div>
+        <h1 class="session-title">Logistics Secure</h1>
+        <p class="session-subtitle">Loading your secure messaging and tracking session...</p>
+        <div class="session-progress">
+            <div class="session-progress-bar" id="sessionProgress"></div>
+        </div>
     </div>
 
     <!-- Connection Status -->
-    <div class="connection-status">Connecting...</div>
+    <div class="connection-status">
+        <i class="fas fa-plug"></i>
+        <span>Connecting...</span>
+    </div>
     
     <!-- App Header (Mobile Only) -->
     <div class="app-header">
         <button class="header-button" id="menuButton">
-            ☰
+            <i class="fas fa-bars"></i>
         </button>
-        <div class="app-title">Team Locations</div>
+        <div class="app-title">
+            <i class="fas fa-map-marker-alt"></i>
+            <span>Team Locations</span>
+        </div>
         <div class="header-actions">
             <div class="battery-indicator-header" id="batteryIndicatorHeader">
+                <i class="fas fa-battery-full"></i>
                 <span id="batteryLevelHeader">100%</span>
             </div>
             <button class="header-button" id="accountButton">
-                👤
+                <i class="fas fa-user"></i>
             </button>
         </div>
     </div>
@@ -1029,18 +1171,24 @@
         <!-- Sidebar - User List -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-title">Team Members</div>
+                <div class="sidebar-title">
+                    <i class="fas fa-users"></i>
+                    <span>Team Members</span>
+                </div>
                 <button class="close-sidebar" id="closeSidebar">
-                    ✕
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="search-bar">
-                <input type="text" class="search-input" placeholder="Search team members..." id="searchInput">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search team members..." id="searchInput">
+                </div>
             </div>
             <div class="user-list" id="userList">
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
-                    <p>Loading users...</p>
+                    <p class="loading-text">Loading team members...</p>
                 </div>
             </div>
         </div>
@@ -1052,20 +1200,13 @@
             <!-- Map Controls -->
             <div class="map-controls">
                 <button class="map-control" id="centerMapButton" title="Center on my location">
-                    🎯
+                    <i class="fas fa-location-arrow"></i>
                 </button>
                 <button class="map-control active" id="toggleUserLocationsButton" title="Toggle team locations">
-                    👥
+                    <i class="fas fa-user-friends"></i>
                 </button>
                 <button class="map-control" id="openChatListButton" title="Open chat list">
-                    💬
-                </button>
-            </div>
-            
-            <!-- Heatmap Controls -->
-            <div class="heatmap-controls">
-                <button class="heatmap-toggle" id="toggleHeatmapButton" title="Toggle heatmap view">
-                    🔥
+                    <i class="fas fa-comments"></i>
                 </button>
             </div>
         </div>
@@ -1074,7 +1215,7 @@
         <div class="chat-view" id="chatView">
             <div class="chat-header">
                 <button class="back-button" id="backToChatListButton">
-                    ←
+                    <i class="fas fa-arrow-left"></i>
                 </button>
                 <div class="chat-partner">
                     <div class="chat-partner-avatar" id="chatPartnerAvatar">
@@ -1093,7 +1234,7 @@
             <div class="message-input-container">
                 <textarea class="message-input" id="messageInput" placeholder="Type your message..." disabled></textarea>
                 <button class="send-button" id="sendButton" disabled>
-                    <span>Send</span>
+                    <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
         </div>
@@ -1115,12 +1256,10 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script>
         // Configuration and global variables
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
-        const HEATMAP_API_URL = "http://localhost:8000/api/heatmap";
         
         let supabaseClient, presenceChannel, typingTimeout;
         let selectedUser = null, currentUserId = null, session = null;
@@ -1134,8 +1273,8 @@
         let batteryLevel = 100;
         let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         let currentDeviceType = isMobile ? 'mobile' : 'desktop';
-        let heatmapLayer = null;
-        let showHeatmap = false;
+        let lastLocationUpdate = null;
+        let locationCache = {};
 
         // Helper functions
         function getInitials(name) {
@@ -1143,9 +1282,11 @@
             const parts = name.split(' ');
             if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
             return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+// Added an extra closing parenthesis here -----------------^
         }
 
         function stringToColor(str) {
+            if (!str) return '#666666';
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 hash = str.charCodeAt(i) + ((hash << 5) - hash);
@@ -1158,30 +1299,39 @@
             return color;
         }
 
-        function formatDistance(date) {
+        function formatTimeAgo(date) {
             if (!date) return 'unknown';
             
-            const diff = (Date.now() - new Date(date)) / 1000;
-            if (diff < 60) return `${Math.floor(diff)}s`;
-            if (diff < 3600) return `${Math.floor(diff/60)}m`;
-            if (diff < 86400) return `${Math.floor(diff/3600)}h`;
-            return `${Math.floor(diff/86400)}d`;
+            const seconds = Math.floor((Date.now() - new Date(date)) / 1000);
+            
+            if (seconds < 60) return 'just now';
+            if (seconds < 3600) return `${Math.floor(seconds/60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds/3600)}h ago`;
+            return `${Math.floor(seconds/86400)}d ago`;
         }
 
         function formatLastOnline(date) {
             if (!date) return 'Offline';
             
-            const diff = (Date.now() - new Date(date)) / 60000;
-            if (diff < 1) return 'Just now';
-            if (diff < 60) return `${Math.floor(diff)}m ago`;
-            if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
-            return `${Math.floor(diff/1440)}d ago`;
+            const seconds = Math.floor((Date.now() - new Date(date)) / 1000);
+            
+            if (seconds < 60) return 'Online';
+            if (seconds < 300) return 'Online'; // Consider online if seen within 5 minutes
+            return formatTimeAgo(date);
         }
 
         function getBatteryColor(level) {
             if (level > 70) return 'high';
             if (level > 30) return 'medium';
             return 'low';
+        }
+
+        function getBatteryIcon(level) {
+            if (level > 90) return 'fa-battery-full';
+            if (level > 70) return 'fa-battery-three-quarters';
+            if (level > 50) return 'fa-battery-half';
+            if (level > 20) return 'fa-battery-quarter';
+            return 'fa-battery-empty';
         }
 
         function getDeviceEmoji(deviceType) {
@@ -1197,7 +1347,7 @@
             document.getElementById('userList').innerHTML = `
                 <div class="loading-state">
                     <div class="loading-spinner"></div>
-                    <p>Loading users...</p>
+                    <p class="loading-text">Loading team members...</p>
                 </div>
             `;
         }
@@ -1205,8 +1355,11 @@
         function showError(message) {
             document.getElementById('userList').innerHTML = `
                 <div class="error-state">
-                    <p>${message}</p>
-                    <button onclick="window.location.reload()">Retry</button>
+                    <div class="error-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <p class="error-message">${message}</p>
+                    <button class="error-button" onclick="window.location.reload()">Retry</button>
                 </div>
             `;
         }
@@ -1220,20 +1373,32 @@
         function hideSendLoading() {
             const btn = document.getElementById('sendButton');
             btn.disabled = false;
-            btn.innerHTML = '<span>Send</span>';
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
         }
 
         function updateConnectionStatus(message, isError = false) {
             const status = document.querySelector('.connection-status');
-            status.textContent = message;
+            status.innerHTML = `
+                <i class="fas ${isError ? 'fa-exclamation-circle' : 'fa-plug'}"></i>
+                <span>${message}</span>
+            `;
             status.classList.toggle('connected', !isError);
+            
+            // Animate in
+            status.style.display = 'flex';
+            setTimeout(() => {
+                status.style.opacity = 1;
+                status.style.transform = 'translateY(0)';
+            }, 10);
         }
 
         function updateBatteryDisplay() {
             const batteryIndicator = document.getElementById('batteryIndicatorHeader');
             const batteryLevelText = document.getElementById('batteryLevelHeader');
+            const batteryIcon = batteryIndicator.querySelector('i');
             
             batteryLevelText.textContent = `${batteryLevel}%`;
+            batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
             batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
         }
 
@@ -1241,7 +1406,10 @@
         function initializeMap() {
             try {
                 // Initialize the map with default view
-                map = L.map('map').setView([0, 0], 2);
+                map = L.map('map', {
+                    zoomControl: false,
+                    attributionControl: false
+                }).setView([0, 0], 2);
                 
                 // Add base map layers
                 const baseLayers = {
@@ -1265,7 +1433,17 @@
                     icon: L.divIcon({
                         className: 'user-marker online current-user-marker',
                         html: `
-                            <div class="user-marker-tooltip">Your location (${currentDeviceType})</div>
+                            <div class="user-marker-tooltip">
+                                <div class="tooltip-name">Your location</div>
+                                <div class="tooltip-status">
+                                    <i class="fas fa-circle"></i>
+                                    <span>Online (${currentDeviceType})</span>
+                                </div>
+                                <div class="tooltip-battery">
+                                    <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                    <span>${batteryLevel}% battery</span>
+                                </div>
+                            </div>
                             <div class="user-marker-inner">${getDeviceEmoji(currentDeviceType)}</div>
                             <div class="user-marker-pulse"></div>
                         `,
@@ -1278,88 +1456,26 @@
                 // Start tracking user's location
                 startLocationTracking();
                 
+                // Add zoom controls
+                L.control.zoom({
+                    position: 'topright'
+                }).addTo(map);
+                
             } catch (error) {
                 console.error("Map initialization failed:", error);
                 throw error;
             }
         }
 
-        async function loadHeatmapData() {
-            try {
-                const response = await fetch(HEATMAP_API_URL);
-                if (!response.ok) throw new Error('Failed to fetch heatmap data');
-                const heatmapData = await response.json();
-
-                // Remove existing heatmap if any
-                if (heatmapLayer) {
-                    map.removeLayer(heatmapLayer);
-                }
-
-                // Convert Plotly heatmap data to Leaflet-compatible format
-                const heatmapPoints = heatmapData.data[0].z.flatMap((row, y) => 
-                    row.map((value, x) => ({
-                        lat: heatmapData.data[0].y[y],
-                        lng: heatmapData.data[0].x[x],
-                        intensity: value
-                    }))
-                ).filter(point => point.intensity > 0);
-
-                // Create heatmap layer
-                heatmapLayer = L.heatLayer(
-                    heatmapPoints.map(p => [p.lat, p.lng, p.intensity * 10]), // Adjust multiplier for visibility
-                    { radius: 25, blur: 15, maxZoom: 17 }
-                ).addTo(map);
-
-            } catch (error) {
-                console.error('Heatmap load error:', error);
-            }
-        }
-
         function startLocationTracking() {
             if (navigator.geolocation) {
-                watchId = navigator.geolocation.watchPosition(
-                    async (position) => {
-                        const { latitude, longitude, accuracy } = position.coords;
-                        lastPosition = { lat: latitude, lng: longitude };
-                        
-                        // Update marker position
-                        marker.setLatLng([latitude, longitude]);
-                        
-                        // Update user location in database
-                        try {
-                            const { error } = await supabaseClient
-                                .from('user_locations')
-                                .upsert({
-                                    user_id: currentUserId,
-                                    latitude,
-                                    longitude,
-                                    accuracy,
-                                    last_updated: new Date().toISOString(),
-                                    device_context: {
-                                        is_mobile: isMobile,
-                                        battery_level: batteryLevel,
-                                        device_type: currentDeviceType
-                                    }
-                                });
-                            
-                            if (error) throw error;
-                            
-                            // Update user's last online status and device type
-                            await supabaseClient
-                                .from('users')
-                                .update({ 
-                                    lastonline: new Date().toISOString(),
-                                    status: 'online',
-                                    device_type: currentDeviceType
-                                })
-                                .eq('id', currentUserId);
-                                
-                        } catch (error) {
-                            console.error('Failed to update location:', error);
-                        }
+                // First try to get current position quickly
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        updateLocation(position);
                     },
                     (error) => {
-                        console.error('Geolocation error:', error);
+                        console.error('Initial geolocation error:', error);
                     },
                     {
                         enableHighAccuracy: true,
@@ -1367,6 +1483,82 @@
                         timeout: 5000
                     }
                 );
+
+                // Then set up continuous tracking
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        updateLocation(position);
+                    },
+                    (error) => {
+                        console.error('Geolocation error:', error);
+                        // If we have a last position, keep showing it
+                        if (lastPosition) {
+                            marker.setLatLng([lastPosition.lat, lastPosition.lng]);
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 30000,
+                        timeout: 10000
+                    }
+                );
+            } else {
+                console.error('Geolocation not supported');
+            }
+        }
+
+        async function updateLocation(position) {
+            const { latitude, longitude, accuracy } = position.coords;
+            lastPosition = { lat: latitude, lng: longitude };
+            lastLocationUpdate = new Date();
+            
+            // Update marker position
+            marker.setLatLng([latitude, longitude]);
+            
+            // Update user location in database
+            try {
+                const { error } = await supabaseClient
+                    .from('user_locations')
+                    .upsert({
+                        user_id: currentUserId,
+                        latitude,
+                        longitude,
+                        accuracy,
+                        last_updated: new Date().toISOString(),
+                        device_context: {
+                            is_mobile: isMobile,
+                            battery_level: batteryLevel,
+                            device_type: currentDeviceType,
+                            last_online: new Date().toISOString()
+                        }
+                    });
+                
+                if (error) throw error;
+                
+                // Update user's last online status and device type
+                await supabaseClient
+                    .from('users')
+                    .update({ 
+                        lastonline: new Date().toISOString(),
+                        status: 'online',
+                        device_type: currentDeviceType
+                    })
+                    .eq('id', currentUserId);
+                    
+            } catch (error) {
+                console.error('Failed to update location:', error);
+                // Cache the location locally if update fails
+                locationCache[currentUserId] = {
+                    latitude,
+                    longitude,
+                    accuracy,
+                    last_updated: new Date().toISOString(),
+                    device_context: {
+                        is_mobile: isMobile,
+                        battery_level: batteryLevel,
+                        device_type: currentDeviceType
+                    }
+                };
             }
         }
 
@@ -1401,13 +1593,28 @@
                 
                 if (usersError) throw usersError;
                 
-                // Get locations for these users
-                const { data: locations, error: locationsError } = await supabaseClient
-                    .from('user_locations')
-                    .select('user_id, latitude, longitude, last_updated, device_context')
-                    .in('user_id', users.map(u => u.id));
+                // Get locations for these users - first try database, then fallback to cache
+                let locations = [];
+                try {
+                    const { data: dbLocations, error: locationsError } = await supabaseClient
+                        .from('user_locations')
+                        .select('user_id, latitude, longitude, last_updated, device_context')
+                        .in('user_id', users.map(u => u.id));
+                    
+                    if (!locationsError) {
+                        locations = dbLocations;
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch locations from DB, using cache:', e);
+                }
                 
-                if (locationsError) throw locationsError;
+                // Merge with cached locations
+                const allLocations = [...locations];
+                Object.keys(locationCache).forEach(userId => {
+                    if (!allLocations.some(loc => loc.user_id === userId)) {
+                        allLocations.push(locationCache[userId]);
+                    }
+                });
                 
                 // Get unread message counts
                 const { data: unreadCounts, error: unreadError } = await supabaseClient
@@ -1417,28 +1624,25 @@
                     .eq('is_read', false);
                 
                 if (!unreadError) {
-                    // Process counts manually
-                    const countsMap = {};
                     unreadCounts.forEach(item => {
-                        if (!countsMap[item.sender_id]) {
-                            countsMap[item.sender_id] = 0;
+                        if (!unreadMessages[item.sender_id]) {
+                            unreadMessages[item.sender_id] = 0;
                         }
-                        countsMap[item.sender_id]++;
-                    });
-                    
-                    Object.keys(countsMap).forEach(senderId => {
-                        unreadMessages[senderId] = countsMap[senderId];
+                        unreadMessages[item.sender_id]++;
                     });
                 }
                 
                 // Combine the data
                 const usersWithLocations = users.map(user => {
-                    const location = locations.find(loc => loc.user_id === user.id);
+                    const location = allLocations.find(loc => loc.user_id === user.id);
+                    const batteryLevel = location?.device_context?.battery_level || null;
+                    
                     return {
                         ...user,
                         user_locations: location ? [location] : [],
                         unread_count: unreadMessages[user.id] || 0,
-                        battery_level: location?.device_context?.battery_level || null
+                        battery_level: batteryLevel,
+                        last_location_update: location?.last_updated || null
                     };
                 });
                 
@@ -1461,7 +1665,7 @@
             userList.innerHTML = '';
 
             if (users.length === 0) {
-                userList.innerHTML = '<p style="padding: 20px; text-align: center;">No other users found</p>';
+                userList.innerHTML = '<p style="padding: 20px; text-align: center;">No other team members found</p>';
                 return;
             }
 
@@ -1472,11 +1676,8 @@
                 const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
                 const batteryLevel = user.battery_level;
                 
-                // Determine status text
+                // Determine status text - only show one status (online or last seen)
                 let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                if (hasLocation) {
-                    statusText += ` • ${formatDistance(locationTime)} ago`;
-                }
                 
                 const userCard = document.createElement('div');
                 userCard.className = `user-card ${user.unread_count > 0 ? 'has-unread' : ''}`;
@@ -1484,20 +1685,24 @@
                 userCard.innerHTML = `
                     <div class="user-avatar" style="background: ${stringToColor(user.name)}">
                         ${getInitials(user.name)}
+                        ${isOnline ? '<div class="status-indicator online"></div>' : ''}
                     </div>
                     <div class="user-info">
                         <h4>${user.name}</h4>
-                        <p>${statusText}</p>
+                        <p>
+                            <span>${statusText}</span>
+                            ${hasLocation ? `<span>• ${getDeviceEmoji(user.device_type || 'unknown')}</span>` : ''}
+                        </p>
                     </div>
                     <div class="user-status">
-                        <div class="status-indicator ${isOnline ? 'online' : ''}"></div>
                         ${batteryLevel ? `
                             <div class="battery-indicator ${getBatteryColor(batteryLevel)}">
-                                ${batteryLevel}%
+                                <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                <span>${batteryLevel}%</span>
                             </div>
                         ` : ''}
                     </div>
-                    <div class="new-message-notification"></div>
+                    ${user.unread_count > 0 ? '<div class="new-message-notification"></div>' : ''}
                 `;
                 userCard.addEventListener('click', () => selectUser(user));
                 userList.appendChild(userCard);
@@ -1536,14 +1741,27 @@
                     const lastUpdated = new Date(location.last_updated);
                     const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000;
                     
-                    // Create custom marker with battery info
+                    // Create custom marker with detailed tooltip
                     const marker = L.marker([location.latitude, location.longitude], {
                         icon: L.divIcon({
                             className: `user-marker ${isOnline && isRecent ? 'online' : 'offline'}`,
                             html: `
                                 <div class="user-marker-tooltip">
-                                    ${user.name} (${deviceType})${!isRecent ? ' • last seen ' + formatDistance(lastUpdated) + ' ago' : ''}
-                                    ${batteryLevel ? ` • Battery: ${batteryLevel}%` : ''}
+                                    <div class="tooltip-name">${user.name}</div>
+                                    <div class="tooltip-status">
+                                        <i class="fas fa-circle"></i>
+                                        <span>${isOnline && isRecent ? 'Online' : formatLastOnline(user.lastonline)} (${deviceType})</span>
+                                    </div>
+                                    ${batteryLevel ? `
+                                    <div class="tooltip-battery">
+                                        <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                        <span>${batteryLevel}% battery</span>
+                                    </div>
+                                    ` : ''}
+                                    <div class="tooltip-location">
+                                        <i class="fas fa-clock"></i>
+                                        <span>Updated ${formatTimeAgo(lastUpdated)}</span>
+                                    </div>
                                 </div>
                                 <div class="user-marker-inner">
                                     ${getDeviceEmoji(deviceType)}
@@ -1586,18 +1804,19 @@
                     (userData?.status === 'online' && lastOnline && 
                     (Date.now() - lastOnline.getTime()) < 300000);
                 
+                // Update status indicator
                 const indicator = card.querySelector('.status-indicator');
                 if (indicator) {
                     indicator.classList.toggle('online', isOnline);
                     
+                    // Update status text
                     const statusText = card.querySelector('p');
                     if (statusText) {
                         const hasLocation = userData?.user_locations?.length > 0;
-                        const locationTime = hasLocation ? new Date(userData.user_locations[0].last_updated) : null;
-                        statusText.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                        if (hasLocation) {
-                            statusText.textContent += ` • ${formatDistance(locationTime)} ago`;
-                        }
+                        statusText.innerHTML = `
+                            <span>${isOnline ? 'Online' : formatLastOnline(lastOnline)}</span>
+                            ${hasLocation ? `<span>• ${getDeviceEmoji(userData.device_type)}</span>` : ''}
+                        `;
                     }
                 }
             });
@@ -1614,6 +1833,38 @@
                     
                     const icon = marker.getIcon();
                     icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
+                    
+                    // Update tooltip content
+                    const location = userData?.user_locations?.[0];
+                    const lastUpdated = location ? new Date(location.last_updated) : null;
+                    const batteryLevel = location?.device_context?.battery_level;
+                    
+                    icon.options.html = `
+                        <div class="user-marker-tooltip">
+                            <div class="tooltip-name">${userData?.name || 'Unknown'}</div>
+                            <div class="tooltip-status">
+                                <i class="fas fa-circle"></i>
+                                <span>${isOnline ? 'Online' : formatLastOnline(lastOnline)} (${userData?.device_type || 'unknown'})</span>
+                            </div>
+                            ${batteryLevel ? `
+                            <div class="tooltip-battery">
+                                <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                <span>${batteryLevel}% battery</span>
+                            </div>
+                            ` : ''}
+                            ${lastUpdated ? `
+                            <div class="tooltip-location">
+                                <i class="fas fa-clock"></i>
+                                <span>Updated ${formatTimeAgo(lastUpdated)}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="user-marker-inner">
+                            ${getDeviceEmoji(userData?.device_type || 'unknown')}
+                            ${isOnline ? '<div class="user-marker-pulse"></div>' : ''}
+                        </div>
+                    `;
+                    
                     marker.setIcon(icon);
                 }
             });
@@ -1645,7 +1896,8 @@
                 id: user.id, 
                 name: user.name,
                 avatarColor: stringToColor(user.name),
-                initials: getInitials(user.name)
+                initials: getInitials(user.name),
+                deviceType: user.device_type
             };
             
             // Update chat header
@@ -1724,8 +1976,11 @@
                 console.error('Failed to load messages:', error);
                 messagesContainer.innerHTML = `
                     <div class="error-state">
-                        <p>Failed to load messages</p>
-                        <button onclick="loadMessages('${userId}')">Retry</button>
+                        <div class="error-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <p class="error-message">Failed to load messages</p>
+                        <button class="error-button" onclick="loadMessages('${userId}')">Retry</button>
                     </div>
                 `;
             }
@@ -1824,7 +2079,14 @@
             
             const indicator = document.createElement('div');
             indicator.className = 'typing-indicator active';
-            indicator.innerHTML = `<span>${userData.name} is typing...</span>`;
+            indicator.innerHTML = `
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <span>${userData.name} is typing...</span>
+            `;
             
             // Remove existing indicator if any
             const existingIndicator = document.querySelector('.typing-indicator');
@@ -1872,7 +2134,9 @@
                     if (status === 'SUBSCRIBED') {
                         await presenceChannel.track({ 
                             online_at: new Date().toISOString(),
-                            user_id: currentUserId
+                            user_id: currentUserId,
+                            device_type: currentDeviceType,
+                            battery_level: batteryLevel
                         });
                         updateConnectionStatus("Connected");
                     }
@@ -1955,6 +2219,9 @@
                             // Skip our own updates
                             if (userId === currentUserId) return;
                             
+                                                        // Cache the location
+                            locationCache[userId] = locationData;
+                            
                             // Update user data cache
                             if (userDataCache[userId]) {
                                 if (!userDataCache[userId].user_locations) {
@@ -1993,14 +2260,19 @@
                                         (userDataCache[userId]?.status === 'online' && lastOnline && 
                                         (Date.now() - lastOnline.getTime()) < 300000);
                                     
-                                    statusText.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
-                                    statusText.textContent += ` • ${formatDistance(new Date(locationData.last_updated))} ago`;
+                                    statusText.innerHTML = `
+                                        <span>${isOnline ? 'Online' : formatLastOnline(lastOnline)}</span>
+                                        ${userDataCache[userId]?.device_type ? `<span>• ${getDeviceEmoji(userDataCache[userId].device_type)}</span>` : ''}
+                                    `;
                                 }
 
                                 // Update battery indicator
                                 if (batteryIndicator && locationData.device_context?.battery_level) {
                                     const batteryLevel = locationData.device_context.battery_level;
-                                    batteryIndicator.textContent = `${batteryLevel}%`;
+                                    batteryIndicator.innerHTML = `
+                                        <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                        <span>${batteryLevel}%</span>
+                                    `;
                                     batteryIndicator.className = `battery-indicator ${getBatteryColor(batteryLevel)}`;
                                 }
                             }
@@ -2071,6 +2343,16 @@
                     function updateBatteryStatus() {
                         batteryLevel = Math.round(battery.level * 100);
                         updateBatteryDisplay();
+                        
+                        // Update our presence status with battery info
+                        if (presenceChannel) {
+                            presenceChannel.track({
+                                online_at: new Date().toISOString(),
+                                user_id: currentUserId,
+                                battery_level: batteryLevel,
+                                device_type: currentDeviceType
+                            });
+                        }
                     }
                     
                     battery.addEventListener('levelchange', updateBatteryStatus);
@@ -2082,6 +2364,14 @@
                     batteryLevel = Math.round(navigator.battery.level * 100);
                     updateBatteryDisplay();
                 });
+            } else {
+                // Fallback for browsers without battery API
+                setInterval(() => {
+                    // Simulate battery drain for demo purposes
+                    batteryLevel = Math.max(0, batteryLevel - 1);
+                    if (batteryLevel <= 0) batteryLevel = 100;
+                    updateBatteryDisplay();
+                }, 60000);
             }
         }
 
@@ -2169,7 +2459,7 @@
 
             // Account button
             document.getElementById('accountButton').addEventListener('click', () => {
-                window.location.href = 'accounts.html';
+                window.location.href = 'account.html';
             });
 
             // Center map button with animation
@@ -2208,26 +2498,6 @@
                     });
                 }
             });
-            
-            // Add this new event listener for the heatmap toggle button
-            document.getElementById('toggleHeatmapButton').addEventListener('click', async () => {
-                showHeatmap = !showHeatmap;
-                const button = document.getElementById('toggleHeatmapButton');
-                button.classList.toggle('active', showHeatmap);
-                
-                // Add visual feedback
-                button.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    button.style.transform = '';
-                }, 200);
-                
-                if (showHeatmap) {
-                    await loadHeatmapData();
-                } else if (heatmapLayer) {
-                    map.removeLayer(heatmapLayer);
-                    heatmapLayer = null;
-                }
-            });
         }
 
         // Clean up on page unload
@@ -2239,10 +2509,6 @@
                 
                 if (watchId && navigator.geolocation) {
                     navigator.geolocation.clearWatch(watchId);
-                }
-                
-                if (heatmapLayer) {
-                    map.removeLayer(heatmapLayer);
                 }
                 
                 // Update user status to offline
@@ -2259,7 +2525,7 @@
             }
         });
 
-        // Initialize the application
+     // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 // Initialize Supabase client
@@ -2316,8 +2582,11 @@
             } catch (error) {
                 console.error("Initialization error:", error);
                 document.querySelector('.session-check').innerHTML = `
-                    <h2>Initialization Error</h2>
-                    <p style="color: var(--danger); margin: 20px 0;">${error.message}</p>
+                    <div class="session-check-logo">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h1 class="session-check-title">Initialization Error</h1>
+                    <p class="session-check-subtitle" style="color: var(--danger);">${error.message}</p>
                     <button onclick="window.location.href='login.html'" 
                             style="padding: 12px 24px; background: var(--primary); border: none; border-radius: var(--radius-md); font-weight: 600;">
                         Go to Login
