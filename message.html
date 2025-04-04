@@ -1254,15 +1254,9 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-})();
-</script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-})();
-</script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-(async () => {
-
         // Configuration and global variables
         const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
@@ -1525,7 +1519,7 @@
             
             // Update user location in database
             try {
-                const { error } = /* await fixed in IIFE */ await supabaseClient
+                const { error } = await supabaseClient
                     .from('user_locations')
                     .upsert({
                         user_id: currentUserId,
@@ -1548,7 +1542,7 @@ if (userDataCache[currentUserId]) {
 }
                 
                 // Update user's last online status and device type
-                /* await fixed in IIFE */ await supabaseClient
+                await supabaseClient
                     .from('users')
                     .update({ 
                         lastonline: new Date().toISOString(),
@@ -1578,9 +1572,9 @@ if (userDataCache[currentUserId]) {
         async function setupDatabaseTables() {
             try {
                 // Verify tables exist by querying them
-                /* await fixed in IIFE */ await supabaseClient.from('messages').select('*').limit(1);
-                /* await fixed in IIFE */ await supabaseClient.from('user_locations').select('*').limit(1);
-                /* await fixed in IIFE */ await supabaseClient.from('users').select('*').limit(1);
+                await supabaseClient.from('messages').select('*').limit(1);
+                await supabaseClient.from('user_locations').select('*').limit(1);
+                await supabaseClient.from('users').select('*').limit(1);
                 
             } catch (error) {
                 console.error("Database verification error:", error);
@@ -1594,10 +1588,10 @@ if (userDataCache[currentUserId]) {
                 showLoading();
                 
                 // First verify database tables
-                /* await fixed in IIFE */ await setupDatabaseTables();
+                await setupDatabaseTables();
                 
                 // Get all users except current user with status info
-                const { data: users, error: usersError } = /* await fixed in IIFE */ await supabaseClient
+                const { data: users, error: usersError } = await supabaseClient
                     .from('users')
                     .select('id, email, name, lastonline, status, device_type')
                     .neq('id', currentUserId)
@@ -1608,7 +1602,7 @@ if (userDataCache[currentUserId]) {
                 // Get locations for these users - first try database, then fallback to cache
                 let locations = [];
                 try {
-                    const { data: dbLocations, error: locationsError } = /* await fixed in IIFE */ await supabaseClient
+                    const { data: dbLocations, error: locationsError } = await supabaseClient
                         .from('user_locations')
                         .select('user_id, latitude, longitude, last_updated, device_context')
                         .in('user_id', users.map(u => u.id));
@@ -1629,7 +1623,7 @@ if (userDataCache[currentUserId]) {
                 });
                 
                 // Get unread message counts
-                const { data: unreadCounts, error: unreadError } = /* await fixed in IIFE */ await supabaseClient
+                const { data: unreadCounts, error: unreadError } = await supabaseClient
                     .from('messages')
                     .select('sender_id')
                     .eq('receiver_id', currentUserId)
@@ -1918,7 +1912,7 @@ if (userDataCache[currentUserId]) {
             document.getElementById('chatPartnerAvatar').style.background = selectedUser.avatarColor;
             
             // Load messages
-            /* await fixed in IIFE */ await loadMessages(user.id);
+            await loadMessages(user.id);
             
             // Show chat view
             document.getElementById('chatView').classList.add('active');
@@ -1958,7 +1952,7 @@ if (userDataCache[currentUserId]) {
                 const messagesContainer = document.getElementById('chatMessages');
                 messagesContainer.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading messages...</p></div>';
                 
-                const { data: messages, error } = /* await fixed in IIFE */ await supabaseClient
+                const { data: messages, error } = await supabaseClient
                     .from('messages')
                     .select('*')
                     .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`)
@@ -1982,7 +1976,7 @@ if (userDataCache[currentUserId]) {
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
                 // Mark messages as read
-                /* await fixed in IIFE */ await markMessagesAsRead(userId);
+                await markMessagesAsRead(userId);
                 
             } catch (error) {
                 console.error('Failed to load messages:', error);
@@ -2000,7 +1994,7 @@ if (userDataCache[currentUserId]) {
 
         async function markMessagesAsRead(userId) {
             try {
-                const { error } = /* await fixed in IIFE */ await supabaseClient
+                const { error } = await supabaseClient
                     .from('messages')
                     .update({ 
                         is_read: true,
@@ -2017,7 +2011,7 @@ if (userDataCache[currentUserId]) {
         }
 
         async function sendMessage(receiverId, content) {
-            const { data: { user }, error: authError } = /* await fixed in IIFE */ await supabaseClient.auth.getUser();
+            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
             if (!user || authError) {
                 alert("⚠️ You're not properly logged in. Please refresh the page and log in again.");
                 console.error("Auth error:", authError);
@@ -2027,7 +2021,7 @@ if (userDataCache[currentUserId]) {
             try {
                 showSendLoading();
                 
-                const { data: message, error } = /* await fixed in IIFE */ await supabaseClient
+                const { data: message, error } = await supabaseClient
                     .from('messages')
                     .insert([{
                         sender_id: user.id,
@@ -2043,7 +2037,7 @@ if (userDataCache[currentUserId]) {
                 
                 addMessageToChat(content, true, new Date().toISOString(), message.id);
                 
-                /* await fixed in IIFE */ await supabaseClient
+                await supabaseClient
                     .from('users')
                     .update({ 
                         lastonline: new Date().toISOString()
@@ -2144,7 +2138,7 @@ if (userDataCache[currentUserId]) {
                 })
                 .subscribe(async (status, error) => {
                     if (status === 'SUBSCRIBED') {
-                        /* await fixed in IIFE */ await presenceChannel.track({ 
+                        await presenceChannel.track({ 
                             online_at: new Date().toISOString(),
                             user_id: currentUserId,
                             device_type: currentDeviceType,
@@ -2446,7 +2440,7 @@ function startBatterySimulation() {
                     alert('Message cannot be empty');
                     return;
                 }
-                /* await fixed in IIFE */ await sendMessage(selectedUser.id, content);
+                await sendMessage(selectedUser.id, content);
                 input.value = '';
                 input.focus();
             });
@@ -2561,7 +2555,7 @@ function startBatterySimulation() {
         window.addEventListener('beforeunload', async () => {
             try {
                 if (presenceChannel) {
-                    /* await fixed in IIFE */ await supabaseClient.removeChannel(presenceChannel);
+                    await supabaseClient.removeChannel(presenceChannel);
                 }
                 
                 if (watchId && navigator.geolocation) {
@@ -2569,7 +2563,7 @@ function startBatterySimulation() {
                 }
                 
                 // Update user status to offline
-                /* await fixed in IIFE */ await supabaseClient
+                await supabaseClient
                     .from('users')
                     .update({ 
                         status: 'offline',
@@ -2584,14 +2578,8 @@ function startBatterySimulation() {
 
      // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
-    if (session && session.user) {
-        currentUserId = session.user.id;
-    } else {
-        console.error("Session or session.user is null:", session);
-        // Optional: show loading screen, or redirect to login
-    }
-});
-try {
+        currentUserId = session?.user?.id;
+            try {
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
@@ -2601,7 +2589,7 @@ try {
                 });
 
                 // Check session
-                const { data: { session: currentSession }, error: sessionError } = /* await fixed in IIFE */ await supabaseClient.auth.getSession();
+                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
                 if (sessionError) throw sessionError;
                 session = currentSession;
 
@@ -2610,22 +2598,22 @@ try {
                     return;
                 }
 
-                currentUserId = session.user.id;
+                currentUserId = session?.user?.id;
                // Initialize notifications
 if ('serviceWorker' in navigator && 'PushManager' in window) {
     try {
         const swUrl = '/sw.js';
-        const registration = /* await fixed in IIFE */ await navigator.serviceWorker.register(swUrl);
+        const registration = await navigator.serviceWorker.register(swUrl);
         
-        let permission = /* await fixed in IIFE */ await Notification.requestPermission();
+        let permission = await Notification.requestPermission();
         if (permission === 'granted') {
             const publicKey = 'BPz...your-key-here...3LQ'; // REPLACE THIS WITH YOUR KEY
-            const subscription = /* await fixed in IIFE */ await registration.pushManager.subscribe({
+            const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicKey)
             });
             
-            const { error } = /* await fixed in IIFE */ await supabaseClient
+            const { error } = await supabaseClient
                 .from('push_subscriptions')
                 .upsert({
                     user_id: currentUserId,
@@ -2649,7 +2637,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
                 // Verify user
-                const { data: { user }, error: authError } = /* await fixed in IIFE */ await supabaseClient.auth.getUser();
+                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
                 if (authError) throw authError;
                 if (!user) throw new Error("User verification failed");
 
@@ -2662,7 +2650,7 @@ function urlBase64ToUint8Array(base64String) {
                 initializeMap();
                 
                 // Load users and setup event listeners
-                /* await fixed in IIFE */ await loadUsers();
+                await loadUsers();
                 setupEventListeners();
                 initializeRealtime();
 
@@ -2703,8 +2691,42 @@ if ('serviceWorker' in navigator) {
         }
     });
 }
-    
-})();
+    </script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm"></script>
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
+
+  const supabaseUrl = 'https://twsqvdxhsfvdibhpfvqr.supabase.co';
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4';
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    let session = null;
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+
+      session = data.session;
+
+      if (session?.user?.id) {
+        currentUserId = session.user.id;
+        console.log("Current User ID:", currentUserId);
+      } else {
+        console.warn("User not logged in or session.user is null");
+      }
+    } catch (err) {
+      console.error("Session load failed:", err);
+    } finally {
+      const loadingScreen = document.getElementById("loadingScreen");
+      if (loadingScreen) {
+        loadingScreen.style.display = "none";
+      }
+    }
+  });
 </script>
+
 </body>
 </html>
