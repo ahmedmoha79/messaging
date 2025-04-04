@@ -2578,8 +2578,14 @@ function startBatterySimulation() {
 
      // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
+    if (session && session.user) {
         currentUserId = session.user.id;
-            try {
+    } else {
+        console.error("Session or session.user is null:", session);
+        // Optional: show loading screen, or redirect to login
+    }
+});
+try {
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
