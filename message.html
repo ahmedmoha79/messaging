@@ -2011,46 +2011,66 @@ if (userDataCache[currentUserId]) {
         }
 
         async function sendMessage(receiverId, content) {
-            const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-            if (!user || authError) {
-                alert("⚠️ You're not properly logged in. Please refresh the page and log in again.");
-                console.error("Auth error:", authError);
+    try {
+        // First verify we have a valid session
+        const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+        if (!user || authError) {
+            // If no valid user, try to refresh the session
+            const { data: { session }, error } = await supabaseClient.auth.refreshSession();
+            if (error || !session?.user) {
+                alert("⚠️ Session expired. Please log in again.");
+                window.location.href = 'login.html';
                 return;
             }
-
-            try {
-                showSendLoading();
-                
-                const { data: message, error } = await supabaseClient
-                    .from('messages')
-                    .insert([{
-                        sender_id: user.id,
-                        receiver_id: receiverId,
-                        content: content,
-                        status: 'delivered',
-                        device_type: currentDeviceType
-                    }])
-                    .select()
-                    .single();
-                
-                if (error) throw error;
-                
-                addMessageToChat(content, true, new Date().toISOString(), message.id);
-                
-                await supabaseClient
-                    .from('users')
-                    .update({ 
-                        lastonline: new Date().toISOString()
-                    })
-                    .eq('id', user.id);
-                
-            } catch (error) {
-                console.error('Failed to send message:', error);
-                alert('Failed to send message: ' + error.message);
-            } finally {
-                hideSendLoading();
-            }
+            currentUserId = session.user.id;
         }
+
+        showSendLoading();
+        
+        // Verify receiver exists
+        const { data: receiver, error: receiverError } = await supabaseClient
+            .from('users')
+            .select('id')
+            .eq('id', receiverId)
+            .single();
+            
+        if (receiverError || !receiver) {
+            throw new Error("Recipient not found");
+        }
+
+        // Send the message
+        const { data: message, error: sendError } = await supabaseClient
+            .from('messages')
+            .insert([{
+                sender_id: currentUserId,
+                receiver_id: receiverId,
+                content: content,
+                status: 'delivered',
+                device_type: currentDeviceType
+            }])
+            .select()
+            .single();
+        
+        if (sendError) throw sendError;
+        
+        addMessageToChat(content, true, new Date().toISOString(), message.id);
+        
+        // Update last online status
+        await supabaseClient
+            .from('users')
+            .update({ 
+                lastonline: new Date().toISOString(),
+                status: 'online'
+            })
+            .eq('id', currentUserId);
+        
+    } catch (error) {
+        console.error('Failed to send message:', error);
+        alert(`Failed to send message: ${error.message}\nPlease refresh the page and try again.`);
+    } finally {
+        hideSendLoading();
+    }
+}
 
         function addMessageToChat(content, isSent, timestamp, messageId) {
             const messagesContainer = document.getElementById('chatMessages');
@@ -2297,22 +2317,6 @@ if (userDataCache[currentUserId]) {
     const user = userDataCache[userId];
     if (!user) return;
 
-    // Check if notifications are allowed
-    if (Notification.permission === 'granted') {
-        notificationService.showNotification(`New message from ${user.name}`, {
-            body: messageContent.length > 50 ? 
-                messageContent.substring(0, 50) + '...' : messageContent,
-            data: { url: `#chat/${userId}` },
-            vibrate: [200, 100, 200]
-        });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                showNotification(userId, messageContent);
-            }
-        });
-    }
-    
     // Show in-app notification for mobile
     if (isMobile) {
         const notification = document.getElementById('mobileNotification');
@@ -2328,18 +2332,32 @@ if (userDataCache[currentUserId]) {
         
         notification.classList.add('active');
         
-        // Remove after delay
         setTimeout(() => {
             notification.classList.remove('active');
         }, 5000);
         
-        // Click handler to open chat
         notification.addEventListener('click', () => {
             notification.classList.remove('active');
             if (userDataCache[userId]) {
                 selectUser(userDataCache[userId]);
             }
         });
+    }
+    
+    // Show browser notification if available
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(`New message from ${user.name}`, {
+            body: messageContent,
+            icon: 'path/to/icon.png',
+            vibrate: [200, 100, 200]
+        });
+        
+        notification.onclick = () => {
+            window.focus();
+            if (userDataCache[userId]) {
+                selectUser(userDataCache[userId]);
+            }
+        };
     }
 }
 
@@ -2578,7 +2596,6 @@ function startBatterySimulation() {
 
      // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
-        currentUserId = session?.user?.id;
             try {
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -2597,34 +2614,46 @@ function startBatterySimulation() {
                     window.location.href = 'login.html';
                     return;
                 }
-
                 currentUserId = session?.user?.id;
-               // Initialize notifications
-if ('serviceWorker' in navigator && 'PushManager' in window) {
-    try {
-        const swUrl = '/sw.js';
-        const registration = await navigator.serviceWorker.register(swUrl);
-        
-        let permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            const publicKey = 'BPz...your-key-here...3LQ'; // REPLACE THIS WITH YOUR KEY
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(publicKey)
-            });
+               async function initNotifications() {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+            // Register service worker
+            const registration = await navigator.serviceWorker.register('/sw.js');
             
-            const { error } = await supabaseClient
-                .from('push_subscriptions')
-                .upsert({
-                    user_id: currentUserId,
-                    subscription: JSON.stringify(subscription)
-                });
+            // Request permission
+            const permission = await Notification.requestPermission();
             
-            if (!error) pushSubscription = subscription;
+            if (permission === 'granted') {
+                // Get existing subscription
+                let subscription = await registration.pushManager.getSubscription();
+                
+                // Subscribe if not already subscribed
+                if (!subscription) {
+                    const publicKey = 'BEdT6Jka1eh6SFbIb_AAHD6X7L1i7CCC4p5-xOjZtfJbwxyzcaxopmCfytNVtWRDcCq_B0MdH-10F78gimvZ3Z8';
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicKey)
+                    });
+                    
+                    // Save subscription to database
+                    const { error } = await supabaseClient
+                        .from('push_subscriptions')
+                        .upsert({
+                            user_id: currentUserId,
+                            subscription: JSON.stringify(subscription)
+                        });
+                    
+                    if (error) throw error;
+                }
+                
+                return registration;
+            }
+        } catch (error) {
+            console.error('Notification initialization failed:', error);
         }
-    } catch (error) {
-        console.error('Notification init error:', error);
     }
+    return null;
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -2642,6 +2671,7 @@ function urlBase64ToUint8Array(base64String) {
                 if (!user) throw new Error("User verification failed");
 
                 // Show main interface
+                notificationService = await initNotifications();
                 document.querySelector('.session-check').style.display = 'none';
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendButton').disabled = false;
@@ -2692,41 +2722,5 @@ if ('serviceWorker' in navigator) {
     });
 }
     </script>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm"></script>
-<script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
-
-  const supabaseUrl = 'https://twsqvdxhsfvdibhpfvqr.supabase.co';
-  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4';
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  document.addEventListener('DOMContentLoaded', async () => {
-    let session = null;
-
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-
-      session = data.session;
-
-      if (session?.user?.id) {
-        currentUserId = session.user.id;
-        console.log("Current User ID:", currentUserId);
-      } else {
-        console.warn("User not logged in or session.user is null");
-      }
-    } catch (err) {
-      console.error("Session load failed:", err);
-    } finally {
-      const loadingScreen = document.getElementById("loadingScreen");
-      if (loadingScreen) {
-        loadingScreen.style.display = "none";
-      }
-    }
-  });
-</script>
-
 </body>
 </html>
