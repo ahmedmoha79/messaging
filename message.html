@@ -1,0 +1,3052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WAZAMBI Secure Messaging</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #00ff88;
+            --primary-dark: #00cc66;
+            --primary-light: rgba(0, 255, 136, 0.1);
+            --danger: #ff4444;
+            --danger-light: rgba(255, 68, 68, 0.1);
+            --background: #0a0a0a;
+            --surface: #121212;
+            --surface-light: #1e1e1e;
+            --surface-lighter: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --text-tertiary: #666666;
+            --border: rgba(255, 255, 255, 0.1);
+            --online: #00ff88;
+            --offline: #666666;
+            --battery-high: #00ff88;
+            --battery-medium: #ffcc00;
+            --battery-low: #ff4444;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --sidebar-width: 320px;
+            --header-height: 60px;
+            --map-controls-bottom: 20px;
+            --map-controls-right: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* App Layout */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Session Check - Professional Loading */
+        .session-check {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--background);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 40px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .session-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, #00ccff 100%);
+            border-radius: var(--radius-xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: #000;
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+
+        .session-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            background: linear-gradient(to right, var(--primary), #00ccff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .session-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            max-width: 300px;
+        }
+
+        .session-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .session-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, var(--primary), #00ccff);
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        /* Connection Status - Enhanced */
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 6px 12px;
+            border-radius: var(--radius-md);
+            font-size: 10px;
+            font-weight: 500;
+            z-index: 2000;
+            background: rgba(0, 0, 0, 0.8);
+            color: var(--danger);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-left: 3px solid currentColor;
+            opacity: 0;
+            transform: translateY(-20px);
+            max-width: 180px;
+        }
+
+        .connection-status.connected {
+            color: var(--online);
+            border-left-color: var(--online);
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .connection-status i {
+            font-size: 12px;
+        }
+
+       /* App Header - Adjusted for mobile spacing */
+        .app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            padding: 0 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .app-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .app-title i {
+            color: var(--primary);
+        }
+
+        .app-title-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .header-button {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .header-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .battery-indicator-header {
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 6px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.05);
+            flex-shrink: 0;
+        }
+
+        .battery-indicator-header i {
+            font-size: 12px;
+        }
+
+        /* Sidebar - Enhanced for both mobile and desktop */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100%;
+            background: var(--surface);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-out;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 10;
+            height: var(--header-height);
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-title i {
+            color: var(--primary);
+        }
+
+        .close-sidebar {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .close-sidebar:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .search-bar {
+            padding: 12px 16px;
+            background: var(--surface);
+            position: sticky;
+            top: var(--header-height);
+            z-index: 10;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .search-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 2px var(--primary-light);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .user-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+            scrollbar-width: none;
+        }
+
+        .user-list::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* User Card - Enhanced with more details */
+        .user-card {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            margin: 0 8px 8px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+            background: var(--surface-light);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .user-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .user-card.active {
+            background: linear-gradient(90deg, rgba(42, 42, 42, 0.8) 0%, rgba(26, 26, 26, 0.8) 100%);
+            border-left: 4px solid var(--primary);
+        }
+
+        .user-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            margin-right: 12px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            position: relative;
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-info h4 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .user-info p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .user-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            margin-left: 8px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--offline);
+            position: relative;
+        }
+
+        .status-indicator.online {
+            background: var(--online);
+            box-shadow: 0 0 8px var(--primary-light);
+        }
+
+        .status-indicator.online::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 50%;
+            background: var(--online);
+            animation: pulse 2s infinite;
+            opacity: 0.4;
+            z-index: -1;
+        }
+
+        .battery-indicator {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .battery-indicator.high {
+            color: var(--battery-high);
+        }
+
+        .battery-indicator.medium {
+            color: var(--battery-medium);
+        }
+
+        .battery-indicator.low {
+            color: var(--battery-low);
+        }
+
+        .new-message-notification {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: none;
+        }
+
+        .user-card.has-unread .new-message-notification {
+            display: block;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Map Container - Enhanced */
+        .map-container {
+            flex: 1;
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            background: #1a1a1a;
+        }
+
+        /* Map Controls - Enhanced */
+        .map-controls {
+            position: absolute;
+            bottom: var(--map-controls-bottom);
+            right: var(--map-controls-right);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+        }
+
+        .map-control {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(5px);
+        }
+
+        .map-control:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .map-control.active {
+            background: var(--primary);
+            color: #000;
+        }
+        /* User Marker - Enhanced with more details */
+        .user-marker {
+            position: relative;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            transition: var(--transition);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+        }
+
+        .user-marker.online {
+            border-color: var(--online);
+            box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
+        }
+
+        .user-marker.offline {
+            border-color: var(--offline);
+            opacity: 0.7;
+        }
+
+        .user-marker-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(0, 255, 136, 0.3);
+            animation: pulse 2s infinite;
+            z-index: -1;
+        }
+
+        .user-marker-tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            white-space: nowrap;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(5px);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 180px;
+        }
+
+        .user-marker:hover .user-marker-tooltip {
+            opacity: 1;
+        }
+
+        .tooltip-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .tooltip-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .tooltip-status i {
+            font-size: 10px;
+        }
+
+        .tooltip-battery {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+
+        .tooltip-location {
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Current User Marker - Special Styling */
+        .current-user-marker {
+            border-width: 3px;
+            width: 48px;
+            height: 48px;
+        }
+
+        /* Chat View - Redesigned with better layout */
+        .chat-view {
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            width: 100%;
+            height: calc(100% - var(--header-height));
+            background: var(--surface);
+            z-index: 900;
+            display: none;
+            flex-direction: column;
+        }
+
+        .chat-view.active {
+            display: flex;
+        }
+
+        .chat-header {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 10;
+            height: var(--header-height);
+        }
+
+        .back-button {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-partner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .chat-partner-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .chat-partner-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .chat-partner-name {
+            font-size: 16px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .chat-partner-status {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chat-partner-status .status-indicator {
+            width: 8px;
+            height: 8px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            display: none;
+        }
+
+        .message {
+            display: flex;
+            animation: messageAppear 0.3s ease-out forwards;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            position: relative;
+            word-break: break-word;
+            line-height: 1.4;
+            font-size: 15px;
+            box-shadow: var(--shadow);
+        }
+
+        .message.sent {
+            justify-content: flex-end;
+        }
+
+        .message.sent .message-content {
+            background: linear-gradient(135deg, var(--primary) 0%, #00ccff 100%);
+            color: #000;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.received .message-content {
+            background: rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            display: block;
+            text-align: right;
+            margin-top: 4px;
+        }
+
+        /* Audio Message Styles */
+        .audio-message-container {
+            position: relative;
+            width: 100%;
+            max-width: 280px;
+            margin: 8px 0;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-md);
+        }
+
+        .audio-play-button {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: black;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .audio-progress-container {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .audio-progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--primary);
+            border-radius: 2px;
+            width: 0%;
+        }
+
+        .audio-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .audio-visualizer {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 30px;
+            margin-top: 8px;
+        }
+
+        .audio-wave-bar {
+            flex: 1;
+            background: var(--primary-light);
+            border-radius: 2px;
+            min-width: 2px;
+            transition: height 0.1s ease;
+        }
+
+        .audio-message-container.playing .audio-wave-bar {
+            animation: wavePulse 1s infinite alternate;
+        }
+
+        /* Message Input Container with Audio Button */
+        .message-input-container {
+            padding: 8px 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            background: rgba(0, 0, 0, 0.8);
+            position: sticky;
+            bottom: 0;
+            backdrop-filter: blur(10px);
+        }
+
+        .audio-record-button {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .audio-record-button:hover {
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .audio-record-button.recording {
+            color: var(--danger);
+            animation: pulse 1.5s infinite;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            resize: none;
+            min-height: 48px;
+            max-height: 120px;
+            font-size: 15px;
+            transition: var(--transition);
+        }
+
+        .message-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 0 2px var(--primary-light);
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, var(--primary) 0%, #00ccff 100%);
+            border: none;
+            border-radius: var(--radius-md);
+            color: #000;
+            padding: 12px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 48px;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
+        }
+
+        .send-button:disabled {
+            opacity: 0.7;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Recording UI */
+        .recording-container {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--primary);
+            border-radius: var(--radius-xl);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 255, 136, 0.2);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .recording-visualizer {
+            width: 100%;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .visualizer-bar {
+            width: 4px;
+            height: 10px;
+            background: var(--primary);
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+
+        .recording-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .recording-stop-button {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--danger);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .recording-timer {
+            font-family: monospace;
+            font-size: 18px;
+            color: white;
+        }
+
+        .recording-cancel-button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* Processing Overlay */
+        .processing-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            backdrop-filter: blur(5px);
+        }
+
+        .processing-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        .processing-text {
+            color: white;
+            font-size: 16px;
+            margin-top: 16px;
+        }
+
+        /* Typing Indicator - Enhanced */
+        .typing-indicator {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 16px;
+            font-size: 13px;
+            color: var(--primary);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 12px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(5px);
+        }
+
+        .typing-indicator.active {
+            opacity: 1;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: typingPulse 1.4s infinite both;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        /* Loading States - Professional */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            color: var(--text-primary);
+            gap: 16px;
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* Error State - Improved */
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            color: var(--danger);
+            gap: 16px;
+            text-align: center;
+        }
+
+        .error-icon {
+            font-size: 40px;
+            color: var(--danger);
+        }
+
+        .error-message {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .error-button {
+            padding: 12px 24px;
+            background: var(--primary);
+            border: none;
+            border-radius: var(--radius-md);
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .error-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
+        }
+
+        /* Mobile Notification - Enhanced */
+        .mobile-notification {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            z-index: 2000;
+            transform: translateY(-120%);
+            opacity: 0;
+            transition: var(--transition);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+        }
+
+        .mobile-notification.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .notification-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .notification-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .notification-text strong {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .notification-text p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Animations */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 60%, 100% { opacity: 0.3; transform: scale(1); }
+            30% { opacity: 1; transform: scale(1.1); }
+        }
+
+        @keyframes typingPulse {
+            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+            30% { opacity: 1; transform: translateY(-3px); }
+        }
+
+        @keyframes messageAppear {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes wavePulse {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* Responsive Adjustments */
+        @media (min-width: 768px) {
+            /* Desktop specific styles */
+            :root {
+                --sidebar-width: 360px;
+                --map-controls-bottom: 24px;
+                --map-controls-right: 24px;
+            }
+
+            .app-container {
+                flex-direction: row;
+            }
+
+            .sidebar {
+                position: relative;
+                width: var(--sidebar-width);
+                transform: none;
+                z-index: 100;
+                border-right: 1px solid var(--border);
+            }
+
+            .sidebar-header {
+                display: flex;
+            }
+
+            .chat-view {
+                position: relative;
+                z-index: 200;
+                border-left: 1px solid var(--border);
+            }
+
+           .app-header {
+           display: flex;
+           padding-left: 16px;
+}
+            .user-card {
+                padding: 12px 16px;
+                margin: 0 12px 8px;
+            }
+
+            .message-content {
+                max-width: 65%;
+            }
+
+            /* Hide mobile-only elements */
+            .mobile-notification {
+                display: none;
+            }
+        }
+
+        /* Special adjustments for very small screens */
+        @media (max-width: 360px) {
+            :root {
+                --header-height: 56px;
+                --map-controls-bottom: 16px;
+                --map-controls-right: 12px;
+            }
+
+            .user-card {
+                padding: 10px 12px;
+            }
+
+            .user-avatar {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+
+            .message-input-container {
+                padding: 10px 12px;
+            }
+
+            .message-input, .send-button {
+                min-height: 44px;
+            }
+
+            .map-control {
+                width: 44px;
+                height: 44px;
+                font-size: 18px;
+            }
+        }
+
+        /* Prevent body scrolling when sidebar is open */
+        body.sidebar-open {
+            overflow: hidden;
+        }
+
+        /* Hidden class for toggling visibility */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Session Check Overlay -->
+    <div class="session-check">
+        <div class="session-logo">
+            <i class="fas fa-truck"></i>
+        </div>
+        <h1 class="session-title">Logistics Secure</h1>
+        <p class="session-subtitle">Loading your secure messaging and tracking session...</p>
+        <div class="session-progress">
+            <div class="session-progress-bar" id="sessionProgress"></div>
+        </div>
+    </div>
+
+    <!-- Connection Status -->
+    <div class="connection-status">
+        <i class="fas fa-plug"></i>
+        <span>Connecting...</span>
+    </div>
+    
+    <!-- App Header (Mobile Only) -->
+    <div class="app-header">
+        <button class="header-button" id="menuButton">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="app-title">
+            <i class="fas fa-map-marker-alt"></i>
+            <span class="app-title-text" id="headerTitle">Team Locations</span>
+        </div>
+        <div class="header-actions">
+            <div class="battery-indicator-header" id="batteryIndicatorHeader">
+                <i class="fas fa-battery-full"></i>
+                <span id="batteryLevelHeader">100%</span>
+            </div>
+            <button class="header-button" id="accountButton">
+                <i class="fas fa-user-cog"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+        <!-- Sidebar - User List -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">
+                    <i class="fas fa-users"></i>
+                    <span>Team Members</span>
+                </div>
+                <button class="close-sidebar" id="closeSidebar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="search-bar">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" placeholder="Search team members..." id="searchInput">
+                </div>
+            </div>
+            <div class="user-list" id="userList">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p class="loading-text">Loading team members...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map View -->
+        <div class="map-container" id="mapContainer">
+            <div id="map"></div>
+            
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <button class="map-control" id="centerMapButton" title="Center on my location">
+                    <i class="fas fa-location-arrow"></i>
+                </button>
+                <button class="map-control active" id="toggleUserLocationsButton" title="Toggle team locations">
+                    <i class="fas fa-user-friends"></i>
+                </button>
+                <button class="map-control" id="openChatListButton" title="Open chat list">
+                    <i class="fas fa-comments"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Chat View -->
+        <div class="chat-view" id="chatView">
+            <div class="chat-header">
+                <button class="back-button" id="backToMapButton">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="chat-partner">
+                    <div class="chat-partner-avatar" id="chatPartnerAvatar">
+                        ?
+                    </div>
+                    <div class="chat-partner-info">
+                        <div class="chat-partner-name" id="chatPartnerName">Select a user</div>
+                        <div class="chat-partner-status">
+                            <div class="status-indicator"></div>
+                            <span id="chatPartnerStatus">Offline</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="message-input-container">
+                <button class="audio-record-button" id="audioRecordButton">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <textarea class="message-input" id="messageInput" placeholder="Type your message..." disabled></textarea>
+                <button class="send-button" id="sendButton" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Notification Container -->
+    <div class="mobile-notification" id="mobileNotification">
+        <div class="notification-content">
+            <div class="notification-avatar" id="notificationAvatar">
+                ?
+            </div>
+            <div class="notification-text">
+                <strong id="notificationName">User</strong>
+                <p id="notificationMessage">Message content</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="audio-recorder.js"></script>
+    <script>
+        // Configuration and global variables
+        const SUPABASE_URL = "https://twsqvdxhsfvdibhpfvqr.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3c3F2ZHhoc2Z2ZGliaHBmdnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxNDA2MzUsImV4cCI6MjA1NTcxNjYzNX0.EVjqobvn9fAd4djsBfg1zOlA2CVSeYukmsc_DMhT1b4";
+        
+        let supabaseClient, presenceChannel, typingTimeout;
+        let selectedUser = null, currentUserId = null, session = null;
+        let map, marker, lastPosition = null;
+        let onlineUsers = {};
+        let userMarkers = {};
+        let showUserLocations = true;
+        let watchId = null;
+        let userDataCache = {};
+        let unreadMessages = {};
+        let batteryLevel = 100;
+        let notificationService = null;
+        let pushSubscription = null;
+        let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let currentDeviceType = isMobile ? 'mobile' : 'desktop';
+        let lastLocationUpdate = null;
+        let locationCache = {};
+        let audioRecorder = new AudioRecorder();
+
+        // Helper functions
+        function getInitials(name) {
+            if (!name) return '?';
+            const parts = name.split(' ');
+            if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+            return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+        }
+
+        function stringToColor(str) {
+            if (!str) return '#666666';
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            let color = '#';
+            for (let i = 0; i < 3; i++) {
+                const value = (hash >> (i * 8)) & 0xFF;
+                color += ('00' + value.toString(16)).substr(-2);
+            }
+            return color;
+        }
+
+        function formatTimeAgo(date) {
+            if (!date) return 'unknown';
+            
+            const seconds = Math.floor((Date.now() - new Date(date)) / 1000);
+            
+            if (seconds < 60) return 'just now';
+            if (seconds < 3600) return `${Math.floor(seconds/60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds/3600)}h ago`;
+            return `${Math.floor(seconds/86400)}d ago`;
+        }
+
+        function formatLastOnline(date) {
+            if (!date) return 'Offline';
+            
+            const seconds = Math.floor((Date.now() - new Date(date)) / 1000);
+            
+            if (seconds < 60) return 'Online';
+            if (seconds < 180) return 'Online'; // Consider online if seen within 5 minutes
+            return formatTimeAgo(date);
+        }
+
+        function getBatteryColor(level) {
+            if (level > 70) return 'high';
+            if (level > 30) return 'medium';
+            return 'low';
+        }
+
+        function getBatteryIcon(level) {
+            if (level > 90) return 'fa-battery-full';
+            if (level > 70) return 'fa-battery-three-quarters';
+            if (level > 50) return 'fa-battery-half';
+            if (level > 20) return 'fa-battery-quarter';
+            return 'fa-battery-empty';
+        }
+
+        function getDeviceEmoji(deviceType) {
+            switch (deviceType) {
+                case 'mobile': return '📱';
+                case 'tablet': return '📱';
+                case 'desktop': return '💻';
+                default: return '❓';
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('userList').innerHTML = `
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p class="loading-text">Loading team members...</p>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            document.getElementById('userList').innerHTML = `
+                <div class="error-state">
+                    <div class="error-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <p class="error-message">${message}</p>
+                    <button class="error-button" onclick="window.location.reload()">Retry</button>
+                </div>
+            `;
+        }
+
+        function showSendLoading() {
+            const btn = document.getElementById('sendButton');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loading-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>';
+        }
+
+        function hideSendLoading() {
+            const btn = document.getElementById('sendButton');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        }
+
+        function updateConnectionStatus(message, isError = false) {
+            const status = document.querySelector('.connection-status');
+            status.innerHTML = `
+                <i class="fas ${isError ? 'fa-exclamation-circle' : 'fa-plug'}"></i>
+                <span>${message}</span>
+            `;
+            status.classList.toggle('connected', !isError);
+            
+            // Animate in
+            status.style.display = 'flex';
+            setTimeout(() => {
+                status.style.opacity = 1;
+                status.style.transform = 'translateY(0)';
+            }, 10);
+
+            // Auto-hide after 3 seconds for non-error messages
+            if (!isError) {
+                setTimeout(() => {
+                    status.style.opacity = 0;
+                    status.style.transform = 'translateY(-20px)';
+                    setTimeout(() => {
+                        status.style.display = 'none';
+                    }, 300);
+                }, 3000);
+            }
+        }
+
+        function updateBatteryDisplay() {
+            const batteryIndicator = document.getElementById('batteryIndicatorHeader');
+            const batteryLevelText = document.getElementById('batteryLevelHeader');
+            const batteryIcon = batteryIndicator.querySelector('i');
+            
+            batteryLevelText.textContent = `${batteryLevel}%`;
+            batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
+            batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
+            
+            // Update current user marker tooltip if it exists
+            if (marker) {
+                const icon = marker.getIcon();
+                icon.options.html = `
+                    <div class="user-marker-tooltip">
+                        <div class="tooltip-name">Your location</div>
+                        <div class="tooltip-status">
+                            <i class="fas fa-circle"></i>
+                            <span>Online (${currentDeviceType})</span>
+                        </div>
+                        <div class="tooltip-battery">
+                            <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                            <span>${batteryLevel}% battery</span>
+                        </div>
+                    </div>
+                    <div class="user-marker-inner">${getDeviceEmoji(currentDeviceType)}</div>
+                    <div class="user-marker-pulse"></div>
+                `;
+                marker.setIcon(icon);
+            }
+        }
+
+        // Map functions
+        function initializeMap() {
+            try {
+                // Initialize the map with default view
+                map = L.map('map', {
+                    zoomControl: false,
+                    attributionControl: false
+                }).setView([0, 0], 2);
+                
+                // Add base map layers
+                const baseLayers = {
+                    "Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    }),
+                    "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                    })
+                };
+
+                // Add default layer (satellite for mobile, street for desktop)
+                if (isMobile) {
+                    baseLayers["Satellite"].addTo(map);
+                } else {
+                    baseLayers["Street Map"].addTo(map);
+                }
+
+                // Initialize user's location marker with device type
+                marker = L.marker([0, 0], {
+                    icon: L.divIcon({
+                        className: 'user-marker online current-user-marker',
+                        html: `
+                            <div class="user-marker-tooltip">
+                                <div class="tooltip-name">Your location</div>
+                                <div class="tooltip-status">
+                                    <i class="fas fa-circle"></i>
+                                    <span>Online (${currentDeviceType})</span>
+                                </div>
+                                <div class="tooltip-battery">
+                                    <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                    <span>${batteryLevel}% battery</span>
+                                </div>
+                            </div>
+                            <div class="user-marker-inner">${getDeviceEmoji(currentDeviceType)}</div>
+                            <div class="user-marker-pulse"></div>
+                        `,
+                        iconSize: [48, 48],
+                        iconAnchor: [24, 48]
+                    }),
+                    zIndexOffset: 1000
+                }).addTo(map);
+
+                // Start tracking user's location
+                startLocationTracking();
+                
+                // Add zoom controls
+                L.control.zoom({
+                    position: 'bottomleft'
+                }).addTo(map);
+                
+            } catch (error) {
+                console.error("Map initialization failed:", error);
+                throw error;
+            }
+        }
+
+        function startLocationTracking() {
+            if (navigator.geolocation) {
+                // First try to get current position quickly
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        updateLocation(position);
+                    },
+                    (error) => {
+                        console.error('Initial geolocation error:', error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 10000,
+                        timeout: 5000
+                    }
+                );
+
+                // Then set up continuous tracking
+                watchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        updateLocation(position);
+                    },
+                    (error) => {
+                        console.error('Geolocation error:', error);
+                        // If we have a last position, keep showing it
+                        if (lastPosition) {
+                            marker.setLatLng([lastPosition.lat, lastPosition.lng]);
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 30000,
+                        timeout: 10000
+                    }
+                );
+            } else {
+                console.error('Geolocation not supported');
+            }
+        }
+
+        async function updateLocation(position) {
+            const { latitude, longitude, accuracy } = position.coords;
+            lastPosition = { lat: latitude, lng: longitude };
+            lastLocationUpdate = new Date();
+            
+            // Update marker position
+            marker.setLatLng([latitude, longitude]);
+            
+            // Update user location in database
+            try {
+                const { error } = await supabaseClient
+                    .from('user_locations')
+                    .upsert({
+                        user_id: currentUserId,
+                        latitude,
+                        longitude,
+                        accuracy,
+                        last_updated: new Date().toISOString(),
+                        device_context: {
+                            is_mobile: isMobile,
+                            battery_level: batteryLevel,
+                            device_type: currentDeviceType,
+                            last_online: new Date().toISOString()
+                        }
+                    });
+                
+                if (error) throw error;
+                
+                // Update battery level in cache for current user
+                if (userDataCache[currentUserId]) {
+                    userDataCache[currentUserId].battery_level = batteryLevel;
+                }
+                
+                // Update user's last online status and device type
+                await supabaseClient
+                    .from('users')
+                    .update({ 
+                        lastonline: new Date().toISOString(),
+                        status: 'online',
+                        device_type: currentDeviceType
+                    })
+                    .eq('id', currentUserId);
+                    
+            } catch (error) {
+                console.error('Failed to update location:', error);
+                // Cache the location locally if update fails
+                locationCache[currentUserId] = {
+                    latitude,
+                    longitude,
+                    accuracy,
+                    last_updated: new Date().toISOString(),
+                    device_context: {
+                        is_mobile: isMobile,
+                        battery_level: batteryLevel,
+                        device_type: currentDeviceType
+                    }
+                };
+            }
+        }
+
+        // Database functions
+        async function setupDatabaseTables() {
+            try {
+                // Verify tables exist by querying them
+                await supabaseClient.from('messages').select('*').limit(1);
+                await supabaseClient.from('user_locations').select('*').limit(1);
+                await supabaseClient.from('users').select('*').limit(1);
+                
+            } catch (error) {
+                console.error("Database verification error:", error);
+                showError("Database connection issue. Please refresh the page.");
+            }
+        }
+
+        // User functions
+        async function loadUsers() {
+            try {
+                showLoading();
+                
+                // First verify database tables
+                await setupDatabaseTables();
+                
+                // Get all users except current user with status info
+                const { data: users, error: usersError } = await supabaseClient
+                    .from('users')
+                    .select('id, email, name, lastonline, status, device_type, avatar_url')
+                    .neq('id', currentUserId)
+                    .order('lastonline', { ascending: false });
+                if (usersError) throw usersError;
+                
+                // Get locations for these users - first try database, then fallback to cache
+                let locations = [];
+                try {
+                    const { data: dbLocations, error: locationsError } = await supabaseClient
+                        .from('user_locations')
+                        .select('user_id, latitude, longitude, last_updated, device_context')
+                        .in('user_id', users.map(u => u.id));
+                    
+                    if (!locationsError) {
+                        locations = dbLocations;
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch locations from DB, using cache:', e);
+                }
+                
+                // Merge with cached locations
+                const allLocations = [...locations];
+                Object.keys(locationCache).forEach(userId => {
+                    if (!allLocations.some(loc => loc.user_id === userId)) {
+                        allLocations.push(locationCache[userId]);
+                    }
+                });
+                
+                // Get unread message counts
+                const { data: unreadCounts, error: unreadError } = await supabaseClient
+                    .from('messages')
+                    .select('sender_id')
+                    .eq('receiver_id', currentUserId)
+                    .eq('is_read', false);
+                
+                if (!unreadError) {
+                    unreadCounts.forEach(item => {
+                        if (!unreadMessages[item.sender_id]) {
+                            unreadMessages[item.sender_id] = 0;
+                        }
+                        unreadMessages[item.sender_id]++;
+                    });
+                }
+                
+                // Combine the data
+                const usersWithLocations = users.map(user => {
+                    const location = allLocations.find(loc => loc.user_id === user.id);
+                    const batteryLevel = location?.device_context?.battery_level || null;
+                    
+                    return {
+                        ...user,
+                        user_locations: location ? [location] : [],
+                        unread_count: unreadMessages[user.id] || 0,
+                        battery_level: batteryLevel,
+                        last_location_update: location?.last_updated || null
+                    };
+                });
+                
+                // Cache user data
+                usersWithLocations.forEach(user => {
+                    userDataCache[user.id] = user;
+                });
+                
+                renderUserList(usersWithLocations);
+                updateUserMarkers(usersWithLocations);
+                
+            } catch (error) {
+                console.error('Failed to load users:', error);
+                showError('Failed to load users. Please try again.');
+            }
+        }
+
+        function renderUserList(users) {
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+
+            if (users.length === 0) {
+                userList.innerHTML = '<p style="padding: 20px; text-align: center;">No other team members found</p>';
+                return;
+            }
+
+            users.forEach(user => {
+                const lastOnline = user.lastonline ? new Date(user.lastonline) : null;
+                const isOnline = onlineUsers[user.id] || (user.status === 'online' && lastOnline && (Date.now() - lastOnline.getTime()) < 300000);
+                const hasLocation = user.user_locations && user.user_locations.length > 0;
+                const locationTime = hasLocation ? new Date(user.user_locations[0].last_updated) : null;
+                const batteryLevel = user.battery_level;
+                
+                // Determine status text - only show one status (online or last seen)
+                let statusText = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                
+                const userCard = document.createElement('div');
+                userCard.className = `user-card ${user.unread_count > 0 ? 'has-unread' : ''}`;
+                userCard.dataset.userId = user.id;
+                userCard.innerHTML = `
+                    <div class="user-avatar" style="background: transparent">
+                        <img src="${user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`}" 
+                             style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+                        ${isOnline ? '<div class="status-indicator online"></div>' : ''}
+                    </div>
+                    <div class="user-info">
+                        <h4>${user.name}</h4>
+                        <p>
+                            <span>${statusText}</span>
+                            ${hasLocation ? `<span>• ${getDeviceEmoji(user.device_type || 'unknown')}</span>` : ''}
+                        </p>
+                    </div>
+                    <div class="user-status">
+                        ${batteryLevel ? `
+                            <div class="battery-indicator ${getBatteryColor(batteryLevel)}">
+                                <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                <span>${batteryLevel}%</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${user.unread_count > 0 ? '<div class="new-message-notification"></div>' : ''}
+                `;
+                userCard.addEventListener('click', () => selectUser(user));
+                userList.appendChild(userCard);
+            });
+
+            // Setup search functionality
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                document.querySelectorAll('.user-card').forEach(card => {
+                    const name = card.querySelector('h4').textContent.toLowerCase();
+                    card.style.display = name.includes(term) ? 'flex' : 'none';
+                });
+            });
+        }
+
+        function updateUserMarkers(users) {
+            // Clear existing markers except our own
+            Object.keys(userMarkers).forEach(userId => {
+                if (userId !== currentUserId && userMarkers[userId]) {
+                    map.removeLayer(userMarkers[userId]);
+                    delete userMarkers[userId];
+                }
+            });
+
+            // Add new markers
+            users.forEach(user => {
+                if (user.id === currentUserId) return;
+                
+                const hasLocation = user.user_locations && user.user_locations.length > 0;
+                const isOnline = onlineUsers[user.id] || (user.status === 'online' && user.lastonline && (Date.now() - new Date(user.lastonline).getTime()) < 300000);
+                const deviceType = user.device_type || 'unknown';
+                const batteryLevel = user.battery_level;
+                
+                if (hasLocation && showUserLocations) {
+                    const location = user.user_locations[0];
+                    const lastUpdated = new Date(location.last_updated);
+                    const isRecent = (Date.now() - lastUpdated) < 5 * 60 * 1000;
+                    
+                    // Create custom marker with detailed tooltip
+                    const marker = L.marker([location.latitude, location.longitude], {
+                        icon: L.divIcon({
+                            className: `user-marker ${isOnline && isRecent ? 'online' : 'offline'}`,
+                            html: `
+                                <div class="user-marker-tooltip">
+                                    <div class="tooltip-name">${user.name}</div>
+                                    <div class="tooltip-status">
+                                        <i class="fas fa-circle"></i>
+                                        <span>${isOnline && isRecent ? 'Online' : formatLastOnline(user.lastonline)} (${deviceType})</span>
+                                    </div>
+                                    ${batteryLevel ? `
+                                    <div class="tooltip-battery">
+                                        <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                        <span>${batteryLevel}% battery</span>
+                                    </div>
+                                    ` : ''}
+                                    <div class="tooltip-location">
+                                        <i class="fas fa-clock"></i>
+                                        <span>Updated ${formatTimeAgo(lastUpdated)}</span>
+                                    </div>
+                                </div>
+                                <div class="user-marker-inner">
+                                    ${getDeviceEmoji(deviceType)}
+                                    ${isOnline && isRecent ? '<div class="user-marker-pulse"></div>' : ''}
+                                </div>
+                            `,
+                            iconSize: [44, 44],
+                            iconAnchor: [22, 44]
+                        }),
+                        zIndexOffset: 900,
+                        title: user.name
+                    }).addTo(map);
+                    
+                    userMarkers[user.id] = marker;
+                    
+                    // Add click handler with smooth animation
+                    marker.on('click', () => {
+                        map.flyTo([location.latitude, location.longitude], 15, {
+                            duration: 0.5,
+                            easeLinearity: 0.25
+                        });
+                    });
+                }
+            });
+        }
+
+        function updateOnlineStatus(userStates) {
+            // Update our online users tracking
+            onlineUsers = {};
+            Object.keys(userStates).forEach(userId => {
+                onlineUsers[userId] = true;
+            });
+            
+            // Update UI in user list
+            document.querySelectorAll('.user-card').forEach(card => {
+                const userId = card.dataset.userId;
+                const userData = userDataCache[userId];
+                const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
+                const isOnline = onlineUsers[userId] || 
+                    (userData?.status === 'online' && lastOnline && 
+                    (Date.now() - lastOnline.getTime()) < 300000);
+                
+                // Update status indicator
+                const indicator = card.querySelector('.status-indicator');
+                if (indicator) {
+                    indicator.classList.toggle('online', isOnline);
+                    
+                    // Update status text
+                    const statusText = card.querySelector('p');
+                    if (statusText) {
+                        const hasLocation = userData?.user_locations?.length > 0;
+                        statusText.innerHTML = `
+                            <span>${isOnline ? 'Online' : formatLastOnline(lastOnline)}</span>
+                            ${hasLocation ? `<span>• ${getDeviceEmoji(userData.device_type)}</span>` : ''}
+                        `;
+                    }
+                }
+            });
+            
+            // Update markers on map
+            Object.keys(userMarkers).forEach(userId => {
+                const marker = userMarkers[userId];
+                if (marker) {
+                    const userData = userDataCache[userId];
+                    const lastOnline = userData?.lastonline ? 
+                        new Date(userData.lastonline) : null;
+                    const isOnline = onlineUsers[userId] || 
+                        (userData?.status === 'online' && lastOnline && 
+                        (Date.now() - lastOnline.getTime()) < 300000);
+                    
+                    const icon = marker.getIcon();
+                    icon.options.className = `user-marker ${isOnline ? 'online' : 'offline'}`;
+                    
+                    // Update tooltip content
+                    const location = userData?.user_locations?.[0];
+                    const lastUpdated = location ? new Date(location.last_updated) : null;
+                    const batteryLevel = location?.device_context?.battery_level;
+                    
+                    icon.options.html = `
+                        <div class="user-marker-tooltip">
+                            <div class="tooltip-name">${userData?.name || 'Unknown'}</div>
+                            <div class="tooltip-status">
+                                <i class="fas fa-circle"></i>
+                                <span>${isOnline ? 'Online' : formatLastOnline(lastOnline)} (${userData?.device_type || 'unknown'})</span>
+                            </div>
+                            ${batteryLevel ? `
+                            <div class="tooltip-battery">
+                                <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                <span>${batteryLevel}% battery</span>
+                            </div>
+                            ` : ''}
+                            ${lastUpdated ? `
+                            <div class="tooltip-location">
+                                <i class="fas fa-clock"></i>
+                                <span>Updated ${formatTimeAgo(lastUpdated)}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="user-marker-inner">
+                            ${getDeviceEmoji(userData?.device_type || 'unknown')}
+                            ${isOnline ? '<div class="user-marker-pulse"></div>' : ''}
+                        </div>
+                    `;
+                    
+                    marker.setIcon(icon);
+                }
+            });
+
+            // Update chat partner status if in chat
+            if (selectedUser) {
+                const userData = userDataCache[selectedUser.id];
+                const lastOnline = userData?.lastonline ? new Date(userData.lastonline) : null;
+                const isOnline = onlineUsers[selectedUser.id] || 
+                    (userData?.status === 'online' && lastOnline && 
+                    (Date.now() - lastOnline.getTime()) < 300000);
+                
+                const statusIndicator = document.querySelector('.chat-partner-status .status-indicator');
+                const statusText = document.getElementById('chatPartnerStatus');
+                
+                if (statusIndicator && statusText) {
+                    statusIndicator.classList.toggle('online', isOnline);
+                    statusText.textContent = isOnline ? 'Online' : formatLastOnline(lastOnline);
+                }
+            }
+        }
+
+        // Chat functions
+        async function selectUser(user) {
+            document.querySelectorAll('.user-card').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-user-id="${user.id}"]`)?.classList.add('active');
+            
+            selectedUser = { 
+                id: user.id, 
+                name: user.name,
+                avatarColor: stringToColor(user.name),
+                initials: getInitials(user.name),
+                deviceType: user.device_type
+            };
+            
+            // Update chat header
+            document.getElementById('chatPartnerName').textContent = user.name;
+            const avatarElement = document.getElementById('chatPartnerAvatar');
+            avatarElement.innerHTML = '<img src="' + 
+                (user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`) + 
+                '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
+            avatarElement.style.background = 'transparent';
+            
+            // Update header title
+            document.getElementById('headerTitle').textContent = user.name;
+            
+            // Load messages
+            await loadMessages(user.id);
+            
+            // Show chat view and hide map
+            document.getElementById('chatView').classList.add('active');
+            document.getElementById('mapContainer').classList.add('hidden');
+            
+            // Hide sidebar if on mobile
+            if (isMobile) {
+                document.getElementById('sidebar').classList.remove('active');
+                document.body.classList.remove('sidebar-open');
+            }
+            
+            // Clear unread count for this user
+            if (unreadMessages[user.id]) {
+                delete unreadMessages[user.id];
+                document.querySelector(`[data-user-id="${user.id}"]`)?.classList.remove('has-unread');
+            }
+        }
+
+        function showMapView() {
+            document.getElementById('mapContainer').classList.remove('hidden');
+            document.getElementById('chatView').classList.remove('active');
+            document.getElementById('headerTitle').textContent = 'Team Locations';
+        }
+
+        function showChatListView() {
+            if (isMobile) {
+                document.getElementById('sidebar').classList.add('active');
+                document.body.classList.add('sidebar-open');
+            } else {
+                // For desktop, just show the sidebar (which is always visible) and hide chat view
+                document.getElementById('chatView').classList.remove('active');
+                document.getElementById('mapContainer').classList.remove('hidden');
+            }
+        }
+
+        async function loadMessages(userId) {
+            try {
+                const messagesContainer = document.getElementById('chatMessages');
+                messagesContainer.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>Loading messages...</p></div>';
+                
+                const { data: messages, error } = await supabaseClient
+                    .from('messages')
+                    .select('*')
+                    .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUserId})`)
+                    .order('created_at', { ascending: true });
+                
+                if (error) {
+                    console.error('Message load error:', error);
+                    throw error;
+                }
+                
+                messagesContainer.innerHTML = '';
+                if (messages.length === 0) {
+                    messagesContainer.innerHTML = '<div class="loading-state"><p>No messages yet. Start the conversation!</p></div>';
+                    return;
+                }
+                
+                messages.forEach(msg => {
+    if (msg.message_type === 'audio') {
+        // Make sure we have all required audio data
+        if (msg.audio_url && msg.audio_duration) {
+            const audioData = {
+                id: msg.id,
+                url: msg.audio_url,
+                duration: msg.audio_duration,
+                waveform: msg.audio_waveform || [0.3,0.5,0.7,0.5,0.3], // Default waveform if missing
+                type: 'audio'
+            };
+            const audioMessageElement = audioRecorder.renderAudioMessage(audioData, msg.sender_id === currentUserId);
+            
+            // Create proper container for the audio message
+            const container = document.createElement('div');
+            container.className = `message ${msg.sender_id === currentUserId ? 'sent' : 'received'}`;
+            container.dataset.messageId = msg.id;
+            container.appendChild(audioMessageElement);
+            
+            messagesContainer.appendChild(container);
+        } else {
+            // Fallback if audio data is incomplete
+            addMessageToChat("[Audio message]", msg.sender_id === currentUserId, msg.created_at, msg.id);
+        }
+    } else {
+        addMessageToChat(msg.content, msg.sender_id === currentUserId, msg.created_at, msg.id);
+    }
+});
+                
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Mark messages as read
+                await markMessagesAsRead(userId);
+                
+            } catch (error) {
+                console.error('Failed to load messages:', error);
+                messagesContainer.innerHTML = `
+                    <div class="error-state">
+                        <div class="error-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <p class="error-message">Failed to load messages</p>
+                        <button class="error-button" onclick="loadMessages('${userId}')">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        async function markMessagesAsRead(userId) {
+            try {
+                const { error } = await supabaseClient
+                    .from('messages')
+                    .update({ 
+                        is_read: true,
+                        read_at: new Date().toISOString()
+                    })
+                    .eq('receiver_id', currentUserId)
+                    .eq('sender_id', userId)
+                    .eq('is_read', false);
+                
+                if (error) throw error;
+            } catch (error) {
+                console.error('Failed to mark messages as read:', error);
+            }
+        }
+
+        async function sendMessage(receiverId, content, audioData = null) {
+            try {
+                // First verify we have a valid session
+                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+                if (!user || authError) {
+                    // If no valid user, try to refresh the session
+                    const { data: { session }, error } = await supabaseClient.auth.refreshSession();
+                    if (error || !session?.user) {
+                        alert("⚠️ Session expired. Please log in again.");
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    currentUserId = session.user.id;
+                }
+
+                showSendLoading();
+                
+                // Verify receiver exists
+                const { data: receiver, error: receiverError } = await supabaseClient
+                    .from('users')
+                    .select('id')
+                    .eq('id', receiverId)
+                    .single();
+                    
+                if (receiverError || !receiver) {
+                    throw new Error("Recipient not found");
+                }
+
+                let messageContent = content;
+                let messageType = 'text';
+                let audioUrl = null;
+                let audioDuration = null;
+                let audioWaveform = null;
+                
+                // If we have audio data, use that instead of text
+                if (audioData) {
+                    messageContent = 'Audio message';
+                    messageType = 'audio';
+                    audioUrl = audioData.url;
+                    audioDuration = audioData.duration;
+                    audioWaveform = audioData.waveform;
+                }
+
+                // Send the message with all required fields
+                const { data: message, error: sendError } = await supabaseClient
+                    .from('messages')
+                    .insert([{
+                        sender_id: currentUserId,
+                        receiver_id: receiverId,
+                        content: messageContent,
+                        status: 'delivered',
+                        device_type: currentDeviceType,
+                        is_read: false,
+                        created_at: new Date().toISOString(),
+                        audio_url: audioUrl,
+                        audio_duration: audioDuration,
+                        audio_waveform: audioWaveform,
+                        message_type: messageType
+                    }])
+                    .select()
+                    .single();
+                
+                if (sendError) throw sendError;
+                
+                if (audioData) {
+                    // Add audio message to chat
+                    const audioMessageElement = audioRecorder.renderAudioMessage(audioData, true);
+                    document.getElementById('chatMessages').appendChild(audioMessageElement);
+                } else {
+                    // Add text message to chat
+                    addMessageToChat(content, true, new Date().toISOString(), message.id);
+                }
+                
+                // Update last online status
+                await supabaseClient
+                    .from('users')
+                    .update({ 
+                        lastonline: new Date().toISOString(),
+                        status: 'online'
+                    })
+                    .eq('id', currentUserId);
+                
+            } catch (error) {
+                console.error('Failed to send message:', error);
+                alert(`Failed to send message: ${error.message}\nPlease refresh the page and try again.`);
+            } finally {
+                hideSendLoading();
+            }
+        }
+
+        function addMessageToChat(content, isSent, timestamp, messageId) {
+            const messagesContainer = document.getElementById('chatMessages');
+            
+            if (messagesContainer.querySelector('.loading-state')) {
+                messagesContainer.innerHTML = '';
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            messageDiv.dataset.messageId = messageId;
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <p>${content}</p>
+                    <span class="message-time">${
+                        new Date(timestamp || new Date()).toLocaleString([], {
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            month: 'short',
+                            day: 'numeric'
+                        })
+                    }</span>
+                </div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTypingIndicator(userId) {
+            const userData = userDataCache[userId];
+            if (!userData) return;
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator active';
+            indicator.innerHTML = `
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <span>${userData.name} is typing...</span>
+            `;
+            
+            // Remove existing indicator if any
+            const existingIndicator = document.querySelector('.typing-indicator');
+            if (existingIndicator) existingIndicator.remove();
+            
+            document.getElementById('chatMessages').appendChild(indicator);
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                indicator.classList.remove('active');
+                setTimeout(() => indicator.remove(), 300);
+            }, 2000);
+        }
+
+        // Realtime functionality
+        async function initializeRealtime() {
+            updateConnectionStatus("Connecting to real-time service...");
+            
+            try {
+                // Remove existing channels if they exist
+                if (presenceChannel) {
+                    supabaseClient.removeChannel(presenceChannel);
+                }
+
+                // Presence channel for online status
+                presenceChannel = supabaseClient.channel('presence-channel', {
+                    config: { 
+                        broadcast: { ack: true },
+                        presence: { 
+                            key: currentUserId,
+                            heartbeatIntervalMs: 30000
+                        } 
+                    }
+                })
+                .on('presence', { event: 'sync' }, () => {
+                    const state = presenceChannel.presenceState();
+                    updateOnlineStatus(state);
+                })
+                .on('broadcast', { event: 'typing' }, ({ payload }) => {
+                    if (payload.partnerId === currentUserId) {
+                        showTypingIndicator(payload.userId);
+                    }
+                })
+                .subscribe(async (status, error) => {
+                    if (status === 'SUBSCRIBED') {
+                        await presenceChannel.track({ 
+                            online_at: new Date().toISOString(),
+                            user_id: currentUserId,
+                            device_type: currentDeviceType,
+                            battery_level: batteryLevel
+                        });
+                        updateConnectionStatus("Connected");
+                    }
+                    if (error) {
+                        console.error('Presence channel error:', error);
+                        updateConnectionStatus("Error: " + error.message, true);
+                        setTimeout(initializeRealtime, 5000);
+                    }
+                });
+
+                // Handle channel connection events with exponential backoff
+                let reconnectAttempts = 0;
+                
+                presenceChannel.on('close', () => {
+                        updateConnectionStatus("Disconnected", true);
+                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                        reconnectAttempts++;
+                        setTimeout(initializeRealtime, delay);
+                    })
+                    .on('error', (err) => {
+                        console.error('Realtime error:', err);
+                        updateConnectionStatus("Error: " + err.message, true);
+                    });
+
+                // Messages channel
+                const messagesChannel = supabaseClient.channel('messages-channel')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'messages',
+                            filter: `receiver_id=eq.${currentUserId}`
+                        },
+                        (payload) => {
+                            const newMessage = payload.new;
+                            
+                            // Update unread count
+                            if (!unreadMessages[newMessage.sender_id]) {
+                                unreadMessages[newMessage.sender_id] = 0;
+                            }
+                            unreadMessages[newMessage.sender_id]++;
+                            
+                            // Update UI
+                            const userCard = document.querySelector(`[data-user-id="${newMessage.sender_id}"]`);
+                            if (userCard) {
+                                userCard.classList.add('has-unread');
+                            }
+                            
+                            // If currently chatting with this user, show message and mark as read
+                            if (selectedUser && selectedUser.id === newMessage.sender_id) {
+                                if (newMessage.message_type === 'audio') {
+                                    const audioData = {
+                                        id: newMessage.id,
+                                        url: newMessage.audio_url,
+                                        duration: newMessage.audio_duration,
+                                        waveform: newMessage.audio_waveform,
+                                        type: 'audio'
+                                    };
+                                    const audioMessageElement = audioRecorder.renderAudioMessage(audioData, false);
+                                    document.getElementById('chatMessages').appendChild(audioMessageElement);
+                                } else {
+                                    addMessageToChat(
+                                        newMessage.content, 
+                                        false, 
+                                        newMessage.created_at, 
+                                        newMessage.id
+                                    );
+                                }
+                                markMessagesAsRead(newMessage.sender_id);
+                            } else {
+                                // Show notification for new message
+                                showNotification(newMessage.sender_id, newMessage.content);
+                            }
+                        }
+                    )
+                    .subscribe();
+
+                // Locations channel for real-time location updates
+                const locationsChannel = supabaseClient.channel('locations-channel')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: '*',
+                            schema: 'public',
+                            table: 'user_locations'
+                        },
+                        (payload) => {
+                            const locationData = payload.new;
+                            const userId = locationData.user_id;
+                            
+                            // Skip our own updates
+                            if (userId === currentUserId) return;
+                            
+                            // Cache the location
+                            locationCache[userId] = locationData;
+                            
+                            // Update user data cache
+                            if (userDataCache[userId]) {
+                                if (!userDataCache[userId].user_locations) {
+                                    userDataCache[userId].user_locations = [];
+                                }
+                                
+                                const existingIndex = userDataCache[userId].user_locations.findIndex(
+                                    loc => loc.user_id === userId
+                                );
+                                
+                                if (existingIndex >= 0) {
+                                    userDataCache[userId].user_locations[existingIndex] = locationData;
+                                } else {
+                                    userDataCache[userId].user_locations.push(locationData);
+                                }
+
+                                // Update battery level in cache
+                                userDataCache[userId].battery_level = locationData.device_context?.battery_level || null;
+                            }
+                            
+                            // Update marker if showing locations
+                            if (showUserLocations) {
+                                updateUserMarkers([userDataCache[userId]]);
+                            }
+                            
+                            // Update status text in user list
+                            const userCard = document.querySelector(`[data-user-id="${userId}"]`);
+                            if (userCard) {
+                                const statusText = userCard.querySelector('p');
+                                const batteryIndicator = userCard.querySelector('.battery-indicator');
+                                
+                                if (statusText) {
+                                    const lastOnline = userDataCache[userId]?.lastonline ? 
+                                        new Date(userDataCache[userId].lastonline) : null;
+                                    const isOnline = onlineUsers[userId] || 
+                                        (userDataCache[userId]?.status === 'online' && lastOnline && 
+                                        (Date.now() - lastOnline.getTime()) < 300000);
+                                    
+                                    statusText.innerHTML = `
+                                        <span>${isOnline ? 'Online' : formatLastOnline(lastOnline)}</span>
+                                        ${userDataCache[userId]?.device_type ? `<span>• ${getDeviceEmoji(userDataCache[userId].device_type)}</span>` : ''}
+                                    `;
+                                }
+
+                                // Update battery indicator
+                                if (batteryIndicator && locationData.device_context?.battery_level) {
+                                    const batteryLevel = locationData.device_context.battery_level;
+                                    batteryIndicator.innerHTML = `
+                                        <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
+                                        <span>${batteryLevel}%</span>
+                                    `;
+                                    batteryIndicator.className = `battery-indicator ${getBatteryColor(batteryLevel)}`;
+                                }
+                            }
+                        }
+                    )
+                    .subscribe();
+
+            } catch (error) {
+                console.error('Realtime initialization error:', error);
+                updateConnectionStatus("Connection failed: " + error.message, true);
+                setTimeout(initializeRealtime, 5000);
+            }
+        }
+
+        function showNotification(userId, messageContent) {
+            const user = userDataCache[userId];
+            if (!user) return;
+
+            // Show in-app notification for mobile
+            if (isMobile) {
+                const notification = document.getElementById('mobileNotification');
+                const avatar = document.getElementById('notificationAvatar');
+                const name = document.getElementById('notificationName');
+                const message = document.getElementById('notificationMessage');
+                
+                avatar.innerHTML = '<img src="' + 
+                    (user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`) + 
+                    '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
+                avatar.style.background = 'transparent';
+                name.textContent = user.name;
+                message.textContent = messageContent.length > 30 ? 
+                    messageContent.substring(0, 30) + '...' : messageContent;
+                
+                notification.classList.add('active');
+                
+                setTimeout(() => {
+                    notification.classList.remove('active');
+                }, 5000);
+                
+                notification.addEventListener('click', () => {
+                    notification.classList.remove('active');
+                    if (userDataCache[userId]) {
+                        selectUser(userDataCache[userId]);
+                    }
+                });
+            }
+            
+            // Show browser notification if available
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const notification = new Notification(`New message from ${user.name}`, {
+                    body: messageContent,
+                    icon: 'path/to/icon.png',
+                    vibrate: [200, 100, 200]
+                });
+                
+                notification.onclick = () => {
+                    window.focus();
+                    if (userDataCache[userId]) {
+                        selectUser(userDataCache[userId]);
+                    }
+                };
+            }
+        }
+
+        // Battery monitoring
+        function initBatteryMonitoring() {
+            // Don't start until we have a valid user ID
+            if (!currentUserId) {
+                console.warn("Battery monitoring delayed - no user ID yet");
+                setTimeout(initBatteryMonitoring, 1000);
+                return;
+            }
+
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(battery => {
+                    const updateBatteryStatus = () => {
+                        try {
+                            batteryLevel = Math.round(battery.level * 100);
+                            updateBatteryDisplay();
+                            
+                            // Only update presence if channel exists
+                            if (presenceChannel?.subscriptionState === 'SUBSCRIBED') {
+                                presenceChannel.track({
+                                    online_at: new Date().toISOString(),
+                                    user_id: currentUserId,
+                                    battery_level: batteryLevel,
+                                    device_type: currentDeviceType
+                                }).catch(e => console.error("Presence update failed:", e));
+                            }
+                            
+                            // Only update location if we have position
+                            if (lastPosition) {
+                                supabaseClient
+                                    .from('user_locations')
+                                    .upsert({
+                                        user_id: currentUserId,
+                                        latitude: lastPosition.lat,
+                                        longitude: lastPosition.lng,
+                                        accuracy: 0,
+                                        last_updated: new Date().toISOString(),
+                                        device_context: {
+                                            is_mobile: isMobile,
+                                            battery_level: batteryLevel,
+                                            device_type: currentDeviceType,
+                                            last_online: new Date().toISOString()
+                                        }
+                                    })
+                                    .then(() => {})
+                                    .catch(e => console.error("Battery location update failed:", e));
+                            }
+                        } catch (e) {
+                            console.error("Battery update error:", e);
+                        }
+                    };
+                    
+                    battery.addEventListener('levelchange', updateBatteryStatus);
+                    updateBatteryStatus();
+                    
+                }).catch(e => {
+                    console.error("Battery API error - using simulation:", e);
+                    startBatterySimulation();
+                });
+            } else {
+                startBatterySimulation();
+            }
+        }
+
+        function startBatterySimulation() {
+            console.log("Using simulated battery");
+            const simulate = () => {
+                batteryLevel = Math.max(0, batteryLevel - 1);
+                if (batteryLevel <= 0) batteryLevel = 100;
+                updateBatteryDisplay();
+                
+                if (presenceChannel?.subscriptionState === 'SUBSCRIBED' && currentUserId) {
+                    presenceChannel.track({
+                        online_at: new Date().toISOString(),
+                        user_id: currentUserId,
+                        battery_level: batteryLevel,
+                        device_type: currentDeviceType
+                    }).catch(e => console.error("Simulated presence update failed:", e));
+                }
+            };
+            setInterval(simulate, 60000);
+            simulate(); // Initial update
+        }
+
+        // Event listeners
+        function setupEventListeners() {
+            // Message sending
+            document.getElementById('sendButton').addEventListener('click', async () => {
+                const input = document.getElementById('messageInput');
+                const content = input.value.trim();
+                if (!selectedUser) {
+                    alert('Please select a user first');
+                    return;
+                }
+                if (!content) {
+                    alert('Message cannot be empty');
+                    return;
+                }
+                await sendMessage(selectedUser.id, content);
+                input.value = '';
+                input.focus();
+            });
+
+            // Audio recording
+document.getElementById('audioRecordButton').addEventListener('click', async () => {
+    const hasPermission = await audioRecorder.checkMicrophonePermission();
+    if (!hasPermission) {
+        alert('Microphone access is required for audio messages');
+        return;
+    }
+
+    // Start recording and wait for result
+    const audioData = await audioRecorder.startRecording();
+    
+    // If we got audio data and have a selected user, send it
+    if (audioData && selectedUser) {
+        await sendMessage(selectedUser.id, null, audioData);
+    }
+});
+            // Typing indicator
+            let isTyping = false;
+            let lastTypingTime = 0;
+            let typingTimer;
+            
+            document.getElementById('messageInput').addEventListener('input', () => {
+                if (!selectedUser) return;
+                
+                const now = Date.now();
+                if (!isTyping) {
+                    isTyping = true;
+                    presenceChannel.send({
+                        type: 'broadcast',
+                        event: 'typing',
+                        payload: { userId: currentUserId, partnerId: selectedUser.id }
+                    });
+                }
+                
+                lastTypingTime = now;
+                
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => {
+                    if (now - lastTypingTime > 1000 && isTyping) {
+                        isTyping = false;
+                        presenceChannel.send({
+                            type: 'broadcast',
+                            event: 'stopped-typing',
+                            payload: { userId: currentUserId }
+                        });
+                    }
+                }, 1000);
+            });
+
+            // Menu button (mobile)
+            document.getElementById('menuButton').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.add('active');
+                document.body.classList.add('sidebar-open');
+            });
+
+            // Close sidebar button
+            document.getElementById('closeSidebar').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.remove('active');
+                document.body.classList.remove('sidebar-open');
+            });
+
+            // Open chat list from map
+            document.getElementById('openChatListButton').addEventListener('click', () => {
+                showChatListView();
+            });
+
+            // Back to map from chat view
+            document.getElementById('backToMapButton').addEventListener('click', () => {
+                showMapView();
+            });
+
+            // Account button
+            document.getElementById('accountButton').addEventListener('click', () => {
+                window.location.href = 'accounts.html';
+            });
+
+            // Center map button with animation
+            document.getElementById('centerMapButton').addEventListener('click', () => {
+                if (lastPosition && marker) {
+                    map.flyTo([lastPosition.lat, lastPosition.lng], 15, {
+                        duration: 0.5,
+                        easeLinearity: 0.25
+                    });
+                } else {
+                    map.setView([0, 0], 2);
+                }
+            });
+            
+            // Toggle user locations button
+            document.getElementById('toggleUserLocationsButton').addEventListener('click', () => {
+                showUserLocations = !showUserLocations;
+                const button = document.getElementById('toggleUserLocationsButton');
+                button.classList.toggle('active', showUserLocations);
+                
+                // Add visual feedback
+                button.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    button.style.transform = '';
+                }, 200);
+                
+                if (showUserLocations) {
+                    loadUsers();
+                } else {
+                    // Remove all user markers except our own
+                    Object.keys(userMarkers).forEach(userId => {
+                        if (userId !== currentUserId && userMarkers[userId]) {
+                            map.removeLayer(userMarkers[userId]);
+                            delete userMarkers[userId];
+                        }
+                    });
+                }
+            });
+        }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', async () => {
+            try {
+                if (presenceChannel) {
+                    await supabaseClient.removeChannel(presenceChannel);
+                }
+                
+                if (watchId && navigator.geolocation) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+                
+                // Update user status to offline
+                await supabaseClient
+                    .from('users')
+                    .update({ 
+                        status: 'offline',
+                        lastonline: new Date().toISOString()
+                    })
+                    .eq('id', currentUserId);
+                
+            } catch (error) {
+                console.error('Cleanup error:', error);
+            }
+        });
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Initialize Supabase client
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true
+                    }
+                });
+
+                // Check session
+                const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
+                if (sessionError) throw sessionError;
+                session = currentSession;
+
+                if (!session) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                currentUserId = session?.user?.id;
+
+                // Verify user
+                const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+                if (authError) throw authError;
+                if (!user) throw new Error("User verification failed");
+
+                // Initialize audio recorder
+                audioRecorder.initialize(supabaseClient, currentUserId);
+
+                // Show main interface
+                document.querySelector('.session-check').style.display = 'none';
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendButton').disabled = false;
+
+                // Initialize map with satellite view by default on mobile
+                initializeMap();
+                
+                // Load users and setup event listeners
+                await loadUsers();
+                setupEventListeners();
+                initializeRealtime();
+
+                // Set up auth state change listener
+                supabaseClient.auth.onAuthStateChange((event, session) => {
+                    if (event === 'SIGNED_OUT') {
+                        window.location.href = 'login.html';
+                    } else if (event === 'TOKEN_REFRESHED') {
+                        console.log('Token refreshed, reinitializing realtime');
+                        initializeRealtime();
+                    }
+                });
+
+                // Initialize battery monitoring
+                initBatteryMonitoring();
+
+            } catch (error) {
+                console.error("Initialization error:", error);
+                document.querySelector('.session-check').innerHTML = `
+                    <div class="session-check-logo">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h1 class="session-check-title">Initialization Error</h1>
+                    <p class="session-check-subtitle" style="color: var(--danger);">${error.message}</p>
+                    <button onclick="window.location.href='login.html'" 
+                            style="padding: 12px 24px; background: var(--primary); border: none; border-radius: var(--radius-md); font-weight: 600;">
+                        Go to Login
+                    </button>
+                `;
+            }
+        });
+
+        // Handle notification clicks
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data.userId) {
+                    const user = userDataCache[event.data.userId];
+                    if (user) selectUser(user);
+                }
+            });
+        }
+
+        // Auto-resize for the message input
+        const input = document.getElementById("messageInput");
+        if (input) {
+            input.style.overflow = "hidden";
+
+            const autoResize = () => {
+                input.style.height = "auto";
+                input.style.height = input.scrollHeight + "px";
+            };
+
+            input.addEventListener("input", autoResize);
+            autoResize(); // Init on page load
+        }
+    </script>
+    <script src="message-encryptor.js"></script>
+    <script src="Weather-router.js"></script>
+    <script src="3d-background.js"></script>
+</body>
+</html>
