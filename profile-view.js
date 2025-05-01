@@ -598,6 +598,9 @@
                 const newFollowStatus = !currentFollowStatus;
                 this.updateFollowButton(newFollowStatus);
                 
+                // Get current stats before making changes
+                const currentStats = await this.loadUserStats(this.currentProfileId, true);
+                
                 if (newFollowStatus) {
                     // Follow logic
                     const { error } = await this.supabase
@@ -613,8 +616,8 @@
                     // Update local cache
                     followStatusCache.set(this.currentProfileId, true);
                     
-                    // Update stats in database
-                    await this.updateStatsAfterFollowChange(true);
+                    // Update stats in database and UI immediately
+                    await this.updateStatsAfterFollowChange(true, currentStats);
                 } else {
                     // Unfollow logic
                     const { error } = await this.supabase
@@ -628,12 +631,9 @@
                     // Update local cache
                     followStatusCache.set(this.currentProfileId, false);
                     
-                    // Update stats in database
-                    await this.updateStatsAfterFollowChange(false);
+                    // Update stats in database and UI immediately
+                    await this.updateStatsAfterFollowChange(false, currentStats);
                 }
-                
-                // Refresh stats display
-                await this.loadUserStats(this.currentProfileId, true);
                 
             } catch (error) {
                 console.error('Error toggling follow:', error);
@@ -663,7 +663,7 @@
             }
         }
         
-        async updateStatsAfterFollowChange(isFollowing) {
+        async updateStatsAfterFollowChange(isFollowing, currentStats) {
             try {
                 // Update both stats in parallel
                 const [followingResult, followersResult] = await Promise.all([
@@ -680,9 +680,26 @@
                 if (followingResult.error) throw followingResult.error;
                 if (followersResult.error) throw followersResult.error;
 
+                // Update UI immediately with new counts
+                const newStats = {
+                    ...currentStats,
+                    followers_count: isFollowing ? 
+                        (currentStats.followers_count || 0) + 1 : 
+                        Math.max(0, (currentStats.followers_count || 0) - 1),
+                    following_count: isFollowing ? 
+                        (currentStats.following_count || 0) + 1 : 
+                        Math.max(0, (currentStats.following_count || 0) - 1)
+                };
+                
+                this.updateStatsUI(newStats);
+                
                 // Invalidate cache for both users
                 statsCache.delete(this.currentUserId);
                 statsCache.delete(this.currentProfileId);
+                
+                // Load fresh stats to ensure accuracy
+                await this.loadUserStats(this.currentProfileId, true);
+                
             } catch (error) {
                 console.error('Error updating stats:', error);
                 throw error;
