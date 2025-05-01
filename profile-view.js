@@ -584,32 +584,21 @@
         async toggleFollow() {
             if (!this.currentProfileId) return;
             
-            this.showLoading(true);
             const button = this.profileContainer.querySelector('#followButton');
             const currentFollowStatus = followStatusCache.get(this.currentProfileId);
             
+            // Prevent multiple clicks while operation is in progress
+            if (button.dataset.processing === 'true') return;
+            button.dataset.processing = 'true';
+            
+            this.showLoading(true);
+            
             try {
-                if (currentFollowStatus) {
-                    // Unfollow logic
-                    const { error } = await this.supabase
-                        .from('follows')
-                        .delete()
-                        .eq('follower_id', this.currentUserId)
-                        .eq('following_id', this.currentProfileId);
-                    
-                    if (error) throw error;
-                    
-                    // Update local cache
-                    followStatusCache.set(this.currentProfileId, false);
-                    
-                    // Update UI
-                    button.innerHTML = '<i class="fas fa-user-plus"></i> Follow';
-                    button.style.background = 'linear-gradient(135deg, rgba(0,123,255,0.8), rgba(0,86,179,0.8))';
-                    
-                    // Update stats in database
-                    await this.updateStatsAfterFollowChange(false);
-                    
-                } else {
+                // Optimistically update UI
+                const newFollowStatus = !currentFollowStatus;
+                this.updateFollowButton(newFollowStatus);
+                
+                if (newFollowStatus) {
                     // Follow logic
                     const { error } = await this.supabase
                         .from('follows')
@@ -624,12 +613,23 @@
                     // Update local cache
                     followStatusCache.set(this.currentProfileId, true);
                     
-                    // Update UI
-                    button.innerHTML = '<i class="fas fa-user-check"></i> Following';
-                    button.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))';
-                    
                     // Update stats in database
                     await this.updateStatsAfterFollowChange(true);
+                } else {
+                    // Unfollow logic
+                    const { error } = await this.supabase
+                        .from('follows')
+                        .delete()
+                        .eq('follower_id', this.currentUserId)
+                        .eq('following_id', this.currentProfileId);
+                    
+                    if (error) throw error;
+                    
+                    // Update local cache
+                    followStatusCache.set(this.currentProfileId, false);
+                    
+                    // Update stats in database
+                    await this.updateStatsAfterFollowChange(false);
                 }
                 
                 // Refresh stats display
@@ -637,11 +637,12 @@
                 
             } catch (error) {
                 console.error('Error toggling follow:', error);
+                
+                // Revert UI to previous state
+                this.updateFollowButton(currentFollowStatus);
+                
                 // Show error feedback
                 button.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${currentFollowStatus ? 'Unfollow Failed' : 'Follow Failed'}`;
-                setTimeout(() => {
-                    this.updateFollowButton(followStatusCache.get(this.currentProfileId));
-                }, 2000);
                 
                 // Show error notification
                 this.showNotification(
@@ -649,28 +650,35 @@
                     error.message,
                     'error'
                 );
+                
+                // Revert after 2 seconds
+                setTimeout(() => {
+                    this.updateFollowButton(followStatusCache.get(this.currentProfileId));
+                }, 2000);
+                
             } finally {
+                // Reset processing state
+                button.dataset.processing = 'false';
                 this.showLoading(false);
             }
         }
         
         async updateStatsAfterFollowChange(isFollowing) {
             try {
-                // Update current user's following count
-                const { error: followingError } = await this.supabase.rpc('increment_following_count', {
-                    in_amount: isFollowing ? 1 : -1,
-                    in_user_id: this.currentUserId
-                });
+                // Update both stats in parallel
+                const [followingResult, followersResult] = await Promise.all([
+                    this.supabase.rpc('increment_following_count', {
+                        in_amount: isFollowing ? 1 : -1,
+                        in_user_id: this.currentUserId
+                    }),
+                    this.supabase.rpc('increment_followers_count', {
+                        in_amount: isFollowing ? 1 : -1,
+                        in_user_id: this.currentProfileId
+                    })
+                ]);
                 
-                if (followingError) throw followingError;
-
-                // Update target user's followers count
-                const { error: followersError } = await this.supabase.rpc('increment_followers_count', {
-                    in_amount: isFollowing ? 1 : -1,
-                    in_user_id: this.currentProfileId
-                });
-                
-                if (followersError) throw followersError;
+                if (followingResult.error) throw followingResult.error;
+                if (followersResult.error) throw followersResult.error;
 
                 // Invalidate cache for both users
                 statsCache.delete(this.currentUserId);
@@ -1149,6 +1157,11 @@
         
         updateFollowButton(isFollowing) {
             const button = this.profileContainer.querySelector('#followButton');
+            if (!button) return;
+            
+            // Reset any error states
+            button.dataset.processing = 'false';
+            
             if (isFollowing) {
                 button.innerHTML = '<i class="fas fa-user-check"></i> Following';
                 button.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))';
