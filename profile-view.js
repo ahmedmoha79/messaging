@@ -588,61 +588,88 @@
             const currentFollowStatus = followStatusCache.get(this.currentProfileId);
             
             // Prevent multiple clicks while operation is in progress
-            if (button.dataset.processing === 'true') return;
-            button.dataset.processing = 'true';
+            if (button.dataset.processing === 'true') {
+                debug('Follow operation already in progress', 'warn');
+                return;
+            }
             
-            this.showLoading(true);
+            // Set processing state
+            button.dataset.processing = 'true';
+            const originalButtonContent = button.innerHTML;
+            
+            // Show loading state
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            button.style.opacity = '0.7';
+            button.style.cursor = 'not-allowed';
+            
+            // Get current stats before making changes
+            const currentStats = await this.loadUserStats(this.currentProfileId, true);
             
             try {
-                // Optimistically update UI
                 const newFollowStatus = !currentFollowStatus;
+                let retryCount = 0;
+                const maxRetries = 3;
+                let success = false;
+                
+                while (retryCount < maxRetries && !success) {
+                    try {
+                        if (newFollowStatus) {
+                            // Follow logic
+                            const { error } = await this.supabase
+                                .from('follows')
+                                .insert([{
+                                    follower_id: this.currentUserId,
+                                    following_id: this.currentProfileId,
+                                    created_at: new Date().toISOString()
+                                }]);
+                            
+                            if (error) throw error;
+                        } else {
+                            // Unfollow logic
+                            const { error } = await this.supabase
+                                .from('follows')
+                                .delete()
+                                .eq('follower_id', this.currentUserId)
+                                .eq('following_id', this.currentProfileId);
+                            
+                            if (error) throw error;
+                        }
+                        
+                        success = true;
+                    } catch (error) {
+                        retryCount++;
+                        if (retryCount === maxRetries) {
+                            throw error;
+                        }
+                        // Wait before retrying
+                        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                    }
+                }
+                
+                // Update local cache
+                followStatusCache.set(this.currentProfileId, newFollowStatus);
+                
+                // Update stats in database and UI immediately
+                await this.updateStatsAfterFollowChange(newFollowStatus, currentStats);
+                
+                // Update button state
                 this.updateFollowButton(newFollowStatus);
                 
-                // Get current stats before making changes
-                const currentStats = await this.loadUserStats(this.currentProfileId, true);
+                // Show success feedback
+                button.innerHTML = `<i class="fas fa-check"></i> ${newFollowStatus ? 'Following' : 'Follow'}`;
+                button.style.backgroundColor = newFollowStatus ? '#4CAF50' : '#2196F3';
                 
-                if (newFollowStatus) {
-                    // Follow logic
-                    const { error } = await this.supabase
-                        .from('follows')
-                        .insert([{
-                            follower_id: this.currentUserId,
-                            following_id: this.currentProfileId,
-                            created_at: new Date().toISOString()
-                        }]);
-                    
-                    if (error) throw error;
-                    
-                    // Update local cache
-                    followStatusCache.set(this.currentProfileId, true);
-                    
-                    // Update stats in database and UI immediately
-                    await this.updateStatsAfterFollowChange(true, currentStats);
-                } else {
-                    // Unfollow logic
-                    const { error } = await this.supabase
-                        .from('follows')
-                        .delete()
-                        .eq('follower_id', this.currentUserId)
-                        .eq('following_id', this.currentProfileId);
-                    
-                    if (error) throw error;
-                    
-                    // Update local cache
-                    followStatusCache.set(this.currentProfileId, false);
-                    
-                    // Update stats in database and UI immediately
-                    await this.updateStatsAfterFollowChange(false, currentStats);
-                }
+                // Reset button state after 2 seconds
+                setTimeout(() => {
+                    this.updateFollowButton(newFollowStatus);
+                }, 2000);
                 
             } catch (error) {
                 console.error('Error toggling follow:', error);
                 
-                // Revert UI to previous state
-                this.updateFollowButton(currentFollowStatus);
-                
                 // Show error feedback
                 button.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${currentFollowStatus ? 'Unfollow Failed' : 'Follow Failed'}`;
+                button.style.backgroundColor = '#f44336';
                 
                 // Show error notification
                 this.showNotification(
@@ -653,13 +680,16 @@
                 
                 // Revert after 2 seconds
                 setTimeout(() => {
-                    this.updateFollowButton(followStatusCache.get(this.currentProfileId));
+                    this.updateFollowButton(currentFollowStatus);
                 }, 2000);
                 
             } finally {
-                // Reset processing state
-                button.dataset.processing = 'false';
-                this.showLoading(false);
+                // Reset processing state after a delay
+                setTimeout(() => {
+                    button.dataset.processing = 'false';
+                    button.style.opacity = '1';
+                    button.style.cursor = 'pointer';
+                }, 2000);
             }
         }
         
@@ -680,25 +710,14 @@
                 if (followingResult.error) throw followingResult.error;
                 if (followersResult.error) throw followersResult.error;
 
-                // Update UI immediately with new counts
-                const newStats = {
-                    ...currentStats,
-                    followers_count: isFollowing ? 
-                        (currentStats.followers_count || 0) + 1 : 
-                        Math.max(0, (currentStats.followers_count || 0) - 1),
-                    following_count: isFollowing ? 
-                        (currentStats.following_count || 0) + 1 : 
-                        Math.max(0, (currentStats.following_count || 0) - 1)
-                };
+                // Force refresh stats for both users to ensure accuracy
+                const [currentUserStats, profileStats] = await Promise.all([
+                    this.loadUserStats(this.currentUserId, true),
+                    this.loadUserStats(this.currentProfileId, true)
+                ]);
                 
-                this.updateStatsUI(newStats);
-                
-                // Invalidate cache for both users
-                statsCache.delete(this.currentUserId);
-                statsCache.delete(this.currentProfileId);
-                
-                // Load fresh stats to ensure accuracy
-                await this.loadUserStats(this.currentProfileId, true);
+                // Update UI with fresh stats
+                this.updateStatsUI(profileStats);
                 
             } catch (error) {
                 console.error('Error updating stats:', error);
@@ -901,49 +920,39 @@
             let stats = { followers_count: 0, following_count: 0, messages_count: 0 };
             
             try {
-                // Try to get from user_stats table first
-                const { data: statsData, error } = await this.supabase
-                    .from('user_stats')
-                    .select('followers_count, following_count, messages_count')
-                    .eq('user_id', userId)
-                    .single();
-                
-                if (!error && statsData) {
-                    stats = statsData;
-                } else {
-                    // Fallback to counting if stats table doesn't have the data
-                    const [followers, following, messages] = await Promise.all([
-                        this.supabase
-                            .from('follows')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('following_id', userId),
+                // Always get the actual counts from the follows table first
+                const [followers, following, messages] = await Promise.all([
+                    this.supabase
+                        .from('follows')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('following_id', userId),
+                    
+                    this.supabase
+                        .from('follows')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('follower_id', userId),
                         
-                        this.supabase
-                            .from('follows')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('follower_id', userId),
-                            
-                        this.supabase
-                            .from('messages')
-                            .select('*', { count: 'exact', head: true })
-                            .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-                    ]);
-                    
-                    stats = {
-                        followers_count: followers.count || 0,
-                        following_count: following.count || 0,
-                        messages_count: messages.count || 0
-                    };
-                    
-                    // Update stats table for future use
-                    await this.supabase
-                        .from('user_stats')
-                        .upsert({
-                            user_id: userId,
-                            ...stats,
-                            last_updated: new Date().toISOString()
-                        });
-                }
+                    this.supabase
+                        .from('messages')
+                        .select('*', { count: 'exact', head: true })
+                        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+                ]);
+                
+                stats = {
+                    followers_count: followers.count || 0,
+                    following_count: following.count || 0,
+                    messages_count: messages.count || 0
+                };
+                
+                // Update stats table to ensure consistency
+                await this.supabase
+                    .from('user_stats')
+                    .upsert({
+                        user_id: userId,
+                        ...stats,
+                        last_updated: new Date().toISOString()
+                    });
+                
             } catch (error) {
                 debug(`Stats error (non-critical): ${error.message}`, 'warn');
             }
@@ -1242,8 +1251,32 @@
         }
         
         showNotification(title, message, type = 'info') {
-            // Implementation would create a toast notification
-            console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4CAF50' : '#2196F3'};
+                color: white;
+                border-radius: 5px;
+                z-index: 1000;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            notification.innerHTML = `
+                <div style="font-weight: bold;">${title}</div>
+                <div style="font-size: 0.9em; opacity: 0.9;">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
         }
         
         showMoreActionsMenu(event) {

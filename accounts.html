@@ -676,8 +676,8 @@
         // Load account data
         async function loadAccountData() {
             try {
-                // Fetch account information
-                let { data: account, error: accountError } = await supabaseClient
+                // Use a single query to get all required data
+                const { data: account, error: accountError } = await supabaseClient
                     .from('users')
                     .select(`
                         id,
@@ -689,7 +689,9 @@
                         role,
                         status,
                         mfa_enabled,
-                        last_password_change
+                        last_password_change,
+                        user_profiles!inner(bio),
+                        user_stats!inner(followers_count, following_count)
                     `)
                     .eq('id', currentUserId)
                     .single();
@@ -707,36 +709,26 @@
                             role: 'user',
                             status: 'online'
                         }])
-                        .select()
+                        .select(`
+                            id,
+                            email,
+                            name,
+                            created_at,
+                            lastonline,
+                            avatar_url,
+                            role,
+                            status,
+                            mfa_enabled,
+                            last_password_change,
+                            user_profiles!inner(bio),
+                            user_stats!inner(followers_count, following_count)
+                        `)
                         .single();
 
                     if (createError) throw createError;
                     account = newUser;
                 } else if (accountError) {
                     throw accountError;
-                }
-
-                // Fetch user profile data
-                const { data: profileData, error: profileError } = await supabaseClient
-                    .from('user_profiles')
-                    .select('bio')
-                    .eq('user_id', currentUserId)
-                    .single();
-
-                if (!profileError && profileData) {
-                    account.bio = profileData.bio;
-                }
-
-                // Fetch user stats
-                const { data: statsData, error: statsError } = await supabaseClient
-                    .from('user_stats')
-                    .select('followers_count, following_count')
-                    .eq('user_id', currentUserId)
-                    .single();
-
-                if (!statsError && statsData) {
-                    account.followers_count = statsData.followers_count;
-                    account.following_count = statsData.following_count;
                 }
                 
                 // Fetch recent activity from security_logs
@@ -755,6 +747,17 @@
             } catch (error) {
                 console.error('Failed to load account data:', error);
                 showError('Failed to load account data. Please try again.');
+                
+                // Log the error to security logs
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Failed to load account data',
+                        status: 'failed',
+                        error: error.message,
+                        created_at: new Date().toISOString()
+                    }]);
             }
         }
 
@@ -950,38 +953,71 @@
             const uploadStatus = document.getElementById('uploadStatus');
             const avatarUploadModal = document.getElementById('avatarUploadModal');
 
-            // Handle file selection
-            avatarUpload.addEventListener('change', (e) => {
+            // Handle file selection with validation
+            avatarUpload.addEventListener('change', async (e) => {
                 const file = e.target.files[0];
-                if (file) {
-                    if (file.size > 2 * 1024 * 1024) { // 2MB limit
-                        uploadStatus.textContent = 'File size must be less than 2MB';
-                        uploadStatus.style.color = '#ff4444';
-                        confirmUploadBtn.disabled = true;
-                        return;
-                    }
-                    
-                    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                    if (!validTypes.includes(file.type)) {
-                        uploadStatus.textContent = 'Only JPG, PNG, GIF or WEBP files are allowed';
-                        uploadStatus.style.color = '#ff4444';
-                        confirmUploadBtn.disabled = true;
-                        return;
-                    }
-                    
-                    selectedAvatarFile = file;
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        avatarPreview.src = event.target.result;
-                        avatarPreview.style.display = 'block';
-                        confirmUploadBtn.disabled = false;
-                        uploadStatus.textContent = '';
-                    };
-                    reader.readAsDataURL(file);
+                if (!file) return;
+
+                // Validate file size (2MB limit)
+                if (file.size > 2 * 1024 * 1024) {
+                    uploadStatus.textContent = 'File size must be less than 2MB';
+                    uploadStatus.style.color = '#ff4444';
+                    confirmUploadBtn.disabled = true;
+                    return;
                 }
+                
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    uploadStatus.textContent = 'Only JPG, PNG, GIF or WEBP files are allowed';
+                    uploadStatus.style.color = '#ff4444';
+                    confirmUploadBtn.disabled = true;
+                    return;
+                }
+
+                // Validate image dimensions
+                try {
+                    const img = new Image();
+                    img.src = URL.createObjectURL(file);
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                    });
+                    
+                    if (img.width < 100 || img.height < 100) {
+                        uploadStatus.textContent = 'Image must be at least 100x100 pixels';
+                        uploadStatus.style.color = '#ff4444';
+                        confirmUploadBtn.disabled = true;
+                        return;
+                    }
+                    
+                    if (img.width > 2000 || img.height > 2000) {
+                        uploadStatus.textContent = 'Image must be less than 2000x2000 pixels';
+                        uploadStatus.style.color = '#ff4444';
+                        confirmUploadBtn.disabled = true;
+                        return;
+                    }
+                    
+                    URL.revokeObjectURL(img.src);
+                } catch (error) {
+                    uploadStatus.textContent = 'Invalid image file';
+                    uploadStatus.style.color = '#ff4444';
+                    confirmUploadBtn.disabled = true;
+                    return;
+                }
+                
+                selectedAvatarFile = file;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    avatarPreview.src = event.target.result;
+                    avatarPreview.style.display = 'block';
+                    confirmUploadBtn.disabled = false;
+                    uploadStatus.textContent = '';
+                };
+                reader.readAsDataURL(file);
             });
 
-            // Handle upload confirmation
+            // Handle upload confirmation with retry logic
             confirmUploadBtn.addEventListener('click', async () => {
                 if (!selectedAvatarFile) return;
                 
@@ -991,34 +1027,56 @@
                 uploadStatus.style.color = '#00ff88';
                 
                 try {
-                    // Generate unique filename with user folder
+                    // Generate unique filename with user folder and timestamp
                     const fileExt = selectedAvatarFile.name.split('.').pop();
-                    const fileName = `avatar.${fileExt}`;
+                    const timestamp = Date.now();
+                    const fileName = `avatar_${timestamp}.${fileExt}`;
                     const filePath = `${currentUserId}/${fileName}`;
                     
                     // First delete any existing avatar to avoid conflicts
                     try {
-                        const { error: deleteError } = await supabaseClient
+                        const { data: existingFiles, error: listError } = await supabaseClient
                             .storage
                             .from('avatars')
-                            .remove([filePath]);
+                            .list(currentUserId);
                         
-                        // We don't care if the delete fails - it might not exist
+                        if (!listError && existingFiles) {
+                            const filesToDelete = existingFiles.map(file => `${currentUserId}/${file.name}`);
+                            if (filesToDelete.length > 0) {
+                                await supabaseClient
+                                    .storage
+                                    .from('avatars')
+                                    .remove(filesToDelete);
+                            }
+                        }
                     } catch (deleteError) {
                         console.log('No existing avatar to delete');
                     }
                     
-                    // Upload the new avatar
-                    const { data: uploadData, error: uploadError } = await supabaseClient
-                        .storage
-                        .from('avatars')
-                        .upload(filePath, selectedAvatarFile, {
-                            cacheControl: '3600',
-                            upsert: true,
-                            contentType: selectedAvatarFile.type
-                        });
+                    // Upload the new avatar with retry logic
+                    let retries = 3;
+                    let uploadData;
                     
-                    if (uploadError) throw uploadError;
+                    while (retries > 0) {
+                        try {
+                            const { data, error: uploadError } = await supabaseClient
+                                .storage
+                                .from('avatars')
+                                .upload(filePath, selectedAvatarFile, {
+                                    cacheControl: '3600',
+                                    upsert: true,
+                                    contentType: selectedAvatarFile.type
+                                });
+                            
+                            if (uploadError) throw uploadError;
+                            uploadData = data;
+                            break;
+                        } catch (error) {
+                            retries--;
+                            if (retries === 0) throw error;
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
+                    }
                     
                     // Get public URL with cache busting
                     const { data: { publicUrl } } = supabaseClient
@@ -1048,7 +1106,7 @@
                         }]);
                     
                     // Update the avatar display with cache busting
-                    document.getElementById('profileAvatar').src = `${publicUrl}?t=${Date.now()}`;
+                    document.getElementById('profileAvatar').src = `${publicUrl}?t=${timestamp}`;
                     
                     // Close modal and reset
                     avatarUploadModal.style.display = 'none';
@@ -1300,14 +1358,20 @@
             try {
                 // Remove existing channels if they exist
                 if (presenceChannel) {
-                    supabaseClient.removeChannel(presenceChannel);
+                    await supabaseClient.removeChannel(presenceChannel);
                 }
 
+                // Create a new channel with optimized configuration
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         presence: { 
-                            key: currentUserId
-                        } 
+                            key: currentUserId,
+                            timeout: 10000, // 10 seconds timeout
+                            heartbeatInterval: 5000 // 5 seconds heartbeat
+                        },
+                        broadcast: {
+                            self: true
+                        }
                     }
                 })
                 .on('presence', { event: 'sync' }, () => {
@@ -1316,18 +1380,35 @@
                 })
                 .subscribe(async (status, error) => {
                     if (status === 'SUBSCRIBED') {
-                        await presenceChannel.track({ 
-                            online_at: new Date().toISOString(),
-                            user_id: currentUserId
-                        });
-                        updateConnectionStatus("Connected");
-                        updateOnlineStatus(true);
-                        
-                        // Update last online in database
-                        await supabaseClient
-                            .from('users')
-                            .update({ lastonline: new Date().toISOString() })
-                            .eq('id', currentUserId);
+                        try {
+                            await presenceChannel.track({ 
+                                online_at: new Date().toISOString(),
+                                user_id: currentUserId
+                            });
+                            
+                            // Update last online in database with retry logic
+                            let retries = 3;
+                            while (retries > 0) {
+                                try {
+                                    await supabaseClient
+                                        .from('users')
+                                        .update({ lastonline: new Date().toISOString() })
+                                        .eq('id', currentUserId);
+                                    break;
+                                } catch (updateError) {
+                                    retries--;
+                                    if (retries === 0) throw updateError;
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
+                                }
+                            }
+                            
+                            updateConnectionStatus("Connected");
+                            updateOnlineStatus(true);
+                        } catch (trackError) {
+                            console.error('Error tracking presence:', trackError);
+                            updateConnectionStatus("Error tracking presence", true);
+                            setTimeout(initializeRealtime, 3000);
+                        }
                     }
                     if (error) {
                         console.error('Presence channel error:', error);
@@ -1336,17 +1417,30 @@
                     }
                 });
 
-                // Handle channel connection events
+                // Handle channel connection events with exponential backoff
+                let reconnectAttempts = 0;
+                const maxReconnectAttempts = 5;
+                
                 presenceChannel
                     .on('CLOSE', () => {
                         updateConnectionStatus("Reconnecting...", true);
                         updateOnlineStatus(false);
-                        setTimeout(initializeRealtime, 3000);
+                        
+                        // Exponential backoff for reconnection
+                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                        reconnectAttempts = Math.min(reconnectAttempts + 1, maxReconnectAttempts);
+                        
+                        setTimeout(() => {
+                            initializeRealtime();
+                        }, delay);
                     })
                     .on('ERROR', (error) => {
                         console.error("Realtime error:", error);
                         updateConnectionStatus("Error: " + error.message, true);
                         updateOnlineStatus(false);
+                        
+                        // Reset reconnect attempts on error
+                        reconnectAttempts = 0;
                         setTimeout(initializeRealtime, 5000);
                     });
 
@@ -1354,6 +1448,18 @@
                 console.error("Realtime connection error:", error);
                 updateConnectionStatus("Realtime failed: " + error.message, true);
                 updateOnlineStatus(false);
+                
+                // Log the error to security logs
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Realtime connection failed',
+                        status: 'failed',
+                        error: error.message,
+                        created_at: new Date().toISOString()
+                    }]);
+            
                 setTimeout(initializeRealtime, 5000);
             }
         }
@@ -1529,58 +1635,57 @@
             modal.style.display = 'flex';
             
             try {
-                // First get the user IDs
-                const { data: follows, error: followsError } = await supabaseClient
+                // Use a single query to get both count and data
+                const { data: follows, count, error: followsError } = await supabaseClient
                     .from('follows')
-                    .select(type === 'followers' ? 'follower_id' : 'following_id')
+                    .select('*, users!inner(*)', { count: 'exact' })
                     .eq(type === 'followers' ? 'following_id' : 'follower_id', currentUserId)
                     .order('created_at', { ascending: false });
                 
                 if (followsError) throw followsError;
                 
-                if (!follows || follows.length === 0) {
+                // Update the stats display to match the actual count
+                const statCount = document.querySelector(`#${type}Stat .stat-count`);
+                if (statCount) {
+                    statCount.textContent = count || 0;
+                }
+                
+                if (!count || count === 0) {
                     list.innerHTML = '<p style="text-align: center; opacity: 0.7;">No ' + type + ' yet</p>';
                     return;
                 }
 
-                // Get the user IDs
-                const userIds = follows.map(f => type === 'followers' ? f.follower_id : f.following_id);
-                
-                // Then get the user data
-                const { data: users, error: usersError } = await supabaseClient
-                    .from('users')
-                    .select('id, name, email, avatar_url')
-                    .in('id', userIds);
-                
-                if (usersError) throw usersError;
-
-                // Combine the data
-                const followers = follows.map(follow => {
-                    const userId = type === 'followers' ? follow.follower_id : follow.following_id;
-                    const user = users.find(u => u.id === userId);
-                    return {
-                        user: user || { id: userId, name: 'Unknown User', email: 'Unknown', avatar_url: null },
-                        created_at: follow.created_at
-                    };
-                });
-                
-                // Render the list
-                list.innerHTML = followers.map(item => `
-                    <div class="follower-item">
-                        <div class="follower-avatar">
-                            <img src="${item.user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user.name)}&background=random`}" 
-                                alt="${item.user.name}">
+                // Render the list using the joined data
+                list.innerHTML = follows.map(follow => {
+                    const user = follow.users;
+                    return `
+                        <div class="follower-item">
+                            <div class="follower-avatar">
+                                <img src="${user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}" 
+                                    alt="${user.name}">
+                            </div>
+                            <div class="follower-info">
+                                <div class="follower-name">${user.name}</div>
+                                <div class="follower-email">${user.email}</div>
+                            </div>
                         </div>
-                        <div class="follower-info">
-                            <div class="follower-name">${item.user.name}</div>
-                            <div class="follower-email">${item.user.email}</div>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
                 
             } catch (error) {
                 console.error('Error loading ' + type + ':', error);
                 list.innerHTML = '<p style="text-align: center; color: #ff4444;">Failed to load ' + type + '</p>';
+                
+                // Log the error to security logs
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: `Failed to load ${type} list`,
+                        status: 'failed',
+                        error: error.message,
+                        created_at: new Date().toISOString()
+                    }]);
             }
         }
     </script>

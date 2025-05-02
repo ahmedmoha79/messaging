@@ -563,9 +563,24 @@ app.get('/api/battery', authenticateUser, async (req, res) => {
   }
 });
 
-// Add health check endpoint
+// Add health check endpoint with error handling
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+    try {
+        // Check if server is responsive
+        res.status(200).json({ 
+            status: 'healthy', 
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            memory: process.memoryUsage()
+        });
+    } catch (error) {
+        console.error('Health check error:', error);
+        res.status(500).json({ 
+            status: 'unhealthy',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Add background ping service
@@ -614,8 +629,27 @@ app.use((req, res) => {
   });
 });
 
-// Server Initialization
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-  console.log(`Supabase connected to: ${supabaseUrl}`);
-});
+// Enhanced server startup
+const startServer = async () => {
+    try {
+        // Verify Supabase connection
+        const { data, error } = await supabase.from('users').select('count').single();
+        if (error) {
+            console.error('Supabase connection test failed:', error);
+            process.exit(1);
+        }
+        console.log('Supabase connection verified');
+
+        // Start the server
+        app.listen(port, () => {
+            console.log(`Server running on port ${port}`);
+            console.log(`Health check available at http://localhost:${port}/health`);
+        });
+    } catch (error) {
+        console.error('Server startup failed:', error);
+        process.exit(1);
+    }
+};
+
+// Start the server
+startServer();
