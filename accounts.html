@@ -402,6 +402,84 @@
             justify-content: center;
         }
         
+        /* Bio Editing */
+        .bio-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1em;
+            width: 100%;
+            min-height: 100px;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+        .edit-bio-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        
+        /* Followers/Following Modal */
+        .followers-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .followers-content {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .follower-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .follower-item:last-child {
+            border-bottom: none;
+        }
+        .follower-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .follower-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .follower-info {
+            flex: 1;
+        }
+        .follower-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .follower-email {
+            opacity: 0.7;
+            font-size: 0.9em;
+        }
+        
         /* Responsive Adjustments */
         @media (max-width: 768px) {
             .account-container {
@@ -442,6 +520,44 @@
                 height: 120px;
             }
         }
+
+        /* Add this CSS in the style section */
+        .social-stats {
+            display: flex;
+            gap: 40px;
+            margin: 25px 0;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            padding: 10px 20px;
+            border-radius: 10px;
+        }
+        .stat-item:hover {
+            background: rgba(0, 255, 136, 0.1);
+            transform: translateY(-2px);
+        }
+        .stat-count {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            font-size: 1em;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
@@ -479,6 +595,19 @@
         </div>
     </div>
 
+    <!-- Followers/Following Modal -->
+    <div id="followersModal" class="followers-modal">
+        <div class="followers-content">
+            <h2 id="followersModalTitle">Followers</h2>
+            <div id="followersList"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" id="closeFollowersBtn">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         // Configuration
@@ -492,6 +621,7 @@
         let originalName = '';
         let currentName = '';
         let selectedAvatarFile = null;
+        let account = null;
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
@@ -585,6 +715,29 @@
                 } else if (accountError) {
                     throw accountError;
                 }
+
+                // Fetch user profile data
+                const { data: profileData, error: profileError } = await supabaseClient
+                    .from('user_profiles')
+                    .select('bio')
+                    .eq('user_id', currentUserId)
+                    .single();
+
+                if (!profileError && profileData) {
+                    account.bio = profileData.bio;
+                }
+
+                // Fetch user stats
+                const { data: statsData, error: statsError } = await supabaseClient
+                    .from('user_stats')
+                    .select('followers_count, following_count')
+                    .eq('user_id', currentUserId)
+                    .single();
+
+                if (!statsError && statsData) {
+                    account.followers_count = statsData.followers_count;
+                    account.following_count = statsData.following_count;
+                }
                 
                 // Fetch recent activity from security_logs
                 const { data: activity, error: activityError } = await supabaseClient
@@ -642,6 +795,16 @@
                         <span id="statusIndicator" class="status-indicator ${isOnline ? 'online' : 'offline'}"></span>
                         <span id="statusText">${isOnline ? 'Online' : formatLastOnline(lastActive)}</span>
                     </div>
+                    <div class="social-stats">
+                        <div class="stat-item" id="followersStat">
+                            <span class="stat-count">${account.followers_count || 0}</span>
+                            <span class="stat-label">Followers</span>
+                        </div>
+                        <div class="stat-item" id="followingStat">
+                            <span class="stat-count">${account.following_count || 0}</span>
+                            <span class="stat-label">Following</span>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="profile-section">
@@ -655,6 +818,20 @@
                     <div class="detail-row">
                         <div class="detail-label">Email</div>
                         <div class="detail-value">${account.email || 'Not provided'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Bio</div>
+                        <div class="detail-value" id="bioDisplay">${account.bio || 'No bio yet'}</div>
+                        <div class="edit-bio-container" id="editBioContainer" style="display: none;">
+                            <textarea class="bio-input" id="bioInput" maxlength="500" placeholder="Write something about yourself...">${account.bio || ''}</textarea>
+                            <button class="btn btn-primary" id="saveBioBtn">
+                                <i class="fas fa-check"></i> Save
+                            </button>
+                            <button class="btn btn-secondary" id="cancelBioBtn">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                        <i class="fas fa-pencil-alt edit-icon" id="editBioIcon"></i>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">Account Created</div>
@@ -738,6 +915,30 @@
                     console.error('Logout error:', error);
                     alert('Failed to logout. Please try again.');
                 }
+            });
+
+            // Setup event listeners for bio editing
+            const editBioIcon = document.getElementById('editBioIcon');
+            const cancelBioBtn = document.getElementById('cancelBioBtn');
+            const saveBioBtn = document.getElementById('saveBioBtn');
+            
+            if (editBioIcon) editBioIcon.addEventListener('click', startBioEditing);
+            if (cancelBioBtn) cancelBioBtn.addEventListener('click', cancelBioEditing);
+            if (saveBioBtn) saveBioBtn.addEventListener('click', saveBio);
+            
+            // Setup event listeners for followers/following
+            const followersStat = document.getElementById('followersStat');
+            const followingStat = document.getElementById('followingStat');
+            
+            if (followersStat) {
+                followersStat.addEventListener('click', () => showFollowersList('followers'));
+            }
+            if (followingStat) {
+                followingStat.addEventListener('click', () => showFollowersList('following'));
+            }
+            
+            document.getElementById('closeFollowersBtn').addEventListener('click', () => {
+                document.getElementById('followersModal').style.display = 'none';
             });
         }
 
@@ -1167,6 +1368,221 @@
                 console.error('Cleanup error:', error);
             }
         });
+
+        function startBioEditing() {
+            const bioDisplay = document.getElementById('bioDisplay');
+            const editBioIcon = document.getElementById('editBioIcon');
+            const editBioContainer = document.getElementById('editBioContainer');
+            const bioInput = document.getElementById('bioInput');
+            
+            bioDisplay.style.display = 'none';
+            editBioIcon.style.display = 'none';
+            editBioContainer.style.display = 'block';
+            bioInput.focus();
+        }
+
+        function cancelBioEditing() {
+            const bioDisplay = document.getElementById('bioDisplay');
+            const editBioIcon = document.getElementById('editBioIcon');
+            const editBioContainer = document.getElementById('editBioContainer');
+            const bioInput = document.getElementById('bioInput');
+            
+            bioDisplay.style.display = 'block';
+            editBioIcon.style.display = 'inline-block';
+            editBioContainer.style.display = 'none';
+            bioInput.value = account.bio || '';
+        }
+
+        async function saveBio() {
+            const newBio = document.getElementById('bioInput').value.trim();
+            const saveBtn = document.getElementById('saveBioBtn');
+            const bioDisplay = document.getElementById('bioDisplay');
+            const editBioIcon = document.getElementById('editBioIcon');
+            const editBioContainer = document.getElementById('editBioContainer');
+            
+            // Disable the save button and show loading state
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            
+            try {
+                // Update the bio in Supabase
+                const { error } = await supabaseClient
+                    .from('user_profiles')
+                    .update({
+                        bio: newBio,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('user_id', currentUserId);
+                
+                if (error) {
+                    // If update fails, try to insert
+                    const { error: insertError } = await supabaseClient
+                        .from('user_profiles')
+                        .insert([{
+                            user_id: currentUserId,
+                            bio: newBio,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        }]);
+                    
+                    if (insertError) throw insertError;
+                }
+                
+                // Update the UI immediately
+                bioDisplay.textContent = newBio || 'No bio yet';
+                
+                // Hide the edit container and show the display
+                editBioContainer.style.display = 'none';
+                bioDisplay.style.display = 'block';
+                editBioIcon.style.display = 'inline-block';
+                
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.className = 'success-message';
+                successMessage.innerHTML = '<i class="fas fa-check-circle"></i> Bio updated successfully';
+                successMessage.style.cssText = `
+                    color: #00ff88;
+                    font-size: 0.9em;
+                    margin-top: 10px;
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                `;
+                
+                // Remove any existing messages
+                const existingMessage = bioDisplay.parentElement.querySelector('.success-message, .error-message');
+                if (existingMessage) {
+                    existingMessage.remove();
+                }
+                
+                bioDisplay.parentElement.appendChild(successMessage);
+                
+                // Remove the success message after 3 seconds
+                setTimeout(() => {
+                    successMessage.remove();
+                }, 3000);
+                
+                // Log the activity
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Updated bio',
+                        status: 'success',
+                        created_at: new Date().toISOString()
+                    }]);
+                
+            } catch (error) {
+                console.error('Error saving bio:', error);
+                
+                // Show error message
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'error-message';
+                errorMessage.innerHTML = '<i class="fas fa-exclamation-circle"></i> Failed to update bio';
+                errorMessage.style.cssText = `
+                    color: #ff4444;
+                    font-size: 0.9em;
+                    margin-top: 10px;
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                `;
+                
+                // Remove any existing messages
+                const existingMessage = bioDisplay.parentElement.querySelector('.success-message, .error-message');
+                if (existingMessage) {
+                    existingMessage.remove();
+                }
+                
+                bioDisplay.parentElement.appendChild(errorMessage);
+                
+                // Remove the error message after 5 seconds
+                setTimeout(() => {
+                    errorMessage.remove();
+                }, 5000);
+                
+                // Log the error
+                await supabaseClient
+                    .from('security_logs')
+                    .insert([{
+                        user_id: currentUserId,
+                        action: 'Failed to update bio',
+                        status: 'failed',
+                        error: error.message,
+                        created_at: new Date().toISOString()
+                    }]);
+                
+            } finally {
+                // Reset the save button
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Save';
+            }
+        }
+
+        async function showFollowersList(type) {
+            const modal = document.getElementById('followersModal');
+            const title = document.getElementById('followersModalTitle');
+            const list = document.getElementById('followersList');
+            
+            title.textContent = type === 'followers' ? 'Followers' : 'Following';
+            list.innerHTML = '<div class="loading-spinner"></div>';
+            modal.style.display = 'flex';
+            
+            try {
+                // First get the user IDs
+                const { data: follows, error: followsError } = await supabaseClient
+                    .from('follows')
+                    .select(type === 'followers' ? 'follower_id' : 'following_id')
+                    .eq(type === 'followers' ? 'following_id' : 'follower_id', currentUserId)
+                    .order('created_at', { ascending: false });
+                
+                if (followsError) throw followsError;
+                
+                if (!follows || follows.length === 0) {
+                    list.innerHTML = '<p style="text-align: center; opacity: 0.7;">No ' + type + ' yet</p>';
+                    return;
+                }
+
+                // Get the user IDs
+                const userIds = follows.map(f => type === 'followers' ? f.follower_id : f.following_id);
+                
+                // Then get the user data
+                const { data: users, error: usersError } = await supabaseClient
+                    .from('users')
+                    .select('id, name, email, avatar_url')
+                    .in('id', userIds);
+                
+                if (usersError) throw usersError;
+
+                // Combine the data
+                const followers = follows.map(follow => {
+                    const userId = type === 'followers' ? follow.follower_id : follow.following_id;
+                    const user = users.find(u => u.id === userId);
+                    return {
+                        user: user || { id: userId, name: 'Unknown User', email: 'Unknown', avatar_url: null },
+                        created_at: follow.created_at
+                    };
+                });
+                
+                // Render the list
+                list.innerHTML = followers.map(item => `
+                    <div class="follower-item">
+                        <div class="follower-avatar">
+                            <img src="${item.user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user.name)}&background=random`}" 
+                                alt="${item.user.name}">
+                        </div>
+                        <div class="follower-info">
+                            <div class="follower-name">${item.user.name}</div>
+                            <div class="follower-email">${item.user.email}</div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading ' + type + ':', error);
+                list.innerHTML = '<p style="text-align: center; color: #ff4444;">Failed to load ' + type + '</p>';
+            }
+        }
     </script>
 </body>
 </html>
