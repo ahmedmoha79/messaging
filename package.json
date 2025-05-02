@@ -17,6 +17,7 @@
     "geolib": "^3.3.3",
     "heatmap.js": "^2.0.5",
     "leaflet.heat": "^0.2.0",
+    "node-fetch": "^2.6.7",
     "plotly.js": "^2.14.0",
     "web-push": "^3.6.7"
   },
