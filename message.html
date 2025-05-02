@@ -3596,15 +3596,62 @@
         // Initialize the application
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                // Register service worker
+                if ('serviceWorker' in navigator) {
+                    try {
+                        const registration = await navigator.serviceWorker.register('/sw.js');
+                        console.log('ServiceWorker registration successful');
+                    } catch (error) {
+                        console.error('ServiceWorker registration failed:', error);
+                    }
+                }
+
                 // Initialize Supabase client
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
                         persistSession: true,
-                        autoRefreshToken: true
+                        autoRefreshToken: true,
+                        detectSessionInUrl: false,
+                        storage: {
+                            getItem: (key) => {
+                                return localStorage.getItem(key) || 
+                                       localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token') || 
+                                       localStorage.getItem('session');
+                            },
+                            setItem: (key, value) => localStorage.setItem(key, value),
+                            removeItem: (key) => localStorage.removeItem(key)
+                        }
                     }
                 });
 
-                // Check session
+                // Add keep-alive mechanism
+                const keepAliveInterval = 5 * 60 * 1000; // Every 5 minutes
+                setInterval(async () => {
+                    try {
+                        // Make a small Supabase query to keep the connection alive
+                        const { data, error } = await supabaseClient
+                            .from('users')
+                            .select('id')
+                            .limit(1);
+                        
+                        if (error) throw error;
+                        
+                        // Also ping the server
+                        fetch('/health')
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.error('Server health check failed');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Server ping failed:', error);
+                            });
+                    } catch (error) {
+                        console.error('Keep-alive failed:', error);
+                    }
+                }, keepAliveInterval);
+
+                // Check session in background
                 const { data: { session: currentSession }, error: sessionError } = await supabaseClient.auth.getSession();
                 if (sessionError) throw sessionError;
                 session = currentSession;

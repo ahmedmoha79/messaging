@@ -2,6 +2,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 require('dotenv').config();
+const fetch = require('node-fetch');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -561,6 +562,31 @@ app.get('/api/battery', authenticateUser, async (req, res) => {
     });
   }
 });
+
+// Add health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Add background ping service
+const pingInterval = 14 * 60 * 1000; // Ping every 14 minutes (Render's timeout is 15 minutes)
+const pingUrl = process.env.RENDER_EXTERNAL_URL || 'https://your-app-name.onrender.com';
+
+function pingServer() {
+    fetch(`${pingUrl}/health`)
+        .then(response => {
+            if (!response.ok) {
+                console.error('Health check failed:', response.status);
+            }
+        })
+        .catch(error => {
+            console.error('Ping failed:', error);
+        });
+}
+
+// Start the ping service
+setInterval(pingServer, pingInterval);
+pingServer(); // Initial ping
 
 // Enhanced Error Handling Middleware
 app.use((err, req, res, next) => {
