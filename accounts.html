@@ -689,9 +689,7 @@
                         role,
                         status,
                         mfa_enabled,
-                        last_password_change,
-                        user_profiles!inner(bio),
-                        user_stats!inner(followers_count, following_count)
+                        last_password_change
                     `)
                     .eq('id', currentUserId)
                     .single();
@@ -719,9 +717,7 @@
                             role,
                             status,
                             mfa_enabled,
-                            last_password_change,
-                            user_profiles!inner(bio),
-                            user_stats!inner(followers_count, following_count)
+                            last_password_change
                         `)
                         .single();
 
@@ -730,6 +726,22 @@
                 } else if (accountError) {
                     throw accountError;
                 }
+
+                // Fetch follower and following counts
+                const [followersCount, followingCount] = await Promise.all([
+                    supabaseClient
+                        .from('follows')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('following_id', currentUserId),
+                    supabaseClient
+                        .from('follows')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('follower_id', currentUserId)
+                ]);
+
+                // Add counts to account object
+                account.followers_count = followersCount.count || 0;
+                account.following_count = followingCount.count || 0;
                 
                 // Fetch recent activity from security_logs
                 const { data: activity, error: activityError } = await supabaseClient
@@ -960,20 +972,20 @@
 
                 // Validate file size (2MB limit)
                 if (file.size > 2 * 1024 * 1024) {
-                    uploadStatus.textContent = 'File size must be less than 2MB';
-                    uploadStatus.style.color = '#ff4444';
-                    confirmUploadBtn.disabled = true;
-                    return;
-                }
-                
+                        uploadStatus.textContent = 'File size must be less than 2MB';
+                        uploadStatus.style.color = '#ff4444';
+                        confirmUploadBtn.disabled = true;
+                        return;
+                    }
+                    
                 // Validate file type
-                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                if (!validTypes.includes(file.type)) {
-                    uploadStatus.textContent = 'Only JPG, PNG, GIF or WEBP files are allowed';
-                    uploadStatus.style.color = '#ff4444';
-                    confirmUploadBtn.disabled = true;
-                    return;
-                }
+                    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                    if (!validTypes.includes(file.type)) {
+                        uploadStatus.textContent = 'Only JPG, PNG, GIF or WEBP files are allowed';
+                        uploadStatus.style.color = '#ff4444';
+                        confirmUploadBtn.disabled = true;
+                        return;
+                    }
 
                 // Validate image dimensions
                 try {
@@ -1005,16 +1017,16 @@
                     confirmUploadBtn.disabled = true;
                     return;
                 }
-                
-                selectedAvatarFile = file;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    avatarPreview.src = event.target.result;
-                    avatarPreview.style.display = 'block';
-                    confirmUploadBtn.disabled = false;
-                    uploadStatus.textContent = '';
-                };
-                reader.readAsDataURL(file);
+                    
+                    selectedAvatarFile = file;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        avatarPreview.src = event.target.result;
+                        avatarPreview.style.display = 'block';
+                        confirmUploadBtn.disabled = false;
+                        uploadStatus.textContent = '';
+                    };
+                    reader.readAsDataURL(file);
             });
 
             // Handle upload confirmation with retry logic
@@ -1060,15 +1072,15 @@
                     while (retries > 0) {
                         try {
                             const { data, error: uploadError } = await supabaseClient
-                                .storage
-                                .from('avatars')
-                                .upload(filePath, selectedAvatarFile, {
-                                    cacheControl: '3600',
-                                    upsert: true,
-                                    contentType: selectedAvatarFile.type
-                                });
-                            
-                            if (uploadError) throw uploadError;
+                        .storage
+                        .from('avatars')
+                        .upload(filePath, selectedAvatarFile, {
+                            cacheControl: '3600',
+                            upsert: true,
+                            contentType: selectedAvatarFile.type
+                        });
+                    
+                    if (uploadError) throw uploadError;
                             uploadData = data;
                             break;
                         } catch (error) {
@@ -1371,7 +1383,7 @@
                         },
                         broadcast: {
                             self: true
-                        }
+                        } 
                     }
                 })
                 .on('presence', { event: 'sync' }, () => {
@@ -1381,19 +1393,19 @@
                 .subscribe(async (status, error) => {
                     if (status === 'SUBSCRIBED') {
                         try {
-                            await presenceChannel.track({ 
-                                online_at: new Date().toISOString(),
-                                user_id: currentUserId
-                            });
-                            
+                        await presenceChannel.track({ 
+                            online_at: new Date().toISOString(),
+                            user_id: currentUserId
+                        });
+                        
                             // Update last online in database with retry logic
                             let retries = 3;
                             while (retries > 0) {
                                 try {
-                                    await supabaseClient
-                                        .from('users')
-                                        .update({ lastonline: new Date().toISOString() })
-                                        .eq('id', currentUserId);
+                        await supabaseClient
+                            .from('users')
+                            .update({ lastonline: new Date().toISOString() })
+                            .eq('id', currentUserId);
                                     break;
                                 } catch (updateError) {
                                     retries--;
@@ -1635,10 +1647,10 @@
             modal.style.display = 'flex';
             
             try {
-                // Use a single query to get both count and data
+                // First get the follow relationships
                 const { data: follows, count, error: followsError } = await supabaseClient
                     .from('follows')
-                    .select('*, users!inner(*)', { count: 'exact' })
+                    .select('*', { count: 'exact' })
                     .eq(type === 'followers' ? 'following_id' : 'follower_id', currentUserId)
                     .order('created_at', { ascending: false });
                 
@@ -1655,20 +1667,42 @@
                     return;
                 }
 
-                // Render the list using the joined data
+                // Get the user IDs we need to fetch
+                const userIds = follows.map(follow => 
+                    type === 'followers' ? follow.follower_id : follow.following_id
+                );
+
+                // Fetch the user details
+                const { data: users, error: usersError } = await supabaseClient
+                    .from('users')
+                    .select('id, name, email, avatar_url')
+                    .in('id', userIds);
+
+                if (usersError) throw usersError;
+
+                // Create a map of user data for easy lookup
+                const usersMap = users.reduce((acc, user) => {
+                    acc[user.id] = user;
+                    return acc;
+                }, {});
+
+                // Render the list using the user data
                 list.innerHTML = follows.map(follow => {
-                    const user = follow.users;
+                    const userId = type === 'followers' ? follow.follower_id : follow.following_id;
+                    const user = usersMap[userId];
+                    if (!user) return '';
+                    
                     return `
-                        <div class="follower-item">
-                            <div class="follower-avatar">
-                                <img src="${user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}" 
-                                    alt="${user.name}">
-                            </div>
-                            <div class="follower-info">
-                                <div class="follower-name">${user.name}</div>
-                                <div class="follower-email">${user.email}</div>
-                            </div>
+                    <div class="follower-item">
+                        <div class="follower-avatar">
+                            <img src="${user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}" 
+                                alt="${user.name}">
                         </div>
+                        <div class="follower-info">
+                            <div class="follower-name">${user.name}</div>
+                            <div class="follower-email">${user.email}</div>
+                        </div>
+                    </div>
                     `;
                 }).join('');
                 

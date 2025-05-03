@@ -601,10 +601,10 @@
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
             button.style.opacity = '0.7';
             button.style.cursor = 'not-allowed';
-            
-            // Get current stats before making changes
-            const currentStats = await this.loadUserStats(this.currentProfileId, true);
-            
+                
+                // Get current stats before making changes
+                const currentStats = await this.loadUserStats(this.currentProfileId, true);
+                
             try {
                 const newFollowStatus = !currentFollowStatus;
                 let retryCount = 0;
@@ -613,26 +613,26 @@
                 
                 while (retryCount < maxRetries && !success) {
                     try {
-                        if (newFollowStatus) {
-                            // Follow logic
-                            const { error } = await this.supabase
-                                .from('follows')
-                                .insert([{
-                                    follower_id: this.currentUserId,
-                                    following_id: this.currentProfileId,
-                                    created_at: new Date().toISOString()
-                                }]);
-                            
-                            if (error) throw error;
-                        } else {
-                            // Unfollow logic
-                            const { error } = await this.supabase
-                                .from('follows')
-                                .delete()
-                                .eq('follower_id', this.currentUserId)
-                                .eq('following_id', this.currentProfileId);
-                            
-                            if (error) throw error;
+                if (newFollowStatus) {
+                    // Follow logic
+                    const { error } = await this.supabase
+                        .from('follows')
+                        .insert([{
+                            follower_id: this.currentUserId,
+                            following_id: this.currentProfileId,
+                            created_at: new Date().toISOString()
+                        }]);
+                    
+                    if (error) throw error;
+                } else {
+                    // Unfollow logic
+                    const { error } = await this.supabase
+                        .from('follows')
+                        .delete()
+                        .eq('follower_id', this.currentUserId)
+                        .eq('following_id', this.currentProfileId);
+                    
+                    if (error) throw error;
                         }
                         
                         success = true;
@@ -645,11 +645,11 @@
                         await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
                     }
                 }
-                
-                // Update local cache
+                    
+                    // Update local cache
                 followStatusCache.set(this.currentProfileId, newFollowStatus);
-                
-                // Update stats in database and UI immediately
+                    
+                    // Update stats in database and UI immediately
                 await this.updateStatsAfterFollowChange(newFollowStatus, currentStats);
                 
                 // Update button state
@@ -686,7 +686,7 @@
             } finally {
                 // Reset processing state after a delay
                 setTimeout(() => {
-                    button.dataset.processing = 'false';
+                button.dataset.processing = 'false';
                     button.style.opacity = '1';
                     button.style.cursor = 'pointer';
                 }, 2000);
@@ -921,37 +921,37 @@
             
             try {
                 // Always get the actual counts from the follows table first
-                const [followers, following, messages] = await Promise.all([
-                    this.supabase
-                        .from('follows')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('following_id', userId),
-                    
-                    this.supabase
-                        .from('follows')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('follower_id', userId),
+                    const [followers, following, messages] = await Promise.all([
+                        this.supabase
+                            .from('follows')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('following_id', userId),
                         
-                    this.supabase
-                        .from('messages')
-                        .select('*', { count: 'exact', head: true })
-                        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-                ]);
-                
-                stats = {
-                    followers_count: followers.count || 0,
-                    following_count: following.count || 0,
-                    messages_count: messages.count || 0
-                };
-                
+                        this.supabase
+                            .from('follows')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('follower_id', userId),
+                            
+                        this.supabase
+                            .from('messages')
+                            .select('*', { count: 'exact', head: true })
+                            .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+                    ]);
+                    
+                    stats = {
+                        followers_count: followers.count || 0,
+                        following_count: following.count || 0,
+                        messages_count: messages.count || 0
+                    };
+                    
                 // Update stats table to ensure consistency
-                await this.supabase
-                    .from('user_stats')
-                    .upsert({
-                        user_id: userId,
-                        ...stats,
-                        last_updated: new Date().toISOString()
-                    });
+                    await this.supabase
+                        .from('user_stats')
+                        .upsert({
+                            user_id: userId,
+                            ...stats,
+                            last_updated: new Date().toISOString()
+                        });
                 
             } catch (error) {
                 debug(`Stats error (non-critical): ${error.message}`, 'warn');
