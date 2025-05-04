@@ -3223,87 +3223,160 @@
         // Initialize notification sound
         let notificationSound = null;
         let soundInitialized = false;
+        let soundPlayed = false;
+        let notificationPermissionRequested = false;
 
         function initializeNotificationSound() {
-            if (!soundInitialized) {
-                try {
-                    notificationSound = new Audio('public/notification.mp3');
-                    notificationSound.volume = 0.7;
-                    // Preload the sound
-                    notificationSound.load();
-                    soundInitialized = true;
-                    console.log('Notification sound initialized successfully');
-                } catch (e) {
-                    console.error('Failed to initialize notification sound:', e);
+            return new Promise((resolve, reject) => {
+                if (!soundInitialized) {
+                    try {
+                        notificationSound = new Audio();
+                        notificationSound.src = 'public/notification.mp3';
+                        notificationSound.volume = 1.0;
+                        notificationSound.preload = 'auto';
+                        
+                        notificationSound.addEventListener('canplaythrough', () => {
+                            soundInitialized = true;
+                            resolve(true);
+                        });
+                        
+                        notificationSound.addEventListener('error', (e) => {
+                            reject(e);
+                        });
+                        
+                        notificationSound.load();
+                        
+                    } catch (e) {
+                        reject(e);
+                    }
+                } else {
+                    resolve(true);
                 }
+            });
+        }
+
+        async function unlockSound() {
+            if (!notificationSound || !soundInitialized) {
+                return false;
+            }
+
+            try {
+                const playPromise = notificationSound.play();
+                if (playPromise !== undefined) {
+                    await playPromise;
+                    notificationSound.pause();
+                    notificationSound.currentTime = 0;
+                    soundPlayed = true;
+                    return true;
+                }
+            } catch (e) {
+                return false;
             }
         }
 
-        // Initialize sound on first user interaction
-        document.addEventListener('click', function initSound() {
-            initializeNotificationSound();
-            document.removeEventListener('click', initSound);
-        });
-
-        function showNotification(userId, messageContent) {
-            const user = userDataCache[userId];
-            if (!user) return;
-
-            // Play notification sound if initialized
-            if (soundInitialized && notificationSound) {
-                try {
-                    notificationSound.currentTime = 0; // Reset to start
-                    notificationSound.play().catch(e => {
-                        console.warn('Notification sound error:', e.message);
-                    });
-                } catch (e) {
-                    console.error('Error playing notification sound:', e);
-                }
-            }
-
-            // Show in-app notification for mobile
-            if (isMobile) {
-                const notification = document.getElementById('mobileNotification');
-                const avatar = document.getElementById('notificationAvatar');
-                const name = document.getElementById('notificationName');
-                const message = document.getElementById('notificationMessage');
+        // Initialize notifications and sound
+        async function initializeNotifications() {
+            try {
+                // Initialize notification service
+                notificationService = new NotificationService();
                 
-                avatar.innerHTML = '<img src="' + 
-                    (user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random`) + 
-                    '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
-                avatar.style.background = 'transparent';
-                name.textContent = user.name;
-                message.textContent = messageContent.length > 30 ? 
-                    messageContent.substring(0, 30) + '...' : messageContent;
+                // Initialize sound
+                await initializeNotificationSound();
                 
-                notification.classList.add('active');
-                
-                setTimeout(() => {
-                    notification.classList.remove('active');
-                }, 5000);
-                
-                notification.addEventListener('click', () => {
-                    notification.classList.remove('active');
-                    if (userDataCache[userId]) {
-                        selectUser(userDataCache[userId]);
-                    }
-                });
-            }
-            
-            // Show browser notification if available
-            if ('Notification' in window && Notification.permission === 'granted') {
-                const notification = new Notification(`New message from ${user.name}`, {
-                    body: messageContent,
-                    icon: 'path/to/icon.png',
-                    vibrate: [200, 100, 200]
-                });
-                
-                notification.onclick = () => {
-                    window.focus();
-                    if (userDataCache[userId]) {
-                        selectUser(userDataCache[userId]);
+                // Add click handler for sound unlock
+                const unlockSoundOnClick = async () => {
+                    if (!soundPlayed) {
+                        try {
+                            await unlockSound();
+                            if (soundPlayed) {
+                                document.removeEventListener('click', unlockSoundOnClick);
+                            }
+                        } catch (e) {
+                            // Silent error
+                        }
                     }
                 };
+                
+                document.addEventListener('click', unlockSoundOnClick);
+                
+            } catch (error) {
+                // Silent error
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeNotifications);
+
+        async function showNotification(data) {
+            try {
+                // Ensure sound is initialized
+                if (!soundInitialized) {
+                    await initializeNotificationSound();
+                }
+
+                // Use notification service if available
+                if (notificationService) {
+                    await notificationService.showNotification(data.title, {
+                        body: data.body,
+                        icon: data.icon,
+                        data: {
+                            userId: data.userId,
+                            messageId: data.messageId
+                        }
+                    });
+                } else {
+                    // Fallback to regular notifications
+                    const notification = new Notification(data.title, {
+                            body: data.body,
+                            icon: data.icon,
+                        data: {
+                            userId: data.userId,
+                            messageId: data.messageId
+                        }
+                    });
+
+                    notification.onclick = () => {
+                        notification.close();
+                        if (data.userId) {
+                            selectUser(data.userId);
+                        }
+                    };
+
+                    notification.onclose = () => {
+                        if (data.messageId) {
+                            markMessageAsRead(data.messageId);
+                        }
+                    };
+                }
+
+                // Play notification sound if available and allowed
+                if (notificationSound && soundInitialized && soundPlayed) {
+                    try {
+                        notificationSound.currentTime = 0;
+                        const playPromise = notificationSound.play();
+                        
+                        if (playPromise !== undefined) {
+                            playPromise.catch(() => {
+                                // If sound play failed, try to reinitialize on next user interaction
+                                soundPlayed = false;
+                                document.addEventListener('click', function retrySound() {
+                                    if (notificationSound) {
+                                        unlockSound().then(success => {
+                                            if (success) {
+                                                document.removeEventListener('click', retrySound);
+                                            }
+                                        });
+                                    }
+                                });
+                            });
+                        }
+                    } catch (e) {
+                        // Silent error
+                    }
+                }
+
+            } catch (error) {
+                // Silent error
             }
         }
 
@@ -3364,8 +3437,8 @@
                 }).catch(e => {
                     console.error("Battery API error - using simulation:", e);
                     startBatterySimulation();
-                });
-            } else {
+                    });
+                } else {
                 startBatterySimulation();
             }
         }
@@ -3706,6 +3779,9 @@
 
                 setupTypingBroadcast();
                 handleUserTyping();
+
+                // Initialize notifications
+                await initializeNotifications();
 
             } catch (error) {
                 console.error("Initialization error:", error);

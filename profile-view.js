@@ -593,28 +593,21 @@
                 return;
             }
             
-            // Set processing state
+            // Set processing state and update button immediately
             button.dataset.processing = 'true';
-            const originalButtonContent = button.innerHTML;
+            const newFollowStatus = !currentFollowStatus;
             
-            // Show loading state
-            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            // Update button to show loading state with the target state
+            button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${newFollowStatus ? 'Following' : 'Follow'}`;
             button.style.opacity = '0.7';
             button.style.cursor = 'not-allowed';
-                
+            
+            try {
                 // Get current stats before making changes
                 const currentStats = await this.loadUserStats(this.currentProfileId, true);
                 
-            try {
-                const newFollowStatus = !currentFollowStatus;
-                let retryCount = 0;
-                const maxRetries = 3;
-                let success = false;
-                
-                while (retryCount < maxRetries && !success) {
-                    try {
+                // Perform the follow/unfollow operation
                 if (newFollowStatus) {
-                    // Follow logic
                     const { error } = await this.supabase
                         .from('follows')
                         .insert([{
@@ -625,7 +618,6 @@
                     
                     if (error) throw error;
                 } else {
-                    // Unfollow logic
                     const { error } = await this.supabase
                         .from('follows')
                         .delete()
@@ -633,41 +625,21 @@
                         .eq('following_id', this.currentProfileId);
                     
                     if (error) throw error;
-                        }
-                        
-                        success = true;
-                    } catch (error) {
-                        retryCount++;
-                        if (retryCount === maxRetries) {
-                            throw error;
-                        }
-                        // Wait before retrying
-                        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-                    }
                 }
-                    
-                    // Update local cache
+                
+                // Update local cache
                 followStatusCache.set(this.currentProfileId, newFollowStatus);
-                    
-                    // Update stats in database and UI immediately
+                
+                // Update stats in database and UI
                 await this.updateStatsAfterFollowChange(newFollowStatus, currentStats);
                 
-                // Update button state
+                // Update button to show success state
                 this.updateFollowButton(newFollowStatus);
-                
-                // Show success feedback
-                button.innerHTML = `<i class="fas fa-check"></i> ${newFollowStatus ? 'Following' : 'Follow'}`;
-                button.style.backgroundColor = newFollowStatus ? '#4CAF50' : '#2196F3';
-                
-                // Reset button state after 2 seconds
-                setTimeout(() => {
-                    this.updateFollowButton(newFollowStatus);
-                }, 2000);
                 
             } catch (error) {
                 console.error('Error toggling follow:', error);
                 
-                // Show error feedback
+                // Show error state
                 button.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${currentFollowStatus ? 'Unfollow Failed' : 'Follow Failed'}`;
                 button.style.backgroundColor = '#f44336';
                 
@@ -678,18 +650,14 @@
                     'error'
                 );
                 
-                // Revert after 2 seconds
-                setTimeout(() => {
-                    this.updateFollowButton(currentFollowStatus);
-                }, 2000);
+                // Revert to previous state
+                this.updateFollowButton(currentFollowStatus);
                 
             } finally {
-                // Reset processing state after a delay
-                setTimeout(() => {
+                // Reset processing state
                 button.dataset.processing = 'false';
-                    button.style.opacity = '1';
-                    button.style.cursor = 'pointer';
-                }, 2000);
+                button.style.opacity = '1';
+                button.style.cursor = 'pointer';
             }
         }
         
