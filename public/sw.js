@@ -15,7 +15,8 @@ self.addEventListener('install', (event) => {
                     '/secure.html',
                     '/login.html',
                     '/signup.html',
-                    '/notification.mp3'
+                    '/notification.mp3',
+                    '/notification-icon.png'
                 ]);
             })
     );
@@ -35,7 +36,8 @@ self.addEventListener('activate', (event) => {
                     })
                 );
             }),
-            self.clients.claim()
+            self.clients.claim(),
+            processNotificationQueue()
         ])
     );
 });
@@ -100,17 +102,22 @@ async function storeNotificationInQueue(notification) {
 }
 
 async function showNotification(data) {
-    const options = {
-        body: data.body,
-        icon: '/notification-icon.png',
+    // Ensure we have all required data
+    const notificationData = {
+        title: data.title || 'New Message',
+        body: data.body || '',
+        icon: data.icon || '/notification-icon.png',
         badge: '/notification-icon.png',
         vibrate: [200, 100, 200],
+        timestamp: Date.now(),
+        requireInteraction: true,
         data: { 
             userId: data.userId,
             messageId: data.messageId,
-            type: data.type
+            type: data.type || 'message',
+            userName: data.userName,
+            avatarUrl: data.avatarUrl
         },
-        requireInteraction: true,
         actions: [
             {
                 action: 'open',
@@ -124,30 +131,39 @@ async function showNotification(data) {
     };
 
     // Play notification sound
-    const audio = new Audio('/notification.mp3');
-    audio.volume = 0.7;
-    await audio.play().catch(e => console.warn('Sound play failed:', e));
+    try {
+        const audio = new Audio('/notification.mp3');
+        audio.volume = 0.7;
+        await audio.play();
+    } catch (e) {
+        console.warn('Sound play failed:', e);
+    }
 
-    return self.registration.showNotification(data.title, options);
+    // Show the notification
+    return self.registration.showNotification(notificationData.title, notificationData);
 }
 
 // Enhanced notification click handling
 self.addEventListener('notificationclick', event => {
     event.notification.close();
     
-    const { userId, messageId } = event.notification.data;
+    const { userId, messageId, userName, avatarUrl } = event.notification.data;
     
     event.waitUntil(
         clients.matchAll({ type: 'window' }).then(clients => {
+            // If a window is already open, focus it and send the message
             if (clients.length) {
                 const client = clients[0];
                 client.postMessage({
                     type: 'notificationClick',
                     userId,
-                    messageId
+                    messageId,
+                    userName,
+                    avatarUrl
                 });
                 client.focus();
             } else {
+                // If no window is open, open a new one
                 clients.openWindow(`/message.html#chat/${userId}`);
             }
         })
@@ -199,8 +215,20 @@ self.addEventListener('message', event => {
                 body: data.body,
                 icon: data.icon,
                 userId: data.userId,
-                messageId: data.messageId
+                messageId: data.messageId,
+                userName: data.userName,
+                avatarUrl: data.avatarUrl,
+                type: data.type || 'message'
             })
         );
     }
 });
+
+// Keep the service worker alive
+setInterval(() => {
+    self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+            client.postMessage({ type: 'keepAlive' });
+        });
+    });
+}, KEEP_ALIVE_INTERVAL);

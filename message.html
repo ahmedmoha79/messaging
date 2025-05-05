@@ -543,6 +543,24 @@
             background: var(--primary);
             color: #000;
         }
+
+        #locationButton {
+            background: var(--primary);
+            color: #000;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        #locationButton:hover {
+            background: var(--primary-dark);
+            transform: scale(1.1);
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+
         /* User Marker - Enhanced with more details */
         .user-marker {
             position: relative;
@@ -1567,6 +1585,307 @@
             50% { transform: scale(1.2); opacity: 0.8; }
             100% { transform: scale(1); opacity: 1; }
         }
+
+        /* Add these styles in the style section */
+        .message-reactions {
+            position: absolute;
+            bottom: -24px;
+            right: 0;
+            display: flex;
+            gap: 4px;
+            background: var(--surface);
+            padding: 4px 8px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow);
+            z-index: 10;
+            opacity: 0;
+            transition: var(--transition);
+            border: 1px solid var(--border);
+        }
+
+        .message:hover .message-reactions {
+            opacity: 1;
+        }
+
+        .message.has-reactions .message-reactions {
+            opacity: 1;
+        }
+
+        .reaction-button {
+            background: none;
+            border: none;
+            padding: 2px 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: var(--transition);
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            border-radius: var(--radius-sm);
+            background: var(--surface-light);
+        }
+
+        .reaction-button:hover {
+            background: var(--primary-light);
+            transform: none;
+        }
+
+        .reaction-count {
+            position: relative;
+            color: var(--text-secondary);
+            font-size: 11px;
+            padding: 0 2px;
+            min-width: 12px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .reaction-picker {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            background: var(--surface);
+            padding: 8px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 8px;
+            z-index: 20;
+            border: 1px solid var(--border);
+            transform: scale(0.9);
+            opacity: 0;
+            transition: var(--transition);
+            pointer-events: none;
+        }
+
+        .reaction-picker.active {
+            transform: scale(1);
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .reaction-emoji {
+            font-size: 16px;
+            cursor: pointer;
+            transition: var(--transition);
+            padding: 4px;
+            border-radius: 50%;
+        }
+
+        .reaction-emoji:hover {
+            transform: scale(1.2);
+            background: var(--primary-light);
+        }
+
+        /* Add spacing for messages with reactions */
+        .message {
+            margin-bottom: 28px;
+        }
+
+        /* Update navigation styles */
+        .nav-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+        }
+
+        .nav-button {
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .nav-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            background: #ffffff;
+        }
+
+        .nav-button i {
+            font-size: 1.2rem;
+            color: #2c3e50;
+        }
+
+        /* Add floating animation for the location button */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .nav-button.location-button {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* Add tooltip */
+        .nav-button::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            right: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .nav-button:hover::after {
+            opacity: 1;
+        }
+
+        /* Location Popup Styles */
+        .location-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .location-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .location-popup {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 400px;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .location-overlay.active .location-popup {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .location-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .location-popup-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+
+        .close-location-popup {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .close-location-popup:hover {
+            color: #333;
+        }
+
+        .location-status {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .location-status i {
+            font-size: 24px;
+            color: #007bff;
+            margin-right: 15px;
+        }
+
+        .location-status-text {
+            flex: 1;
+        }
+
+        .location-status-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .location-status-subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .location-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .location-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .location-button.primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .location-button.primary:hover {
+            background: #0056b3;
+        }
+
+        .location-button.secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .location-button.secondary:hover {
+            background: #dee2e6;
+        }
+
+        .location-button i {
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -1588,7 +1907,7 @@
         <span>Connecting...</span>
     </div>
     
-    <!-- App Header (Mobile Only) -->
+    <!-- App Header -->
     <div class="app-header">
         <button class="header-button" id="menuButton">
             <i class="fas fa-bars"></i>
@@ -1650,6 +1969,9 @@
                 <button class="map-control" id="openChatListButton" title="Open chat list">
                     <i class="fas fa-comments"></i>
                 </button>
+                <button class="map-control" id="mapLocationButton" title="View Location">
+                    <i class="fas fa-map-marker-alt"></i>
+                </button>
             </div>
         </div>
         
@@ -1698,6 +2020,37 @@
         </div>
     </div>
 
+    <!-- Location Popup -->
+    <div class="location-overlay" id="locationOverlay">
+        <div class="location-popup" id="locationPopup">
+            <div class="location-popup-header">
+                <h2 class="location-popup-title">Location Services</h2>
+                <button class="close-location-popup" id="closeLocationPopup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="location-popup-content">
+                <div class="location-status">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <div class="location-status-text">
+                        <div class="location-status-title">Location Access</div>
+                        <div class="location-status-subtitle" id="locationStatusText">Requesting location access...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="location-actions">
+                <button class="location-button primary" id="enableLocationButton">
+                    <i class="fas fa-check"></i>
+                    Enable Location
+                </button>
+                <button class="location-button secondary" id="cancelLocationButton">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1729,6 +2082,64 @@
         let locationCache = {};
         let audioRecorder = new EnhancedAudioRecorder();
         let keepAliveInterval;
+        
+        // Initialize battery monitoring
+        function initBatteryMonitoring() {
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(battery => {
+                    // Update initial battery level
+                    batteryLevel = Math.round(battery.level * 100);
+                    
+                    // Update header battery display
+                    const batteryIndicator = document.getElementById('batteryIndicatorHeader');
+                    const batteryLevelText = document.getElementById('batteryLevelHeader');
+                    if (batteryIndicator && batteryLevelText) {
+                        const batteryIcon = batteryIndicator.querySelector('i');
+                        if (batteryIcon) {
+                            batteryLevelText.textContent = `${batteryLevel}%`;
+                            batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
+                            batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
+                        }
+                    }
+                    
+                    // Update battery level when it changes
+                    battery.addEventListener('levelchange', () => {
+                        batteryLevel = Math.round(battery.level * 100);
+                        const batteryIndicator = document.getElementById('batteryIndicatorHeader');
+                        const batteryLevelText = document.getElementById('batteryLevelHeader');
+                        if (batteryIndicator && batteryLevelText) {
+                            const batteryIcon = batteryIndicator.querySelector('i');
+                            if (batteryIcon) {
+                                batteryLevelText.textContent = `${batteryLevel}%`;
+                                batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
+                                batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
+                            }
+                        }
+                    });
+                    
+                    // Update battery level when charging status changes
+                    battery.addEventListener('chargingchange', () => {
+                        const batteryIndicator = document.getElementById('batteryIndicatorHeader');
+                        const batteryLevelText = document.getElementById('batteryLevelHeader');
+                        if (batteryIndicator && batteryLevelText) {
+                            const batteryIcon = batteryIndicator.querySelector('i');
+                            if (batteryIcon) {
+                                batteryLevelText.textContent = `${batteryLevel}%`;
+                                batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
+                                batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
+                            }
+                        }
+                    });
+                }).catch(error => {
+                    console.error('Error getting battery status:', error);
+                });
+            }
+        }
+
+        // Call initBatteryMonitoring when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initBatteryMonitoring();
+        });
         
         // Typing indicator variables
         let typingTimeout;
@@ -1941,7 +2352,7 @@
         function getBatteryIcon(level) {
             if (level > 90) return 'fa-battery-full';
             if (level > 70) return 'fa-battery-three-quarters';
-            if (level > 50) return 'fa-battery-half';
+            if (level > 40) return 'fa-battery-half';
             if (level > 20) return 'fa-battery-quarter';
             return 'fa-battery-empty';
         }
@@ -2015,37 +2426,6 @@
             }
         }
 
-        function updateBatteryDisplay() {
-            const batteryIndicator = document.getElementById('batteryIndicatorHeader');
-            const batteryLevelText = document.getElementById('batteryLevelHeader');
-            const batteryIcon = batteryIndicator.querySelector('i');
-            
-            batteryLevelText.textContent = `${batteryLevel}%`;
-            batteryIcon.className = `fas ${getBatteryIcon(batteryLevel)}`;
-            batteryIndicator.className = `battery-indicator-header ${getBatteryColor(batteryLevel)}`;
-            
-            // Update current user marker tooltip if it exists
-            if (marker) {
-                const icon = marker.getIcon();
-                icon.options.html = `
-                    <div class="user-marker-tooltip">
-                        <div class="tooltip-name">Your location</div>
-                        <div class="tooltip-status">
-                            <i class="fas fa-circle"></i>
-                            <span>Online (${currentDeviceType})</span>
-                        </div>
-                        <div class="tooltip-battery">
-                            <i class="fas ${getBatteryIcon(batteryLevel)}"></i>
-                            <span>${batteryLevel}% battery</span>
-                        </div>
-                    </div>
-                    <div class="user-marker-inner">${getDeviceEmoji(currentDeviceType)}</div>
-                    <div class="user-marker-pulse"></div>
-                `;
-                marker.setIcon(icon);
-            }
-        }
-
         // Map functions
         function initializeMap() {
             try {
@@ -2097,6 +2477,20 @@
                     }),
                     zIndexOffset: 1000
                 }).addTo(map);
+
+                // Add popup to the marker
+                marker.bindPopup(`
+                    <div class="location-popup-content">
+                        <h3>Your Location</h3>
+                        <div class="location-details">
+                            <p><i class="fas fa-map-marker-alt"></i> <span id="currentLocation">Loading...</span></p>
+                            <p><i class="fas fa-clock"></i> Last updated: <span id="lastUpdate">Just now</span></p>
+                            <p><i class="fas fa-signal"></i> Accuracy: <span id="locationAccuracy">Calculating...</span></p>
+                            <p><i class="fas fa-battery-three-quarters"></i> Battery: ${batteryLevel}%</p>
+                            <p><i class="fas fa-mobile-alt"></i> Device: ${currentDeviceType}</p>
+                        </div>
+                    </div>
+                `);
 
                 // Start tracking user's location
                 startLocationTracking();
@@ -2159,6 +2553,47 @@
             
             // Update marker position
             marker.setLatLng([latitude, longitude]);
+            
+            // Update popup content
+            if (marker.getPopup()) {
+                const popup = marker.getPopup();
+                const content = popup.getContent();
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = content;
+                
+                // Safely update elements if they exist
+                const updateElement = (selector, value) => {
+                    const element = tempDiv.querySelector(selector);
+                    if (element) {
+                        element.textContent = value;
+                    }
+                };
+                
+                // Update location details
+                updateElement('#currentLocation', `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                updateElement('#lastUpdate', 'Just now');
+                
+                // Format accuracy based on value
+                let accuracyText;
+                if (accuracy <= 10) {
+                    accuracyText = 'Very High (≤10m)';
+                } else if (accuracy <= 50) {
+                    accuracyText = 'High (≤50m)';
+                } else if (accuracy <= 100) {
+                    accuracyText = 'Medium (≤100m)';
+                } else {
+                    accuracyText = `Low (${Math.round(accuracy)}m)`;
+                }
+                updateElement('#locationAccuracy', accuracyText);
+                
+                // Update battery level with current value
+                updateElement('#currentBattery', `${batteryLevel}%`);
+                
+                // Only update popup content if we have valid content
+                if (tempDiv.innerHTML) {
+                    popup.setContent(tempDiv.innerHTML);
+                }
+            }
             
             // Update user location in database
             try {
@@ -2816,6 +3251,20 @@
             const messageContent = `
                 <div class="message-content">
                     <p>${content}</p>
+                    <div class="message-reactions">
+                        <button class="reaction-button" onclick="showReactionPicker(this, '${messageId}')">
+                            <span class="reaction-emoji">👍</span>
+                            <span class="reaction-count">0</span>
+                        </button>
+                        <div class="reaction-picker">
+                            <span class="reaction-emoji" onclick="addReaction('${messageId}', '👍')">👍</span>
+                            <span class="reaction-emoji" onclick="addReaction('${messageId}', '❤️')">❤️</span>
+                            <span class="reaction-emoji" onclick="addReaction('${messageId}', '😂')">😂</span>
+                            <span class="reaction-emoji" onclick="addReaction('${messageId}', '😮')">😮</span>
+                            <span class="reaction-emoji" onclick="addReaction('${messageId}', '😢')">😢</span>
+                            <span class="reaction-emoji" onclick="addReaction('${messageId}', '🙏')">🙏</span>
+                        </div>
+                    </div>
                     <span class="message-time">${
                         new Date(timestamp || new Date()).toLocaleString([], {
                             hour: '2-digit', 
@@ -2837,6 +3286,9 @@
             messageDiv.innerHTML = messageContent;
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            // Load existing reactions
+            loadReactions(messageId);
         }
 
         // Enhanced Typing Indicator Functions
@@ -3213,6 +3665,22 @@
                     )
                     .subscribe();
 
+                // Add reaction updates
+                const reactionsChannel = supabaseClient.channel('reactions-channel')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'UPDATE',
+                            schema: 'public',
+                            table: 'messages',
+                            filter: `reactions->>'${currentUserId}' IS NOT NULL`
+                        },
+                        (payload) => {
+                            updateReactionUI(payload.new.id, payload.new.reactions);
+                        }
+                    )
+                    .subscribe();
+
             } catch (error) {
                 console.error('Realtime initialization error:', error);
                 updateConnectionStatus("Connection failed: " + error.message, true);
@@ -3226,27 +3694,107 @@
         let soundPlayed = false;
         let notificationPermissionRequested = false;
 
+        // Notification Service Class
+        class NotificationService {
+            constructor() {
+                this.permission = null;
+                this.initialize();
+            }
+
+            async initialize() {
+                try {
+                    // Check if notifications are supported
+                    if (!('Notification' in window)) {
+                        console.warn('Notifications not supported');
+                        return;
+                    }
+
+                    // Request permission if not already granted
+                    if (Notification.permission === 'default') {
+                        this.permission = await Notification.requestPermission();
+                    } else {
+                        this.permission = Notification.permission;
+                    }
+
+                    console.log('Notification permission:', this.permission);
+                } catch (error) {
+                    console.error('Failed to initialize notifications:', error);
+                }
+            }
+
+            async showNotification(title, options) {
+                try {
+                    // Check if notifications are supported and permission is granted
+                    if (!('Notification' in window) || this.permission !== 'granted') {
+                        console.warn('Notifications not available or permission not granted');
+                        return;
+                    }
+
+                    // Create and show notification
+                    const notification = new Notification(title, options);
+
+                    // Handle notification click
+                    notification.onclick = () => {
+                        notification.close();
+                        if (options.data?.userId) {
+                            const user = userDataCache[options.data.userId];
+                            if (user) selectUser(user);
+                        }
+                    };
+
+                    // Handle notification close
+                    notification.onclose = () => {
+                        if (options.data?.messageId) {
+                            markMessageAsRead(options.data.messageId);
+                        }
+                    };
+
+                    return notification;
+                } catch (error) {
+                    console.error('Failed to show notification:', error);
+                }
+            }
+        }
+
         function initializeNotificationSound() {
             return new Promise((resolve, reject) => {
                 if (!soundInitialized) {
                     try {
                         notificationSound = new Audio();
-                        notificationSound.src = 'public/notification.mp3';
+                        notificationSound.src = 'public/notification.mp3';  // Updated path
                         notificationSound.volume = 1.0;
                         notificationSound.preload = 'auto';
                         
+                        console.log('Initializing notification sound from local file...');
+                        console.log('Sound file path:', notificationSound.src);
+                        
+                        notificationSound.addEventListener('loadstart', () => {
+                            console.log('Sound file loading started');
+                        });
+                        
+                        notificationSound.addEventListener('progress', () => {
+                            console.log('Sound file loading in progress');
+                        });
+                        
                         notificationSound.addEventListener('canplaythrough', () => {
+                            console.log('Notification sound ready to play');
                             soundInitialized = true;
                             resolve(true);
                         });
                         
                         notificationSound.addEventListener('error', (e) => {
+                            console.error('Notification sound error:', e);
+                            console.error('Error details:', {
+                                code: notificationSound.error.code,
+                                message: notificationSound.error.message
+                            });
                             reject(e);
                         });
                         
                         notificationSound.load();
                         
                     } catch (e) {
+                        console.error('Failed to initialize notification sound:', e);
                         reject(e);
                     }
                 } else {
@@ -3257,19 +3805,28 @@
 
         async function unlockSound() {
             if (!notificationSound || !soundInitialized) {
-                return false;
+                console.log('Sound not initialized, trying to initialize...');
+                try {
+                    await initializeNotificationSound();
+                } catch (e) {
+                    console.error('Failed to initialize sound:', e);
+                    return false;
+                }
             }
 
             try {
+                console.log('Attempting to play notification sound...');
                 const playPromise = notificationSound.play();
                 if (playPromise !== undefined) {
                     await playPromise;
+                    console.log('Notification sound played successfully');
                     notificationSound.pause();
                     notificationSound.currentTime = 0;
                     soundPlayed = true;
                     return true;
                 }
             } catch (e) {
+                console.error('Failed to play notification sound:', e);
                 return false;
             }
         }
@@ -3277,6 +3834,8 @@
         // Initialize notifications and sound
         async function initializeNotifications() {
             try {
+                console.log('Initializing notifications...');
+                
                 // Initialize notification service
                 notificationService = new NotificationService();
                 
@@ -3285,14 +3844,16 @@
                 
                 // Add click handler for sound unlock
                 const unlockSoundOnClick = async () => {
+                    console.log('User interaction detected, attempting to unlock sound...');
                     if (!soundPlayed) {
                         try {
                             await unlockSound();
                             if (soundPlayed) {
+                                console.log('Sound unlocked successfully');
                                 document.removeEventListener('click', unlockSoundOnClick);
                             }
                         } catch (e) {
-                            // Silent error
+                            console.error('Failed to unlock sound:', e);
                         }
                     }
                 };
@@ -3300,17 +3861,17 @@
                 document.addEventListener('click', unlockSoundOnClick);
                 
             } catch (error) {
-                // Silent error
+                console.error('Failed to initialize notifications:', error);
             }
         }
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', initializeNotifications);
-
         async function showNotification(data) {
             try {
+                console.log('Showing notification:', data);
+                
                 // Ensure sound is initialized
                 if (!soundInitialized) {
+                    console.log('Sound not initialized, initializing...');
                     await initializeNotificationSound();
                 }
 
@@ -3327,8 +3888,8 @@
                 } else {
                     // Fallback to regular notifications
                     const notification = new Notification(data.title, {
-                            body: data.body,
-                            icon: data.icon,
+                        body: data.body,
+                        icon: data.icon,
                         data: {
                             userId: data.userId,
                             messageId: data.messageId
@@ -3350,117 +3911,35 @@
                 }
 
                 // Play notification sound if available and allowed
-                if (notificationSound && soundInitialized && soundPlayed) {
+                if (notificationSound && soundInitialized) {
+                    console.log('Attempting to play notification sound...');
                     try {
                         notificationSound.currentTime = 0;
                         const playPromise = notificationSound.play();
                         
                         if (playPromise !== undefined) {
-                            playPromise.catch(() => {
-                                // If sound play failed, try to reinitialize on next user interaction
-                                soundPlayed = false;
-                                document.addEventListener('click', function retrySound() {
-                                    if (notificationSound) {
-                                        unlockSound().then(success => {
-                                            if (success) {
-                                                document.removeEventListener('click', retrySound);
-                                            }
-                                        });
-                                    }
-                                });
-                            });
+                            await playPromise;
+                            console.log('Notification sound played successfully');
                         }
                     } catch (e) {
-                        // Silent error
+                        console.error('Failed to play notification sound:', e);
+                        // If sound play failed, try to reinitialize on next user interaction
+                        soundPlayed = false;
+                        document.addEventListener('click', function retrySound() {
+                            if (notificationSound) {
+                                unlockSound().then(success => {
+                                    if (success) {
+                                        document.removeEventListener('click', retrySound);
+                                    }
+                                });
+                            }
+                        });
                     }
                 }
 
             } catch (error) {
-                // Silent error
+                console.error('Failed to show notification:', error);
             }
-        }
-
-        // Battery monitoring
-        function initBatteryMonitoring() {
-            // Don't start until we have a valid user ID
-            if (!currentUserId) {
-                console.warn("Battery monitoring delayed - no user ID yet");
-                setTimeout(initBatteryMonitoring, 1000);
-                return;
-            }
-
-            if ('getBattery' in navigator) {
-                navigator.getBattery().then(battery => {
-                    const updateBatteryStatus = () => {
-                        try {
-                            batteryLevel = Math.round(battery.level * 100);
-                            updateBatteryDisplay();
-                            
-                            // Only update presence if channel exists
-                            if (presenceChannel?.subscriptionState === 'SUBSCRIBED') {
-                                presenceChannel.track({
-                                    online_at: new Date().toISOString(),
-                                    user_id: currentUserId,
-                                    battery_level: batteryLevel,
-                                    device_type: currentDeviceType
-                                }).catch(e => console.error("Presence update failed:", e));
-                            }
-                            
-                            // Only update location if we have position
-                            if (lastPosition) {
-                                supabaseClient
-                                    .from('user_locations')
-                                    .upsert({
-                                        user_id: currentUserId,
-                                        latitude: lastPosition.lat,
-                                        longitude: lastPosition.lng,
-                                        accuracy: 0,
-                                        last_updated: new Date().toISOString(),
-                                        device_context: {
-                                            is_mobile: isMobile,
-                                            battery_level: batteryLevel,
-                                            device_type: currentDeviceType,
-                                            last_online: new Date().toISOString()
-                                        }
-                                    })
-                                    .then(() => {})
-                                    .catch(e => console.error("Battery location update failed:", e));
-                            }
-                        } catch (e) {
-                            console.error("Battery update error:", e);
-                        }
-                    };
-                    
-                    battery.addEventListener('levelchange', updateBatteryStatus);
-                    updateBatteryStatus();
-                    
-                }).catch(e => {
-                    console.error("Battery API error - using simulation:", e);
-                    startBatterySimulation();
-                    });
-                } else {
-                startBatterySimulation();
-            }
-        }
-
-        function startBatterySimulation() {
-            console.log("Using simulated battery");
-            const simulate = () => {
-                batteryLevel = Math.max(0, batteryLevel - 1);
-                if (batteryLevel <= 0) batteryLevel = 100;
-                updateBatteryDisplay();
-                
-                if (presenceChannel?.subscriptionState === 'SUBSCRIBED' && currentUserId) {
-                    presenceChannel.track({
-                        online_at: new Date().toISOString(),
-                        user_id: currentUserId,
-                        battery_level: batteryLevel,
-                        device_type: currentDeviceType
-                    }).catch(e => console.error("Simulated presence update failed:", e));
-                }
-            };
-            setInterval(simulate, 60000);
-            simulate(); // Initial update
         }
 
         // Keep Render server awake
@@ -3635,6 +4114,44 @@
                     }
                 });
             }
+
+            // Map location button
+            document.getElementById('mapLocationButton').addEventListener('click', () => {
+                if (map && lastPosition) {
+                    // Center map on user's location
+                    map.setView([lastPosition.lat, lastPosition.lng], 15);
+                    
+                    // Show the marker's popup
+                    if (marker) {
+                        marker.openPopup();
+                    }
+                } else {
+                    // If no location yet, request it
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            lastPosition = {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            };
+                            if (map) {
+                                map.setView([lastPosition.lat, lastPosition.lng], 15);
+                                if (marker) {
+                                    marker.setLatLng([lastPosition.lat, lastPosition.lng]);
+                                    marker.openPopup();
+                                }
+                            }
+                        },
+                        (error) => {
+                            console.error('Error getting location:', error);
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 5000,
+                            maximumAge: 0
+                        }
+                    );
+                }
+            });
         }
 
         // Clean up on page unload
@@ -3844,6 +4361,173 @@
                 renderUserList(filteredUsers);
             });
         }
+
+        // Add these new functions for reaction handling
+        function showReactionPicker(button, messageId) {
+            const picker = button.nextElementSibling;
+            picker.classList.toggle('active');
+            
+            // Close other pickers
+            document.querySelectorAll('.reaction-picker').forEach(p => {
+                if (p !== picker) p.classList.remove('active');
+            });
+        }
+
+        async function addReaction(messageId, emoji) {
+            try {
+                const { data: message, error } = await supabaseClient
+                    .from('messages')
+                    .select('reactions')
+                    .eq('id', messageId)
+                    .single();
+                    
+                if (error) throw error;
+                
+                let reactions = message.reactions || {};
+                if (!reactions[emoji]) reactions[emoji] = [];
+                
+                // Remove user's previous reaction if any
+                Object.keys(reactions).forEach(e => {
+                    reactions[e] = reactions[e].filter(id => id !== currentUserId);
+                });
+                
+                // Add new reaction
+                if (!reactions[emoji].includes(currentUserId)) {
+                    reactions[emoji].push(currentUserId);
+                }
+                
+                // Update database
+                const { error: updateError } = await supabaseClient
+                    .from('messages')
+                    .update({ reactions: reactions })
+                    .eq('id', messageId);
+                    
+                if (updateError) throw updateError;
+                
+                // Update UI
+                updateReactionUI(messageId, reactions);
+                
+                // Close picker
+                document.querySelectorAll('.reaction-picker').forEach(p => p.classList.remove('active'));
+                
+            } catch (error) {
+                console.error('Failed to add reaction:', error);
+            }
+        }
+
+        async function loadReactions(messageId) {
+            try {
+                const { data: message, error } = await supabaseClient
+                    .from('messages')
+                    .select('reactions')
+                    .eq('id', messageId)
+                    .single();
+                    
+                if (error) throw error;
+                
+                if (message.reactions) {
+                    updateReactionUI(messageId, message.reactions);
+                }
+            } catch (error) {
+                console.error('Failed to load reactions:', error);
+            }
+        }
+
+        function updateReactionUI(messageId, reactions) {
+            const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (!messageDiv) return;
+            
+            const reactionButton = messageDiv.querySelector('.reaction-button');
+            if (!reactionButton) return;
+            
+            // Clear existing reactions
+            reactionButton.innerHTML = '';
+            
+            // Only show reactions if there are any
+            const hasReactions = Object.entries(reactions).some(([_, users]) => users.length > 0);
+            
+            if (hasReactions) {
+                // Add reactions with counts
+                Object.entries(reactions).forEach(([emoji, users]) => {
+                    if (users.length > 0) {
+                        const reactionSpan = document.createElement('span');
+                        reactionSpan.className = 'reaction-emoji';
+                        reactionSpan.textContent = emoji;
+                        
+                        const countSpan = document.createElement('span');
+                        countSpan.className = 'reaction-count';
+                        countSpan.textContent = users.length;
+                        
+                        reactionButton.appendChild(reactionSpan);
+                        reactionButton.appendChild(countSpan);
+                    }
+                });
+                messageDiv.classList.add('has-reactions');
+            } else {
+                // If no reactions, show the default reaction button
+                reactionButton.innerHTML = `
+                    <span class="reaction-emoji">👍</span>
+                    <span class="reaction-count">0</span>
+                `;
+                messageDiv.classList.remove('has-reactions');
+            }
+        }
+
+        // Location Services
+        let locationPermissionGranted = false;
+
+        function showLocationPopup() {
+            document.getElementById('locationOverlay').classList.add('active');
+            document.getElementById('locationPopup').classList.add('active');
+        }
+
+        function hideLocationPopup() {
+            document.getElementById('locationOverlay').classList.remove('active');
+            document.getElementById('locationPopup').classList.remove('active');
+        }
+
+        async function requestLocationPermission() {
+            try {
+                const status = document.getElementById('locationStatusText');
+                status.textContent = 'Requesting location access...';
+                
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    });
+                });
+
+                locationPermissionGranted = true;
+                lastPosition = position;
+                status.textContent = 'Location access granted';
+                hideLocationPopup();
+                
+                // Initialize map with user's location
+                if (map) {
+                    map.setView([position.coords.latitude, position.coords.longitude], 15);
+                    updateUserLocation(position);
+                }
+            } catch (error) {
+                const status = document.getElementById('locationStatusText');
+                status.textContent = 'Location access denied';
+                console.error('Error getting location:', error);
+            }
+        }
+
+        // Remove the old location permission popup handlers
+        document.getElementById('enableLocationButton')?.removeEventListener('click', requestLocationPermission);
+        document.getElementById('cancelLocationButton')?.removeEventListener('click', hideLocationPopup);
+        document.getElementById('closeLocationPopup')?.removeEventListener('click', hideLocationPopup);
+        document.getElementById('locationOverlay')?.removeEventListener('click', hideLocationPopup);
+
+        // Remove the old location popup HTML
+        const oldPopup = document.getElementById('locationOverlay');
+        if (oldPopup) {
+            oldPopup.remove();
+        }
+
     </script>
 </body>
 </html>

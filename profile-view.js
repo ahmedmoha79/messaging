@@ -12,6 +12,7 @@
     let followStatusCache = new Map();
     let statsCache = new Map();
     let debounceTimers = {};
+    let followOperationInProgress = false;
 
     // Debug function with timestamp and log levels
     function debug(message, level = 'info') {
@@ -547,25 +548,49 @@
                 this.hideProfile();
             });
             
-            // Follow button click with debounce
-            this.profileContainer.querySelector('#followButton').addEventListener('click', () => {
-                if (!this.currentProfileId) return;
-                
-                // Debounce to prevent rapid clicks
-                if (debounceTimers.follow) {
-                    clearTimeout(debounceTimers.follow);
+            // Follow button click with improved debounce
+            const followButton = this.profileContainer.querySelector('#followButton');
+            let isFollowProcessing = false;
+            
+            followButton.addEventListener('click', async () => {
+                if (!this.currentProfileId || isFollowProcessing) {
+                    debug('Follow action prevented - no profile ID or already processing', 'warn');
+                    return;
                 }
                 
-                debounceTimers.follow = setTimeout(() => {
-                    this.toggleFollow();
-                }, DEBOUNCE_DELAY);
+                isFollowProcessing = true;
+                try {
+                    await this.toggleFollow();
+                } finally {
+                    isFollowProcessing = false;
+                }
             });
             
             // Message button click
             this.profileContainer.querySelector('#messageButton').addEventListener('click', () => {
                 if (this.currentProfileId && typeof window.selectUser === 'function') {
+                    const userData = profileCache.get(this.currentProfileId)?.data;
+                    if (userData) {
                     this.hideProfile();
-                    window.selectUser({ id: this.currentProfileId });
+                        window.selectUser({ 
+                            id: this.currentProfileId,
+                            name: userData.name,
+                            avatar_url: userData.avatar_url
+                        });
+                    } else {
+                        // If user data isn't in cache, fetch it first
+                        this.loadUserData(this.currentProfileId).then(userData => {
+                            this.hideProfile();
+                            window.selectUser({ 
+                                id: this.currentProfileId,
+                                name: userData.name,
+                                avatar_url: userData.avatar_url
+                            });
+                        }).catch(error => {
+                            debug(`Failed to load user data for chat: ${error.message}`, 'error');
+                            this.showNotification('Error', 'Failed to open chat. Please try again.', 'error');
+                        });
+                    }
                 }
             });
             
@@ -582,19 +607,14 @@
         }
 
         async toggleFollow() {
-            if (!this.currentProfileId) return;
+            if (!this.currentProfileId || followOperationInProgress) return;
             
             const button = this.profileContainer.querySelector('#followButton');
-            const currentFollowStatus = followStatusCache.get(this.currentProfileId);
-            
-            // Prevent multiple clicks while operation is in progress
-            if (button.dataset.processing === 'true') {
-                debug('Follow operation already in progress', 'warn');
-                return;
-            }
+            const currentFollowStatus = followStatusCache.get(this.currentProfileId)?.data || false;
             
             // Set processing state and update button immediately
             button.dataset.processing = 'true';
+            followOperationInProgress = true;
             const newFollowStatus = !currentFollowStatus;
             
             // Update button to show loading state with the target state
@@ -603,8 +623,28 @@
             button.style.cursor = 'not-allowed';
             
             try {
-                // Get current stats before making changes
-                const currentStats = await this.loadUserStats(this.currentProfileId, true);
+                // Check if follow relationship exists
+                const { data: existingFollow, error: checkError } = await this.supabase
+                    .from('follows')
+                    .select('id')
+                    .eq('follower_id', this.currentUserId)
+                    .eq('following_id', this.currentProfileId)
+                    .maybeSingle();
+                    
+                if (checkError) {
+                    throw checkError;
+                }
+
+                // If the current state matches what we want, just update the UI
+                if ((existingFollow && newFollowStatus) || (!existingFollow && !newFollowStatus)) {
+                    followStatusCache.set(this.currentProfileId, {
+                        data: newFollowStatus,
+                        timestamp: Date.now()
+                    });
+                    this.updateFollowButton(newFollowStatus);
+                    await this.updateStatsAfterFollowChange(newFollowStatus);
+                    return;
+                }
                 
                 // Perform the follow/unfollow operation
                 if (newFollowStatus) {
@@ -614,9 +654,23 @@
                             follower_id: this.currentUserId,
                             following_id: this.currentProfileId,
                             created_at: new Date().toISOString()
-                        }]);
+                        }])
+                        .select()
+                        .single();
                     
-                    if (error) throw error;
+                    if (error) {
+                        if (error.code === '23505') { // Duplicate key error
+                            // If we get a duplicate key error, the follow was actually successful
+                            followStatusCache.set(this.currentProfileId, {
+                                data: true,
+                                timestamp: Date.now()
+                            });
+                            this.updateFollowButton(true);
+                            await this.updateStatsAfterFollowChange(true);
+                            return;
+                        }
+                        throw error;
+                    }
                 } else {
                     const { error } = await this.supabase
                         .from('follows')
@@ -628,12 +682,13 @@
                 }
                 
                 // Update local cache
-                followStatusCache.set(this.currentProfileId, newFollowStatus);
+                followStatusCache.set(this.currentProfileId, {
+                    data: newFollowStatus,
+                    timestamp: Date.now()
+                });
                 
-                // Update stats in database and UI
-                await this.updateStatsAfterFollowChange(newFollowStatus, currentStats);
-                
-                // Update button to show success state
+                // Update stats and UI
+                await this.updateStatsAfterFollowChange(newFollowStatus);
                 this.updateFollowButton(newFollowStatus);
                 
             } catch (error) {
@@ -658,38 +713,44 @@
                 button.dataset.processing = 'false';
                 button.style.opacity = '1';
                 button.style.cursor = 'pointer';
+                followOperationInProgress = false;
             }
         }
         
         async updateStatsAfterFollowChange(isFollowing, currentStats) {
             try {
-                // Update both stats in parallel
-                const [followingResult, followersResult] = await Promise.all([
-                    this.supabase.rpc('increment_following_count', {
-                        in_amount: isFollowing ? 1 : -1,
-                        in_user_id: this.currentUserId
-                    }),
-                    this.supabase.rpc('increment_followers_count', {
-                        in_amount: isFollowing ? 1 : -1,
-                        in_user_id: this.currentProfileId
-                    })
+                // Instead of trying to update user_stats, just calculate the new counts
+                const [followers, following] = await Promise.all([
+                    this.supabase
+                        .from('follows')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('following_id', this.currentProfileId),
+                    this.supabase
+                        .from('follows')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('follower_id', this.currentProfileId)
                 ]);
                 
-                if (followingResult.error) throw followingResult.error;
-                if (followersResult.error) throw followersResult.error;
+                // Get messages count
+                const { count: messagesCount } = await this.supabase
+                    .from('messages')
+                    .select('*', { count: 'exact', head: true })
+                    .or(`sender_id.eq.${this.currentProfileId},receiver_id.eq.${this.currentProfileId}`);
 
-                // Force refresh stats for both users to ensure accuracy
-                const [currentUserStats, profileStats] = await Promise.all([
-                    this.loadUserStats(this.currentUserId, true),
-                    this.loadUserStats(this.currentProfileId, true)
-                ]);
+                // Update the UI with the new counts
+                const newStats = {
+                    followers_count: followers.count || 0,
+                    following_count: following.count || 0,
+                    messages_count: messagesCount || 0
+                };
                 
                 // Update UI with fresh stats
-                this.updateStatsUI(profileStats);
+                this.updateStatsUI(newStats);
                 
             } catch (error) {
                 console.error('Error updating stats:', error);
-                throw error;
+                // Don't throw the error, just log it
+                // This prevents the UI from showing an error state for non-critical stats updates
             }
         }
 
@@ -787,6 +848,9 @@
                 ]).catch(error => {
                     debug('Failed to load additional profile data:', 'error', error);
                 });
+
+                // Set up realtime message listener for this user
+                this.setupMessageListener(userId, userData);
                 
                 debug('Profile UI updated', 'success');
                 
@@ -885,53 +949,46 @@
             }
             
             debug(`Loading stats for ${userId}`, 'info');
-            let stats = { followers_count: 0, following_count: 0, messages_count: 0 };
             
             try {
-                // Always get the actual counts from the follows table first
-                    const [followers, following, messages] = await Promise.all([
-                        this.supabase
+                // Get all stats in a single query using a join
+                const { data: followsData, error: followsError } = await this.supabase
                             .from('follows')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('following_id', userId),
-                        
-                        this.supabase
-                            .from('follows')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('follower_id', userId),
-                            
-                        this.supabase
+                    .select(`
+                        following_id,
+                        follower_id
+                    `)
+                    .or(`following_id.eq.${userId},follower_id.eq.${userId}`);
+
+                if (followsError) throw followsError;
+
+                // Calculate stats from the raw data
+                const userStats = {
+                    followers_count: followsData.filter(f => f.following_id === userId).length,
+                    following_count: followsData.filter(f => f.follower_id === userId).length,
+                    messages_count: 0 // We'll get this separately
+                };
+
+                // Get messages count
+                const { count: messagesCount } = await this.supabase
                             .from('messages')
                             .select('*', { count: 'exact', head: true })
-                            .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-                    ]);
+                    .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
                     
-                    stats = {
-                        followers_count: followers.count || 0,
-                        following_count: following.count || 0,
-                        messages_count: messages.count || 0
-                    };
-                    
-                // Update stats table to ensure consistency
-                    await this.supabase
-                        .from('user_stats')
-                        .upsert({
-                            user_id: userId,
-                            ...stats,
-                            last_updated: new Date().toISOString()
-                        });
-                
-            } catch (error) {
-                debug(`Stats error (non-critical): ${error.message}`, 'warn');
-            }
+                userStats.messages_count = messagesCount || 0;
             
             // Update cache
             statsCache.set(userId, {
-                data: stats,
+                    data: userStats,
                 timestamp: Date.now()
             });
             
-            return stats;
+                return userStats;
+                
+            } catch (error) {
+                debug(`Stats error (non-critical): ${error.message}`, 'warn');
+                return { followers_count: 0, following_count: 0, messages_count: 0 };
+            }
         }
         
         async loadFollowStatus(userId) {
@@ -978,7 +1035,7 @@
             debug(`Loading recent followers for ${userId}`, 'info');
             
             try {
-                // First get the follower IDs
+                // First get the recent follows
                 const { data: follows, error: followsError } = await this.supabase
                     .from('follows')
                     .select('follower_id, created_at')
@@ -993,29 +1050,37 @@
                     return;
                 }
 
-                // Then get the user data for each follower
+                // Then get the user data for these followers
                 const followerIds = follows.map(f => f.follower_id);
                 const { data: users, error: usersError } = await this.supabase
                     .from('users')
-                    .select('id, name, avatar_url')
+                    .select('id, name, avatar_url, status, lastonline')
                     .in('id', followerIds);
                 
                 if (usersError) throw usersError;
 
-                // Combine the data
-                const followers = follows.map(follow => {
+                // Combine the data and maintain the order
+                const validFollowers = follows
+                    .map(follow => {
                     const user = users.find(u => u.id === follow.follower_id);
+                        if (!user) return null;
+                        
                     return {
-                        follower: user || { id: follow.follower_id, name: 'Unknown User', avatar_url: null },
+                            follower: {
+                                id: user.id,
+                                name: user.name || 'Unknown User',
+                                avatar_url: user.avatar_url,
+                                isOnline: this.isUserOnline(user)
+                            },
                         created_at: follow.created_at
                     };
-                });
+                    })
+                    .filter(Boolean); // Remove any null entries
                 
-                this.updateRecentFollowersUI(followers);
+                this.updateRecentFollowersUI(validFollowers);
                 
             } catch (error) {
                 debug(`Failed to load recent followers: ${error.message}`, 'warn');
-                // Show empty state in UI
                 this.updateRecentFollowersUI([]);
             }
         }
@@ -1109,6 +1174,37 @@
                 return;
             }
             
+            // Create a wrapper for better organization
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                width: 100%;
+            `;
+            
+            // Add a header
+            const header = document.createElement('div');
+            header.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 5px;
+            `;
+            header.innerHTML = `
+                <span style="color: rgba(255,255,255,0.7); font-size: 14px;">Recent Followers</span>
+                <span style="color: rgba(255,255,255,0.5); font-size: 12px;">${followers.length} shown</span>
+            `;
+            wrapper.appendChild(header);
+            
+            // Create avatars container
+            const avatarsContainer = document.createElement('div');
+            avatarsContainer.style.cssText = `
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            `;
+            
             followers.forEach(follower => {
                 const avatar = document.createElement('div');
                 avatar.className = 'follower-avatar';
@@ -1122,6 +1218,7 @@
                     justify-content: center;
                     overflow: hidden;
                     cursor: pointer;
+                    position: relative;
                 `;
                 
                 if (follower.follower.avatar_url) {
@@ -1140,13 +1237,88 @@
                     avatar.appendChild(icon);
                 }
                 
+                // Add online status indicator
+                if (follower.follower.isOnline) {
+                    const onlineIndicator = document.createElement('div');
+                    onlineIndicator.style.cssText = `
+                        position: absolute;
+                        bottom: 0;
+                        right: 0;
+                        width: 12px;
+                        height: 12px;
+                        border-radius: 50%;
+                        background-color: #4CAF50;
+                        border: 2px solid rgba(255,255,255,0.3);
+                    `;
+                    avatar.appendChild(onlineIndicator);
+                }
+                
+                // Add tooltip with name and follow date
+                const tooltip = document.createElement('div');
+                tooltip.style.cssText = `
+                    position: absolute;
+                    bottom: 100%;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0,0,0,0.8);
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    white-space: nowrap;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                    pointer-events: none;
+                    z-index: 1000;
+                `;
+                tooltip.textContent = `${follower.follower.name} • ${this.formatFollowDate(follower.created_at)}`;
+                avatar.appendChild(tooltip);
+                
+                // Add hover effects
+                avatar.addEventListener('mouseenter', () => {
+                    tooltip.style.opacity = '1';
+                });
+                avatar.addEventListener('mouseleave', () => {
+                    tooltip.style.opacity = '0';
+                });
+                
                 avatar.title = follower.follower.name;
                 avatar.addEventListener('click', () => {
                     this.showProfile(follower.follower.id);
                 });
                 
-                container.appendChild(avatar);
+                avatarsContainer.appendChild(avatar);
             });
+            
+            wrapper.appendChild(avatarsContainer);
+            container.appendChild(wrapper);
+        }
+        
+        formatFollowDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            
+            // Less than 24 hours
+            if (diff < 24 * 60 * 60 * 1000) {
+                const hours = Math.floor(diff / (60 * 60 * 1000));
+                return hours === 0 ? 'Just now' : `${hours}h ago`;
+            }
+            
+            // Less than 7 days
+            if (diff < 7 * 24 * 60 * 60 * 1000) {
+                const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+                return `${days}d ago`;
+            }
+            
+            // Otherwise show the date
+            return date.toLocaleDateString();
+        }
+        
+        isUserOnline(user) {
+            return onlineUsers[user.id] || 
+                (user.status === 'online' && user.lastonline && 
+                (Date.now() - new Date(user.lastonline).getTime()) < 300000);
         }
         
         updateFollowButton(isFollowing) {
@@ -1155,6 +1327,7 @@
             
             // Reset any error states
             button.dataset.processing = 'false';
+            button.style.backgroundColor = ''; // Reset any error background
             
             if (isFollowing) {
                 button.innerHTML = '<i class="fas fa-user-check"></i> Following';
@@ -1218,33 +1391,89 @@
             document.body.style.overflow = '';
         }
         
-        showNotification(title, message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 25px;
-                background: ${type === 'error' ? '#f44336' : type === 'success' ? '#4CAF50' : '#2196F3'};
-                color: white;
-                border-radius: 5px;
-                z-index: 1000;
-                animation: slideIn 0.3s ease-out;
-            `;
-            
-            notification.innerHTML = `
-                <div style="font-weight: bold;">${title}</div>
-                <div style="font-size: 0.9em; opacity: 0.9;">${message}</div>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Remove after 3 seconds
+        showNotification(title, message, type = 'info', data = {}) {
+            // Handle both desktop and mobile notifications
+            if ('Notification' in window && Notification.permission === 'granted') {
+                // Desktop notification
+                const notification = new Notification(title, {
+                    body: message,
+                    icon: data.avatar_url || '/notification-icon.png',
+                    badge: '/notification-icon.png',
+                    vibrate: [200, 100, 200],
+                    requireInteraction: true,
+                    data: {
+                        userId: data.userId,
+                        messageId: data.messageId,
+                        type: data.type
+                    }
+                });
+
+                notification.onclick = () => {
+                    notification.close();
+                    if (data.userId) {
+                        window.focus();
+                        if (typeof window.selectUser === 'function') {
+                            window.selectUser({ 
+                                id: data.userId,
+                                name: data.userName,
+                                avatar_url: data.avatar_url
+                            });
+                        }
+                    }
+                };
+            }
+
+            // Mobile notification (always show)
+            const mobileNotification = document.getElementById('mobileNotification');
+            if (mobileNotification) {
+                const notificationContent = mobileNotification.querySelector('.notification-content');
+                const avatar = mobileNotification.querySelector('#notificationAvatar');
+                const name = mobileNotification.querySelector('#notificationName');
+                const messageEl = mobileNotification.querySelector('#notificationMessage');
+
+                // Set notification content
+                if (data.avatar_url) {
+                    avatar.innerHTML = `<img src="${data.avatar_url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                } else {
+                    avatar.textContent = data.userName ? data.userName[0].toUpperCase() : '?';
+                }
+                name.textContent = data.userName || title;
+                messageEl.textContent = message;
+
+                // Show notification
+                mobileNotification.classList.add('active');
+
+                // Add click handler
+                mobileNotification.onclick = () => {
+                    mobileNotification.classList.remove('active');
+                    if (data.userId) {
+                        if (typeof window.selectUser === 'function') {
+                            window.selectUser({ 
+                                id: data.userId,
+                                name: data.userName,
+                                avatar_url: data.avatar_url
+                            });
+                        }
+                    }
+                };
+
+                // Auto-hide after 5 seconds
             setTimeout(() => {
-                notification.style.animation = 'slideOut 0.3s ease-in';
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
+                    mobileNotification.classList.remove('active');
+                }, 5000);
+            }
+
+            // Play notification sound
+            if (window.notificationSound && window.soundInitialized) {
+                try {
+                    window.notificationSound.currentTime = 0;
+                    window.notificationSound.play().catch(e => {
+                        console.warn('Failed to play notification sound:', e);
+                    });
+                } catch (e) {
+                    console.warn('Error playing notification sound:', e);
+                }
+            }
         }
         
         showMoreActionsMenu(event) {
@@ -1265,6 +1494,41 @@
         showFollowingList() {
             // Implementation would show a modal with full following list
             console.log('Show following list for:', this.currentProfileId);
+        }
+
+        setupMessageListener(userId, userData) {
+            // Remove any existing listener for this user
+            if (this.realtimeChannels[`messages_${userId}`]) {
+                this.realtimeChannels[`messages_${userId}`].unsubscribe();
+            }
+
+            // Set up new listener
+            this.realtimeChannels[`messages_${userId}`] = this.supabase
+                .channel(`messages_${userId}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `receiver_id=eq.${this.currentUserId}`
+                }, async (payload) => {
+                    const newMessage = payload.new;
+                    if (newMessage.sender_id === userId) {
+                        // Show notification with full user data
+                        this.showNotification(
+                            userData.name,
+                            newMessage.content,
+                            'message',
+                            {
+                                userId: userId,
+                                userName: userData.name,
+                                avatar_url: userData.avatar_url,
+                                messageId: newMessage.id,
+                                type: 'message'
+                            }
+                        );
+                    }
+                })
+                .subscribe();
         }
     }
 

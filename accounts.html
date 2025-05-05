@@ -727,6 +727,17 @@
                     throw accountError;
                 }
 
+                // Fetch user profile data including bio
+                const { data: profile, error: profileError } = await supabaseClient
+                    .from('user_profiles')
+                    .select('bio')
+                    .eq('user_id', currentUserId)
+                    .single();
+
+                if (!profileError && profile) {
+                    account.bio = profile.bio;
+                }
+
                 // Fetch follower and following counts
                 const [followersCount, followingCount] = await Promise.all([
                     supabaseClient
