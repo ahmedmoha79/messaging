@@ -2093,8 +2093,7 @@
         // Notification Service Class
         class NotificationService {
             constructor() {
-                this.permission = null;
-                this.initialize();
+                this.permission = Notification.permission;
             }
 
             async initialize() {
@@ -2105,13 +2104,8 @@
                         return;
                     }
 
-                    // Request permission if not already granted
-                    if (Notification.permission === 'default') {
-                        this.permission = await Notification.requestPermission();
-                    } else {
-                        this.permission = Notification.permission;
-                    }
-
+                    // Just store the current permission state
+                    this.permission = Notification.permission;
                     console.log('Notification permission:', this.permission);
                 } catch (error) {
                     console.error('Failed to initialize notifications:', error);
