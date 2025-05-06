@@ -2084,11 +2084,73 @@
         let audioRecorder = new EnhancedAudioRecorder();
         let keepAliveInterval;
 
-        // Notification variables
-        let notificationSound = null;
+        // Global notification variables
+        let notificationService;
+        let notificationSound;
         let soundInitialized = false;
         let soundPlayed = false;
-        let notificationPermissionRequested = false;
+
+        // Notification Service Class
+        class NotificationService {
+            constructor() {
+                this.permission = null;
+                this.initialize();
+            }
+
+            async initialize() {
+                try {
+                    // Check if notifications are supported
+                    if (!('Notification' in window)) {
+                        console.warn('Notifications not supported');
+                        return;
+                    }
+
+                    // Request permission if not already granted
+                    if (Notification.permission === 'default') {
+                        this.permission = await Notification.requestPermission();
+                    } else {
+                        this.permission = Notification.permission;
+                    }
+
+                    console.log('Notification permission:', this.permission);
+                } catch (error) {
+                    console.error('Failed to initialize notifications:', error);
+                }
+            }
+
+            async showNotification(title, options) {
+                try {
+                    // Check if notifications are supported and permission is granted
+                    if (!('Notification' in window) || this.permission !== 'granted') {
+                        console.warn('Notifications not available or permission not granted');
+                        return;
+                    }
+
+                    // Create and show notification
+                    const notification = new Notification(title, options);
+
+                    // Handle notification click
+                    notification.onclick = () => {
+                        notification.close();
+                        if (options.data?.userId) {
+                            const user = userDataCache[options.data.userId];
+                            if (user) selectUser(user);
+                        }
+                    };
+
+                    // Handle notification close
+                    notification.onclose = () => {
+                        if (options.data?.messageId) {
+                            markMessageAsRead(options.data.messageId);
+                        }
+                    };
+
+                    return notification;
+                } catch (error) {
+                    console.error('Failed to show notification:', error);
+                }
+            }
+        }
 
         // Initialize notification sound
         async function initializeNotificationSound() {
@@ -2096,7 +2158,7 @@
                 if (!soundInitialized) {
                     try {
                         notificationSound = new Audio();
-                        notificationSound.src = '/notification.mp3';
+                        notificationSound.src = 'public/notification.mp3';  // Updated path to point to the public directory
                         notificationSound.volume = 0.7;
                         notificationSound.preload = 'auto';
 
@@ -2125,7 +2187,8 @@
         async function unlockSound() {
             if (notificationSound && soundInitialized) {
                 try {
-                    await notificationSound.play();
+                    // Only initialize the sound without playing it
+                    notificationSound.load();
                     soundPlayed = true;
                 } catch (e) {
                     console.error('Failed to unlock sound:', e);
@@ -2133,76 +2196,21 @@
             }
         }
 
-        // Show notification function
-        async function showNotification(senderId, messageContent) {
-            try {
-                // Get sender's info from cache
-                const sender = userDataCache[senderId];
-                if (!sender) return;
-
-                // Prepare notification data
-                const notificationData = {
-                    title: sender.name,
-                    body: messageContent.length > 30 
-                        ? messageContent.substring(0, 30) + '...' 
-                        : messageContent,
-                    icon: sender.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sender.name || 'User')}&background=random`,
-                    data: {
-                        userId: senderId
-                    }
-                };
-
-                // Show web notification if permission is granted
-                if (Notification.permission === 'granted') {
-                    const notification = new Notification(notificationData.title, notificationData);
-                    
-                    notification.onclick = () => {
-                        notification.close();
-                        if (sender) selectUser(sender);
-                    };
-                }
-
-                // Show mobile notification (in-app)
-                const mobileNotification = document.getElementById('mobileNotification');
-                if (mobileNotification) {
-                    document.getElementById('notificationAvatar').innerHTML = 
-                        `<img src="${notificationData.icon}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
-                    document.getElementById('notificationName').textContent = notificationData.title;
-                    document.getElementById('notificationMessage').textContent = notificationData.body;
-                    
-                    // Show and auto-hide after 5 seconds
-                    mobileNotification.classList.add('active');
-                    setTimeout(() => {
-                        mobileNotification.classList.remove('active');
-                    }, 5000);
-                }
-
-                // Play notification sound
-                if (notificationSound && soundInitialized) {
-                    notificationSound.currentTime = 0;
-                    notificationSound.play().catch(e => console.error('Sound play error:', e));
-                }
-
-            } catch (error) {
-                console.error('Notification error:', error);
-            }
-        }
-
         // Initialize notifications
         async function initializeNotifications() {
             try {
-                // Request notification permission if not already granted
-                if (Notification.permission === 'default') {
-                    await Notification.requestPermission();
-                }
-
+                console.log('Initializing notifications...');
+                
+                // Initialize notification service
+                notificationService = new NotificationService();
+                
                 // Initialize sound
                 await initializeNotificationSound();
                 
-                // Add click handler for sound unlock
+                // Add click handler for sound initialization only
                 document.addEventListener('click', async () => {
-                    if (!soundPlayed) {
-                        await unlockSound();
+                    if (!soundInitialized) {
+                        await initializeNotificationSound();
                     }
                 });
                 
@@ -2210,6 +2218,85 @@
                 console.error('Failed to initialize notifications:', error);
             }
         }
+
+        // Show notification function
+        async function showNotification(data) {
+            try {
+                console.log('Showing notification:', data);
+                
+                // Ensure sound is initialized
+                if (!soundInitialized) {
+                    console.log('Sound not initialized, initializing...');
+                    await initializeNotificationSound();
+                }
+
+                // Show mobile notification
+                const mobileNotification = document.getElementById('mobileNotification');
+                if (mobileNotification) {
+                    const avatar = mobileNotification.querySelector('#notificationAvatar');
+                    const name = mobileNotification.querySelector('#notificationName');
+                    const message = mobileNotification.querySelector('#notificationMessage');
+
+                    // Set notification content
+                    if (data.avatar_url) {
+                        avatar.innerHTML = `<img src="${data.avatar_url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    } else {
+                        avatar.textContent = data.userName ? data.userName[0].toUpperCase() : '?';
+                    }
+                    name.textContent = data.userName || data.title;
+                    message.textContent = data.body;
+
+                    // Store user ID for click handling
+                    mobileNotification.dataset.userId = data.userId;
+
+                    // Show notification
+                    mobileNotification.classList.add('active');
+
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                        mobileNotification.classList.remove('active');
+                    }, 5000);
+                }
+
+                // Use notification service if available
+                if (notificationService) {
+                    await notificationService.showNotification(data.title, {
+                        body: data.body,
+                        icon: data.icon,
+                        data: {
+                            userId: data.userId,
+                            messageId: data.messageId
+                        }
+                    });
+                }
+
+                // Play notification sound if available and allowed
+                if (notificationSound && soundInitialized) {
+                    console.log('Attempting to play notification sound...');
+                    try {
+                        notificationSound.currentTime = 0;
+                        const playPromise = notificationSound.play();
+                        
+                        if (playPromise !== undefined) {
+                            await playPromise;
+                            console.log('Notification sound played successfully');
+                        }
+                    } catch (e) {
+                        console.error('Failed to play notification sound:', e);
+                        // If sound play failed, try to reinitialize on next user interaction
+                        soundPlayed = false;
+                    }
+                }
+
+            } catch (error) {
+                console.error('Failed to show notification:', error);
+            }
+        }
+
+        // Initialize notifications when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeNotifications();
+        });
 
         // Add mobile notification click handler
         document.getElementById('mobileNotification')?.addEventListener('click', () => {
@@ -2220,9 +2307,6 @@
             }
             document.getElementById('mobileNotification').classList.remove('active');
         });
-
-        // Call initializeNotifications in your app initialization
-        initializeNotifications();
 
         // Initialize battery monitoring
         function initBatteryMonitoring() {
@@ -2361,11 +2445,11 @@
                 clearTimeout(typingStatus[userId]);
             }
             
-            // Set timeout to hide the indicator after 3 seconds of inactivity
+            // Set timeout to hide the indicator after 5 seconds of inactivity
             typingStatus[userId] = setTimeout(() => {
                 hideTypingIndicator(userId);
                 delete typingStatus[userId];
-            }, 3000);
+            }, 5000);
         }
 
         // Hide typing indicator
@@ -3483,11 +3567,11 @@
                 clearTimeout(typingStatus[userId]);
             }
             
-            // Set timeout to hide the indicator after 3 seconds of inactivity
+            // Set timeout to hide the indicator after 5 seconds of inactivity
             typingStatus[userId] = setTimeout(() => {
                 hideTypingIndicator(userId);
                 delete typingStatus[userId];
-            }, 3000);
+            }, 5000);
         }
 
         function hideTypingIndicator(userId) {
@@ -3539,9 +3623,9 @@
                 clearTimeout(typingTimeout);
             }
             
-            // Set timeout to send stopped typing event after 1 second of inactivity
+            // Set timeout to send stopped typing event after 5 seconds of inactivity
             typingTimeout = setTimeout(() => {
-                if (isTyping && (now - lastTypingTime > 1000)) {
+                if (isTyping && (now - lastTypingTime > 5000)) {
                     isTyping = false;
                     if (presenceChannel && presenceChannel.subscriptionState === 'SUBSCRIBED') {
                         presenceChannel.send({
@@ -3554,7 +3638,7 @@
                         }).catch(e => console.error('Error sending stopped typing event:', e));
                     }
                 }
-            }, 1000);
+            }, 5000);
         }
 
         // Realtime functionality with enhanced typing support
@@ -3683,7 +3767,19 @@
                                     markMessagesAsRead(newMessage.sender_id);
                                 } else {
                                     // Show notification for new message
-                                    showNotification(newMessage.sender_id, newMessage.content);
+                                    const userData = userDataCache[newMessage.sender_id];
+                                    if (userData) {
+                                        showNotification({
+                                            title: userData.name,
+                                            body: newMessage.content,
+                                            icon: userData.avatar_url,
+                                            userId: newMessage.sender_id,
+                                            userName: userData.name,
+                                            avatar_url: userData.avatar_url,
+                                            messageId: newMessage.id,
+                                            type: 'message'
+                                        });
+                                    }
                                 }
                             }
                             else if (payload.eventType === 'UPDATE') {
@@ -3829,272 +3925,6 @@
             }
         }
 
-        // Notification Service Class
-        class NotificationService {
-            constructor() {
-                this.permission = null;
-                this.initialize();
-            }
-
-            async initialize() {
-                try {
-                    // Check if notifications are supported
-                    if (!('Notification' in window)) {
-                        console.warn('Notifications not supported');
-                        return;
-                    }
-
-                    // Request permission if not already granted
-                    if (Notification.permission === 'default') {
-                        this.permission = await Notification.requestPermission();
-                    } else {
-                        this.permission = Notification.permission;
-                    }
-
-                    console.log('Notification permission:', this.permission);
-                } catch (error) {
-                    console.error('Failed to initialize notifications:', error);
-                }
-            }
-
-            async showNotification(title, options) {
-                try {
-                    // Check if notifications are supported and permission is granted
-                    if (!('Notification' in window) || this.permission !== 'granted') {
-                        console.warn('Notifications not available or permission not granted');
-                        return;
-                    }
-
-                    // Create and show notification
-                    const notification = new Notification(title, options);
-
-                    // Handle notification click
-                    notification.onclick = () => {
-                        notification.close();
-                        if (options.data?.userId) {
-                            const user = userDataCache[options.data.userId];
-                            if (user) selectUser(user);
-                        }
-                    };
-
-                    // Handle notification close
-                    notification.onclose = () => {
-                        if (options.data?.messageId) {
-                            markMessageAsRead(options.data.messageId);
-                        }
-                    };
-
-                    return notification;
-                } catch (error) {
-                    console.error('Failed to show notification:', error);
-                }
-            }
-        }
-
-        function initializeNotificationSound() {
-            return new Promise((resolve, reject) => {
-                if (!soundInitialized) {
-                    try {
-                        notificationSound = new Audio();
-                        notificationSound.src = 'public/notification.mp3';  // Updated path
-                        notificationSound.volume = 1.0;
-                        notificationSound.preload = 'auto';
-                        
-                        console.log('Initializing notification sound from local file...');
-                        console.log('Sound file path:', notificationSound.src);
-                        
-                        notificationSound.addEventListener('loadstart', () => {
-                            console.log('Sound file loading started');
-                        });
-                        
-                        notificationSound.addEventListener('progress', () => {
-                            console.log('Sound file loading in progress');
-                        });
-                        
-                        notificationSound.addEventListener('canplaythrough', () => {
-                            console.log('Notification sound ready to play');
-                            soundInitialized = true;
-                            resolve(true);
-                        });
-                        
-                        notificationSound.addEventListener('error', (e) => {
-                            console.error('Notification sound error:', e);
-                            console.error('Error details:', {
-                                code: notificationSound.error.code,
-                                message: notificationSound.error.message
-                            });
-                            reject(e);
-                        });
-                        
-                        notificationSound.load();
-                        
-                    } catch (e) {
-                        console.error('Failed to initialize notification sound:', e);
-                        reject(e);
-                    }
-                } else {
-                    resolve(true);
-                }
-            });
-        }
-
-        async function unlockSound() {
-            if (!notificationSound || !soundInitialized) {
-                console.log('Sound not initialized, trying to initialize...');
-                try {
-                    await initializeNotificationSound();
-                } catch (e) {
-                    console.error('Failed to initialize sound:', e);
-                    return false;
-                }
-            }
-
-            try {
-                console.log('Attempting to play notification sound...');
-                const playPromise = notificationSound.play();
-                if (playPromise !== undefined) {
-                    await playPromise;
-                    console.log('Notification sound played successfully');
-                    notificationSound.pause();
-                    notificationSound.currentTime = 0;
-                    soundPlayed = true;
-                    return true;
-                }
-            } catch (e) {
-                console.error('Failed to play notification sound:', e);
-                return false;
-            }
-        }
-
-        // Initialize notifications and sound
-        async function initializeNotifications() {
-            try {
-                console.log('Initializing notifications...');
-                
-                // Initialize notification service
-                notificationService = new NotificationService();
-                
-                // Initialize sound
-                await initializeNotificationSound();
-                
-                // Add click handler for sound unlock
-                const unlockSoundOnClick = async () => {
-                    console.log('User interaction detected, attempting to unlock sound...');
-                    if (!soundPlayed) {
-                        try {
-                            await unlockSound();
-                            if (soundPlayed) {
-                                console.log('Sound unlocked successfully');
-                                document.removeEventListener('click', unlockSoundOnClick);
-                            }
-                        } catch (e) {
-                            console.error('Failed to unlock sound:', e);
-                        }
-                    }
-                };
-                
-                document.addEventListener('click', unlockSoundOnClick);
-                
-            } catch (error) {
-                console.error('Failed to initialize notifications:', error);
-            }
-        }
-
-        async function showNotification(data) {
-            try {
-                console.log('Showing notification:', data);
-                
-                // Ensure sound is initialized
-                if (!soundInitialized) {
-                    console.log('Sound not initialized, initializing...');
-                    await initializeNotificationSound();
-                }
-
-                // Use notification service if available
-                if (notificationService) {
-                    await notificationService.showNotification(data.title, {
-                        body: data.body,
-                        icon: data.icon,
-                        data: {
-                            userId: data.userId,
-                            messageId: data.messageId
-                        }
-                    });
-                } else {
-                    // Fallback to regular notifications
-                    const notification = new Notification(data.title, {
-                        body: data.body,
-                        icon: data.icon,
-                        data: {
-                            userId: data.userId,
-                            messageId: data.messageId
-                        }
-                    });
-
-                    notification.onclick = () => {
-                        notification.close();
-                        if (data.userId) {
-                            selectUser(data.userId);
-                        }
-                    };
-
-                    notification.onclose = () => {
-                        if (data.messageId) {
-                            markMessageAsRead(data.messageId);
-                        }
-                    };
-                }
-
-                // Play notification sound if available and allowed
-                if (notificationSound && soundInitialized) {
-                    console.log('Attempting to play notification sound...');
-                    try {
-                        notificationSound.currentTime = 0;
-                        const playPromise = notificationSound.play();
-                        
-                        if (playPromise !== undefined) {
-                            await playPromise;
-                            console.log('Notification sound played successfully');
-                        }
-                    } catch (e) {
-                        console.error('Failed to play notification sound:', e);
-                        // If sound play failed, try to reinitialize on next user interaction
-                        soundPlayed = false;
-                        document.addEventListener('click', function retrySound() {
-                            if (notificationSound) {
-                                unlockSound().then(success => {
-                                    if (success) {
-                                        document.removeEventListener('click', retrySound);
-                                    }
-                                });
-                            }
-                        });
-                    }
-                }
-
-            } catch (error) {
-                console.error('Failed to show notification:', error);
-            }
-        }
-
-        // Keep Render server awake
-        function setupKeepAlive() {
-            // Small ping to Supabase every 30 seconds
-            keepAliveInterval = setInterval(async () => {
-                try {
-                    // Make a small query to keep the connection alive
-                    await supabaseClient
-                        .from('users')
-                        .select('id')
-                        .eq('id', currentUserId)
-                        .limit(1)
-                        .single();
-                } catch (e) {
-                    console.log("Keep-alive ping failed:", e);
-                }
-            }, 30000);
-        }
-
         // Event listeners
         function setupEventListeners() {
             // Message sending
@@ -4153,7 +3983,7 @@
                 
                 clearTimeout(typingTimer);
                 typingTimer = setTimeout(() => {
-                    if (now - lastTypingTime > 1000 && isTyping) {
+                    if (now - lastTypingTime > 5000 && isTyping) {
                         isTyping = false;
                         presenceChannel.send({
                             type: 'broadcast',
@@ -4161,7 +3991,7 @@
                             payload: { userId: currentUserId }
                         });
                     }
-                }, 1000);
+                }, 5000);
             });
 
             // Menu button (mobile)
@@ -4414,7 +4244,6 @@
                 await loadUsers();
                 setupEventListeners();
                 initializeRealtime();
-                setupKeepAlive();
 
                 // Set up auth state change listener
                 supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -4663,10 +4492,7 @@
             oldPopup.remove();
         }
 
-        // Initialize notification service
-        const notificationService = new NotificationService();
-
-        // Call initializeNotifications in your app initialization
+        // Initialize notifications
         initializeNotifications();
 
     </script>
