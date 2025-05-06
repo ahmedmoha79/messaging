@@ -504,6 +504,30 @@
             height: 100%;
             width: 100%;
             background: #1a1a1a;
+            transition: opacity 0.3s ease;
+        }
+
+        #map.loading {
+            opacity: 0.7;
+        }
+
+        #map.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+            z-index: 1000;
+        }
+
+        @keyframes spin {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
         /* Map Controls - Enhanced */
@@ -2648,29 +2672,65 @@
         // Map functions
         function initializeMap() {
             try {
-                // Initialize the map with default view
+                // Initialize the map with default view and enhanced settings
                 map = L.map('map', {
                     zoomControl: false,
                     attributionControl: false,
-                    preferCanvas: true // Better performance for many markers
+                    preferCanvas: true,
+                    maxZoom: 19,
+                    minZoom: 2,
+                    zoomSnap: 0.5,
+                    zoomDelta: 0.5,
+                    wheelDebounceTime: 40,
+                    updateWhenIdle: true,
+                    updateWhenZooming: false,
+                    keepBuffer: 2
                 }).setView([0, 0], 2);
                 
-                // Add base map layers
+                // Add base map layers with enhanced options
                 const baseLayers = {
                     "Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                        maxZoom: 19,
+                        tileSize: 256,
+                        zoomOffset: 0,
+                        updateWhenIdle: true,
+                        updateWhenZooming: false,
+                        keepBuffer: 2,
+                        crossOrigin: true
                     }),
                     "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                        maxZoom: 19,
+                        tileSize: 256,
+                        zoomOffset: 0,
+                        updateWhenIdle: true,
+                        updateWhenZooming: false,
+                        keepBuffer: 2,
+                        crossOrigin: true
                     })
                 };
 
-                // Add default layer (satellite for mobile, street for desktop)
-                if (isMobile) {
-                    baseLayers["Satellite"].addTo(map);
-                } else {
-                    baseLayers["Street Map"].addTo(map);
-                }
+                // Add default layer with error handling
+                const defaultLayer = isMobile ? baseLayers["Satellite"] : baseLayers["Street Map"];
+                defaultLayer.addTo(map);
+
+                // Add error handling for tile loading
+                defaultLayer.on('tileerror', function(e) {
+                    console.warn('Tile loading error:', e);
+                    // Retry loading the tile
+                    setTimeout(() => {
+                        e.tile.src = e.url;
+                    }, 1000);
+                });
+
+                // Add loading indicator
+                map.on('loading', function() {
+                    document.getElementById('map').classList.add('loading');
+                });
+                map.on('load', function() {
+                    document.getElementById('map').classList.remove('loading');
+                });
 
                 // Initialize user's location marker with device type
                 marker = L.marker([0, 0], {
