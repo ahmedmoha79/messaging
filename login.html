@@ -169,22 +169,26 @@
 
                 // Create a new session log entry
                 try {
-                    const { error: sessionError } = await supabaseClient
+                    console.log('Creating session log for user:', user.id);
+                    console.log('User Agent:', navigator.userAgent);
+                    
+                    const { data: sessionData, error: sessionError } = await supabaseClient
                         .from('user_session_logs')
                         .insert([{
                             user_id: user.id,
                             user_agent: navigator.userAgent,
                             ip_address: await getClientIP(),
                             created_at: new Date().toISOString()
-                        }]);
+                        }])
+                        .select();  // Add this to get the created record
                     
                     if (sessionError) {
                         console.error('Session logging error:', sessionError);
-                        // Continue with login even if session logging fails
+                    } else {
+                        console.log('Session log created successfully:', sessionData);
                     }
                 } catch (sessionError) {
                     console.error('Session logging error:', sessionError);
-                    // Continue with login even if session logging fails
                 }
 
                 // Redirect to messaging page

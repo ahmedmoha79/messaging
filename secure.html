@@ -530,20 +530,6 @@
                 
                 if (sessionsError) throw sessionsError;
 
-                // Mark current session
-                const formattedSessions = sessions ? await Promise.all(sessions.map(async s => ({
-                    id: s.id,
-                    user_id: s.user_id,
-                    created_at: s.created_at,
-                    user_agent: s.user_agent || navigator.userAgent,
-                    ip_address: s.ip_address || await getClientIP(),
-                    current: s.user_agent === navigator.userAgent // Compare user agents instead of session IDs
-                }))) : [];
-
-                // Find current session ID
-                const currentSessionLog = formattedSessions.find(s => s.current);
-                const currentSessionId = currentSessionLog ? currentSessionLog.id : null;
-
                 // Fetch security logs
                 const { data: securityLogs, error: logsError } = await supabaseClient
                     .from('security_logs')
@@ -554,13 +540,71 @@
                 
                 if (logsError) throw logsError;
 
+                // Mark current session
+                console.log('Current User Agent:', navigator.userAgent);
+                console.log('All Sessions:', sessions);
+                
+                const formattedSessions = sessions ? await Promise.all(sessions.map(async s => {
+                    // More precise current session detection
+                    const isCurrentSession = s.user_agent === navigator.userAgent && 
+                                           s.ip_address === await getClientIP();
+                    console.log('Comparing session:', {
+                        sessionUserAgent: s.user_agent,
+                        currentUserAgent: navigator.userAgent,
+                        sessionIP: s.ip_address,
+                        currentIP: await getClientIP(),
+                        isCurrent: isCurrentSession
+                    });
+                    
+                    return {
+                        id: s.id,
+                        user_id: s.user_id,
+                        created_at: s.created_at,
+                        user_agent: s.user_agent || navigator.userAgent,
+                        ip_address: s.ip_address || await getClientIP(),
+                        current: isCurrentSession
+                    };
+                })) : [];
+
+                // Find current session ID
+                const currentSessionLog = formattedSessions.find(s => s.current);
+                console.log('Current Session Log:', currentSessionLog);
+                const currentSessionId = currentSessionLog ? currentSessionLog.id : null;
+                console.log('Current Session ID:', currentSessionId);
+
+                // If no current session is found, create one
+                if (!currentSessionId) {
+                    console.log('No current session found, creating new session log');
+                    const { data: newSession, error: newSessionError } = await supabaseClient
+                        .from('user_session_logs')
+                        .insert([{
+                            user_id: currentUserId,
+                            user_agent: navigator.userAgent,
+                            ip_address: await getClientIP(),
+                            created_at: new Date().toISOString()
+                        }])
+                        .select()
+                        .single();
+                    
+                    if (newSessionError) {
+                        console.error('Error creating new session log:', newSessionError);
+                    } else {
+                        console.log('New session log created:', newSession);
+                        // Add the new session to the list
+                        formattedSessions.unshift({
+                            ...newSession,
+                            current: true
+                        });
+                    }
+                }
+
                 // Render the security page
                 renderSecurityPage({
                     login_alerts: userData.login_alerts,
                     suspicious_activity_alerts: userData.suspicious_activity_alerts,
                     last_password_change: userData.last_password_change,
                     avatar_url: userData.avatar_url
-                }, formattedSessions, securityLogs || [], currentSessionId);
+                }, formattedSessions, securityLogs || [], currentSessionId || formattedSessions[0]?.id);
 
             } catch (error) {
                 console.error('Failed to load security data:', error);
@@ -580,6 +624,9 @@
         }
 
         function renderSecurityPage(securitySettings, sessions, securityLogs, currentSessionId) {
+            console.log('Rendering security page with sessions:', sessions);
+            console.log('Current Session ID:', currentSessionId);
+            
             const accountContent = document.getElementById('accountContent');
             
             // Format dates
@@ -650,28 +697,31 @@
                     </div>
                     <div class="activity-log" id="sessionsLog">
                         ${sessions.length > 0 ? 
-                            sessions.map(session => `
-                                <div class="activity-item">
-                                    <div class="activity-icon">
-                                        <i class="fas ${getDeviceIcon(session.user_agent)}"></i>
-                                    </div>
-                                    <div class="activity-info">
-                                        <div><strong>${getBrowserName(session.user_agent)}</strong> on ${getOSName(session.user_agent)}</div>
-                                        <div class="activity-location">
-                                            <i class="fas fa-map-marker-alt"></i>
-                                            ${session.ip_address || 'Unknown location'}
+                            sessions.map(session => {
+                                console.log('Rendering session:', session);
+                                return `
+                                    <div class="activity-item">
+                                        <div class="activity-icon">
+                                            <i class="fas ${getDeviceIcon(session.user_agent)}"></i>
                                         </div>
-                                        <div class="activity-time">
-                                            ${formatLastOnline(new Date(session.created_at))} • ${session.current ? '<span style="color: #00ff88;">Current session</span>' : 'Active'}
+                                        <div class="activity-info">
+                                            <div><strong>${getBrowserName(session.user_agent)}</strong> on ${getOSName(session.user_agent)}</div>
+                                            <div class="activity-location">
+                                                <i class="fas fa-map-marker-alt"></i>
+                                                ${session.ip_address || 'Unknown location'}
+                                            </div>
+                                            <div class="activity-time">
+                                                ${formatLastOnline(new Date(session.created_at))} • ${session.current ? '<span style="color: #00ff88;">Current session</span>' : 'Active'}
+                                            </div>
                                         </div>
+                                        ${!session.current ? `
+                                            <button class="btn btn-danger btn-sm revoke-session-btn" data-session-id="${session.id}">
+                                                <i class="fas fa-sign-out-alt"></i> Revoke
+                                            </button>
+                                        ` : ''}
                                     </div>
-                                    ${!session.current ? `
-                                        <button class="btn btn-danger btn-sm revoke-session-btn" data-session-id="${session.id}">
-                                            <i class="fas fa-sign-out-alt"></i> Revoke
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            `).join('') : 
+                                `;
+                            }).join('') : 
                             '<p style="padding: 10px; text-align: center; opacity: 0.7;">No active sessions found</p>'
                         }
                     </div>
@@ -1117,8 +1167,20 @@
 
         async function logoutAllDevices(currentSessionId) {
             if (!currentSessionId) {
-                showError('Unable to identify current session');
-                return;
+                // If no current session ID, try to find it again
+                const { data: sessions } = await supabaseClient
+                    .from('user_session_logs')
+                    .select('*')
+                    .eq('user_id', currentUserId)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                
+                if (sessions && sessions.length > 0) {
+                    currentSessionId = sessions[0].id;
+                } else {
+                    showError('Unable to identify current session. Please try logging out and logging back in.');
+                    return;
+                }
             }
 
             showModal(
@@ -1145,14 +1207,22 @@
                             
                             await logSecurityEvent('ALL_SESSIONS_REVOKED', 'success', 'User logged out all other devices');
                             
+                            // Close the confirmation modal first
+                            closeModal();
+                            
+                            // Then show success message
                             showModal(
                                 'Success', 
                                 'All other devices have been logged out successfully.',
                                 [
-                                    { text: 'OK', action: () => {
-                                        closeModal();
-                                        window.location.reload();
-                                    }, class: 'btn-primary' }
+                                    { 
+                                        text: 'OK', 
+                                        action: () => {
+                                            closeModal();
+                                            window.location.reload();
+                                        }, 
+                                        class: 'btn-primary' 
+                                    }
                                 ]
                             );
                             
@@ -1197,6 +1267,12 @@
         }
 
         function showModal(title, message, buttons, customContent = null) {
+            // Remove any existing modals first
+            const existingModal = document.querySelector('.modal-overlay');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             
@@ -1222,7 +1298,9 @@
             buttons.forEach((btn, index) => {
                 const button = document.getElementById(`modal-btn-${index}`);
                 if (button && btn.action) {
-                    button.addEventListener('click', btn.action);
+                    button.addEventListener('click', () => {
+                        btn.action();
+                    });
                 }
             });
             
