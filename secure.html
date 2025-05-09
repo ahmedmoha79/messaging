@@ -521,21 +521,29 @@
                 
                 if (userError) throw userError;
                 
-                // Fetch active sessions - Supabase doesn't provide direct access to all sessions
-// So we'll just show the current session
-const { data: { session: currentSession }, error: sessionsError } = await supabaseClient.auth.getSession();
-
-const formattedSessions = currentSession ? [{
-    id: currentSession.id,
-    user_id: currentSession.user.id,
-    created_at: currentSession.created_at,
-    current: true,
-    ip_address: await getClientIP(),
-    user_agent: navigator.userAgent
-}] : [];
+                // Fetch all active sessions from the sessions table
+                const { data: sessions, error: sessionsError } = await supabaseClient
+                    .from('user_session_logs')
+                    .select('*')
+                    .eq('user_id', currentUserId)
+                    .order('created_at', { ascending: false });
                 
                 if (sessionsError) throw sessionsError;
-                
+
+                // Mark current session
+                const formattedSessions = sessions ? await Promise.all(sessions.map(async s => ({
+                    id: s.id,
+                    user_id: s.user_id,
+                    created_at: s.created_at,
+                    user_agent: s.user_agent || navigator.userAgent,
+                    ip_address: s.ip_address || await getClientIP(),
+                    current: s.user_agent === navigator.userAgent // Compare user agents instead of session IDs
+                }))) : [];
+
+                // Find current session ID
+                const currentSessionLog = formattedSessions.find(s => s.current);
+                const currentSessionId = currentSessionLog ? currentSessionLog.id : null;
+
                 // Fetch security logs
                 const { data: securityLogs, error: logsError } = await supabaseClient
                     .from('security_logs')
@@ -552,27 +560,26 @@ const formattedSessions = currentSession ? [{
                     suspicious_activity_alerts: userData.suspicious_activity_alerts,
                     last_password_change: userData.last_password_change,
                     avatar_url: userData.avatar_url
-                    
-                 }, formattedSessions, securityLogs || []);
+                }, formattedSessions, securityLogs || [], currentSessionId);
 
             } catch (error) {
                 console.error('Failed to load security data:', error);
                 showError('Failed to load security data. Please try again.');
             }
         }
- 
-       // Helper function to get client IP
-async function getClientIP() {
-    try {
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
-        return data.ip;
-    } catch {
-        return 'unknown';
-    }
-}
 
-        function renderSecurityPage(securitySettings, sessions, securityLogs) {
+        // Helper function to get client IP
+        async function getClientIP() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch {
+                return 'unknown';
+            }
+        }
+
+        function renderSecurityPage(securitySettings, sessions, securityLogs, currentSessionId) {
             const accountContent = document.getElementById('accountContent');
             
             // Format dates
@@ -580,8 +587,8 @@ async function getClientIP() {
             
             accountContent.innerHTML = `
                 <div class="profile-header">
-<img id="profileAvatar" src="${securitySettings.avatar_url || 'https://ui-avatars.com/api/?name=Security&background=000000&color=00ff88'}"  
-    class="profile-avatar" alt="Security">
+                    <img id="profileAvatar" src="${securitySettings.avatar_url || 'https://ui-avatars.com/api/?name=Security&background=000000&color=00ff88'}"  
+                        class="profile-avatar" alt="Security">
                     <h1 class="profile-name">
                         Security Settings
                     </h1>
@@ -711,7 +718,7 @@ async function getClientIP() {
             document.getElementById('suspiciousActivityToggle').addEventListener('change', toggleSuspiciousActivityAlerts);
             document.getElementById('changePasswordBtn').addEventListener('click', showChangePasswordModal);
             document.getElementById('refreshBtn').addEventListener('click', () => window.location.reload());
-            document.getElementById('logoutButton').addEventListener('click', logoutAllDevices);
+            document.getElementById('logoutButton').addEventListener('click', () => logoutAllDevices(currentSessionId));
             
             // Add event listeners for revoke session buttons
             document.querySelectorAll('.revoke-session-btn').forEach(btn => {
@@ -1000,35 +1007,120 @@ async function getClientIP() {
         }
 
         async function revokeSession(sessionId) {
-            showModal(
-                'Revoke Session', 
-                'Are you sure you want to revoke this session? The device will be logged out immediately.',
-                [
-                    { text: 'Cancel', action: closeModal, class: 'btn-secondary' },
-                    { text: 'Revoke', action: async () => {
-                        try {
-                            const { error } = await supabaseClient
-                                .from('auth_sessions')
-                                .delete()
-                                .eq('id', sessionId);
-                            
-                            if (error) throw error;
-                            
-                            await logSecurityEvent('SESSION_REVOKED', 'success', `User revoked session ${sessionId}`);
-                            
-                            window.location.reload();
-                            
-                        } catch (error) {
-                            console.error('Error revoking session:', error);
-                            showError('Failed to revoke session');
-                            closeModal();
-                        }
-                    }, class: 'btn-danger' }
-                ]
-            );
+            // First show password verification modal
+            const modalContent = `
+                <div class="modal-content">
+                    <div class="modal-title">Verify Password</div>
+                    <div class="modal-message">
+                        <p>Please enter your password to revoke this session:</p>
+                        <div style="margin-top: 15px;">
+                            <div class="password-input-container">
+                                <input type="password" id="verifyPassword" class="password-input" placeholder="Enter your password">
+                                <i class="fas fa-eye-slash password-toggle" id="toggleVerifyPassword"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-buttons">
+                        <button id="cancelVerifyBtn" class="btn btn-secondary">Cancel</button>
+                        <button id="confirmVerifyBtn" class="btn btn-danger">Verify & Revoke</button>
+                    </div>
+                </div>
+            `;
+            
+            showModal('', '', [], modalContent);
+            
+            // Setup password toggle
+            document.getElementById('toggleVerifyPassword').addEventListener('click', function() {
+                togglePasswordVisibility('verifyPassword', this);
+            });
+            
+            // Handle verification
+            document.getElementById('confirmVerifyBtn').addEventListener('click', async () => {
+                const password = document.getElementById('verifyPassword').value;
+                if (!password) {
+                    showError('Please enter your password');
+                    return;
+                }
+                
+                try {
+                    // Verify password by attempting to re-authenticate
+                    const { error: authError } = await supabaseClient.auth.signInWithPassword({
+                        email: session.user.email,
+                        password: password
+                    });
+                    
+                    if (authError) {
+                        showError('Incorrect password');
+                        return;
+                    }
+                    
+                    // Password verified, proceed with revocation
+                    closeModal();
+                    
+                    // Show confirmation modal
+                    showModal(
+                        'Revoke Session', 
+                        'Are you sure you want to revoke this session? The device will be logged out immediately.',
+                        [
+                            { text: 'Cancel', action: closeModal, class: 'btn-secondary' },
+                            { text: 'Revoke', action: async () => {
+                                try {
+                                    // First, delete from our custom session logs
+                                    const { error: logError } = await supabaseClient
+                                        .from('user_session_logs')
+                                        .delete()
+                                        .eq('id', sessionId);
+                                    
+                                    if (logError) throw logError;
+
+                                    // If this is the current session, sign out the user
+                                    if (sessionId === session.id) {
+                                        const { error: signOutError } = await supabaseClient.auth.signOut();
+                                        if (signOutError) throw signOutError;
+                                        window.location.href = 'login.html';
+                                        return;
+                                    }
+                                    
+                                    // Notify the user of the session being revoked
+                                    await supabaseClient
+                                        .from('user_session_logs')
+                                        .insert([{
+                                            user_id: currentUserId,
+                                            action: 'SESSION_REVOKED',
+                                            details: `Session ${sessionId} was revoked`,
+                                            ip_address: await getClientIP(),
+                                            user_agent: navigator.userAgent
+                                        }]);
+                                    
+                                    await logSecurityEvent('SESSION_REVOKED', 'success', `User revoked session ${sessionId}`);
+                                    
+                                    // Refresh the page to update the session list
+                                    window.location.reload();
+                                    
+                                } catch (error) {
+                                    console.error('Error revoking session:', error);
+                                    showError('Failed to revoke session: ' + error.message);
+                                    closeModal();
+                                }
+                            }, class: 'btn-danger' }
+                        ]
+                    );
+                    
+                } catch (error) {
+                    console.error('Verification error:', error);
+                    showError('Failed to verify password: ' + error.message);
+                }
+            });
+            
+            document.getElementById('cancelVerifyBtn').addEventListener('click', closeModal);
         }
 
-        async function logoutAllDevices() {
+        async function logoutAllDevices(currentSessionId) {
+            if (!currentSessionId) {
+                showError('Unable to identify current session');
+                return;
+            }
+
             showModal(
                 'Logout All Devices', 
                 'This will log you out of all devices except this one. Are you sure you want to continue?',
@@ -1036,12 +1128,20 @@ async function getClientIP() {
                     { text: 'Cancel', action: closeModal, class: 'btn-secondary' },
                     { text: 'Logout All', action: async () => {
                         try {
-                            const { error } = await supabaseClient
-                                .from('auth_sessions')
+                            // Delete all session logs except the current one
+                            const { error: logError } = await supabaseClient
+                                .from('user_session_logs')
                                 .delete()
-                                .neq('id', session.id);
+                                .neq('id', currentSessionId);
                             
-                            if (error) throw error;
+                            if (logError) throw logError;
+
+                            // Sign out from all other devices using Supabase
+                            const { error: signOutError } = await supabaseClient.auth.signOut({
+                                scope: 'others'
+                            });
+                            
+                            if (signOutError) throw signOutError;
                             
                             await logSecurityEvent('ALL_SESSIONS_REVOKED', 'success', 'User logged out all other devices');
                             
@@ -1058,7 +1158,7 @@ async function getClientIP() {
                             
                         } catch (error) {
                             console.error('Error logging out all devices:', error);
-                            showError('Failed to logout all devices');
+                            showError('Failed to logout all devices: ' + (error.message || 'Unknown error'));
                             closeModal();
                         }
                     }, class: 'btn-danger' }
@@ -1165,14 +1265,14 @@ async function getClientIP() {
         }
 
         function formatLastOnline(date) {
-    if (!date || isNaN(date.getTime())) return 'Never';
-    
-    const diff = (Date.now() - date) / 60000;
-    if (diff < 1) return 'Just now';
-    if (diff < 60) return `${Math.floor(diff)} minutes ago`;
-    if (diff < 1440) return `${Math.floor(diff/60)} hours ago`;
-    return `${Math.floor(diff/1440)} days ago`;
-}
+            if (!date || isNaN(date.getTime())) return 'Never';
+            
+            const diff = (Date.now() - date) / 60000;
+            if (diff < 1) return 'Just now';
+            if (diff < 60) return `${Math.floor(diff)} minutes ago`;
+            if (diff < 1440) return `${Math.floor(diff/60)} hours ago`;
+            return `${Math.floor(diff/1440)} days ago`;
+        }
 
         function updateConnectionStatus(message, isError = false) {
             const status = document.querySelector('.connection-status');
@@ -1191,7 +1291,7 @@ async function getClientIP() {
             }
         }
 
-        // Initialize realtime functionality
+        // Initialize realtime functionality for sessions
         async function initializeRealtime() {
             updateConnectionStatus("Connecting to real-time service...");
             
@@ -1201,6 +1301,37 @@ async function getClientIP() {
                     supabaseClient.removeChannel(presenceChannel);
                 }
 
+                // Subscribe to session changes
+                const sessionChannel = supabaseClient
+                    .channel('session-changes')
+                    .on('postgres_changes', 
+                        { 
+                            event: '*', 
+                            schema: 'public', 
+                            table: 'user_session_logs',
+                            filter: `user_id=eq.${currentUserId}`
+                        }, 
+                        async (payload) => {
+                            console.log('Session change detected:', payload);
+                            // Immediately reload security data
+                            await loadSecurityData();
+                        }
+                    )
+                    .subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            console.log('Subscribed to session changes');
+                        }
+                    });
+
+                // Also subscribe to auth state changes
+                supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+                        console.log('Auth state changed:', event);
+                        await loadSecurityData();
+                    }
+                });
+
+                // Presence channel for online status
                 presenceChannel = supabaseClient.channel('presence-channel', {
                     config: { 
                         presence: { 

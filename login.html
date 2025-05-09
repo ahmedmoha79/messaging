@@ -134,6 +134,17 @@
             errorMessage.style.display = 'block';
         }
 
+        // Helper function to get client IP
+        async function getClientIP() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                return data.ip;
+            } catch {
+                return 'unknown';
+            }
+        }
+
         // Form submission handler
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -155,6 +166,26 @@
                 // Check if login was successful
                 const { data: { user } } = await supabaseClient.auth.getUser();
                 if (!user) throw new Error("Login failed - no user returned");
+
+                // Create a new session log entry
+                try {
+                    const { error: sessionError } = await supabaseClient
+                        .from('user_session_logs')
+                        .insert([{
+                            user_id: user.id,
+                            user_agent: navigator.userAgent,
+                            ip_address: await getClientIP(),
+                            created_at: new Date().toISOString()
+                        }]);
+                    
+                    if (sessionError) {
+                        console.error('Session logging error:', sessionError);
+                        // Continue with login even if session logging fails
+                    }
+                } catch (sessionError) {
+                    console.error('Session logging error:', sessionError);
+                    // Continue with login even if session logging fails
+                }
 
                 // Redirect to messaging page
                 window.location.href = 'message.html';
