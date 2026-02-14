@@ -1,108 +1,59 @@
 # Messaging Service
 
-A high-performance real-time messaging service built with Elixir and Phoenix.
+Production messaging platform with a Node.js API, Supabase-backed auth/data, and static web clients.
 
-## Features
+## What was improved
 
-- Real-time presence tracking
-- Follow/unfollow functionality
-- User status updates
-- Caching with Redis
-- Integration with Supabase
-- WebSocket support
-- High concurrency handling
+This repository now includes a broader hardening pass across backend and client layers:
 
-## Prerequisites
+- API security headers, safer error exposure, request throttling, and stricter input validation.
+- Better startup/shutdown behavior for server reliability in managed runtimes.
+- Service worker cache strategy updated to avoid caching authenticated API requests.
+- Offline fallback page and tighter PWA manifest defaults.
+- Stronger client-side validation and safer form behavior on login/signup pages.
 
-- Elixir 1.14 or later
-- Erlang/OTP 25 or later
-- PostgreSQL 13 or later
-- Redis 6 or later
-- Node.js 16 or later (for assets)
+## Runtime
 
-## Installation
+- Node.js `>=18`
+- Supabase project + anon key
 
-1. Clone the repository:
+## Environment variables
+
+The API supports both `SUPABASE_KEY` and `SUPABASE_ANON_KEY` (for deployment compatibility).
+
+Required/used keys:
+
+- `PORT`
+- `NODE_ENV`
+- `CLIENT_ORIGIN` (comma-separated list supported)
+- `SUPABASE_URL`
+- `SUPABASE_KEY` or `SUPABASE_ANON_KEY`
+- `RENDER_EXTERNAL_URL` / `RENDER_EXTERNAL_HOSTNAME` / `PUBLIC_BASE_URL` (optional keep-alive source)
+
+## Run locally
+
 ```bash
-git clone https://github.com/yourusername/messaging.git
-cd messaging
+npm install
+npm start
 ```
 
-2. Install dependencies:
-```bash
-mix deps.get
-cd assets && npm install
-```
+Then open:
 
-3. Set up the database:
-```bash
-mix ecto.create
-mix ecto.migrate
-```
+- `http://localhost:3000/login.html`
+- `http://localhost:3000/message.html`
 
-4. Configure environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+## Security notes
 
-## Development
+- Do not replace live credentials in this repo unless coordinated with deployment.
+- Keep Supabase RLS policies strict; this API relies on Supabase auth + table permissions.
+- Prefer setting secrets via deployment environment variables over source defaults.
 
-To start the development server:
-```bash
-mix phx.server
-```
+## Deployment
 
-Visit `http://localhost:4000` in your browser.
+Render config is included in `render.yaml`.
 
-## Testing
 
-To run the test suite:
-```bash
-mix test
-```
+## Keep-alive behavior
 
-## Production Deployment
-
-1. Set up the required environment variables:
-```bash
-export SECRET_KEY_BASE="your-secret-key-base"
-export DATABASE_URL="your-database-url"
-export SUPABASE_URL="your-supabase-url"
-export SUPABASE_KEY="your-supabase-key"
-export REDIS_HOST="your-redis-host"
-export REDIS_PASSWORD="your-redis-password"
-```
-
-2. Build the release:
-```bash
-MIX_ENV=prod mix release
-```
-
-3. Start the release:
-```bash
-_build/prod/rel/messaging/bin/messaging start
-```
-
-## Architecture
-
-The service is built with the following components:
-
-- **Phoenix Channels**: Handle real-time WebSocket connections
-- **Presence**: Track user presence and status
-- **Cachex**: In-memory caching
-- **Redis**: Distributed caching and pub/sub
-- **Supabase**: User authentication and data storage
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
- 
+- The API pings `${baseUrl}/health` every 14 minutes to reduce free-tier sleeping.
+- `baseUrl` is resolved in this order: `RENDER_EXTERNAL_URL`, `PUBLIC_BASE_URL`, `RENDER_EXTERNAL_HOSTNAME` (as `https://...`), then `https://messaging-app.onrender.com`.
