@@ -2,14 +2,14 @@
   "name": "WAZAMBI Secure Messaging",
   "short_name": "WAZAMBI",
   "description": "Secure team messaging and location tracking app",
-  "start_url": "/",
+  "start_url": "/login.html",
   "display": "standalone",
   "orientation": "portrait-primary",
   "theme_color": "#00ff88",
   "background_color": "#0a0a0a",
   "scope": "/",
   "lang": "en",
-  "categories": ["communication", "productivity", "social"],
+  "categories": ["communication", "productivity"],
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -26,42 +26,11 @@
   ],
   "shortcuts": [
     {
-      "name": "New Message",
-      "short_name": "Message",
-      "description": "Start a new conversation",
-      "url": "/?action=new-message",
-      "icons": [
-        {
-          "src": "/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Team Locations",
-      "short_name": "Locations",
-      "description": "View team member locations",
-      "url": "/?action=locations",
-      "icons": [
-        {
-          "src": "/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "assets/screenshot-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "assets/screenshot-narrow.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow"
+      "name": "Open Messages",
+      "short_name": "Messages",
+      "description": "Open messaging workspace",
+      "url": "/message.html",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     }
   ]
-} 
+}
