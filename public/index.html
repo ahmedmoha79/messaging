@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sign in · WAZAMBI</title>
+  <meta name="description" content="WAZAMBI: messages, voice and video calls, and the team map for your crew.">
+  <meta name="theme-color" content="#0b8a5f">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://twsqvdxhsfvdibhpfvqr.supabase.co" crossorigin>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <script src="/config.js"></script>
+  <script src="/vendor/supabase.js" defer></script>
+  <script type="module" src="/js/auth-page.js"></script>
+</head>
+<body>
+  <main class="auth">
+    <section class="auth-brand" aria-hidden="true">
+      <div class="wordmark">WAZAMBI</div>
+      <p class="brand-line">Messages, calls and the team map, in one place for your crew.</p>
+      <svg class="brand-art" viewBox="0 0 320 220" role="presentation">
+        <path class="route" d="M18 190 C 70 150, 70 110, 120 112 S 190 70, 230 80 S 290 40, 304 24"/>
+        <circle class="stop" cx="18" cy="190" r="7"/>
+        <circle class="stop" cx="120" cy="112" r="7"/>
+        <circle class="stop live" cx="304" cy="24" r="9"/>
+        <g class="bubble b1"><rect x="36" y="40" width="132" height="44" rx="16"/><rect x="54" y="56" width="70" height="6" rx="3" class="line"/><rect x="54" y="68" width="44" height="6" rx="3" class="line"/></g>
+        <g class="bubble b2"><rect x="150" y="128" width="124" height="44" rx="16"/><rect x="168" y="144" width="80" height="6" rx="3" class="line"/><rect x="168" y="156" width="52" height="6" rx="3" class="line"/></g>
+      </svg>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-card">
+        <div class="wordmark small" aria-hidden="true">WAZAMBI</div>
+
+        <div class="auth-tabs" role="tablist" aria-label="Account">
+          <button type="button" role="tab" id="tab-signin" aria-selected="true" data-mode="signin">Sign in</button>
+          <button type="button" role="tab" id="tab-signup" aria-selected="false" data-mode="signup">Create account</button>
+        </div>
+
+        <h1 class="auth-title" id="authTitle">Welcome back</h1>
+        <p class="auth-sub" id="authSub">Sign in to pick up your conversations.</p>
+
+        <button type="button" class="btn outline block google-btn" id="googleBtn">
+          <span data-icon="google"></span>
+          <span>Continue with Google</span>
+        </button>
+
+        <div class="divider"><span>or</span></div>
+
+        <form id="authForm" novalidate>
+          <label class="field" data-show="signup">
+            <span>Your name</span>
+            <input class="input" id="name" name="name" autocomplete="name" placeholder="e.g. Mutale Banda" maxlength="60">
+          </label>
+
+          <label class="field">
+            <span>Email</span>
+            <input class="input" id="email" name="email" type="email" autocomplete="username email" inputmode="email" placeholder="you@company.com" required>
+          </label>
+
+          <label class="field" data-show="signin signup">
+            <span>Password</span>
+            <div class="password-wrap">
+              <input class="input" id="password" name="password" type="password" autocomplete="current-password" minlength="8" required>
+              <button type="button" class="icon-btn reveal" id="togglePassword" aria-label="Show password" data-icon="eye" data-icon-size="sm"></button>
+            </div>
+            <div class="strength" data-show="signup" aria-hidden="true"><i id="strengthBar"></i></div>
+            <span class="hint" data-show="signup" id="strengthHint">At least 8 characters. A longer phrase is stronger.</span>
+          </label>
+
+          <p class="error-text" id="formError" role="alert" hidden></p>
+
+          <button type="submit" class="btn primary block" id="submitBtn">
+            <span id="submitLabel">Sign in</span>
+          </button>
+        </form>
+
+        <div class="auth-links">
+          <button type="button" class="link-btn" id="magicLinkBtn" data-show="signin">Email me a sign-in link instead</button>
+          <button type="button" class="link-btn" id="usePasswordBtn" data-show="magic">Use my password instead</button>
+          <button type="button" class="link-btn" id="forgotBtn" data-show="signin">Forgot password?</button>
+        </div>
+
+        <div class="auth-done" id="authDone" hidden>
+          <span class="done-icon" data-icon="mail" data-icon-size="lg"></span>
+          <h2 id="doneTitle">Check your email</h2>
+          <p id="doneText"></p>
+          <button type="button" class="btn outline block" id="doneBack">Back to sign in</button>
+        </div>
+      </div>
+      <p class="auth-foot">By continuing you agree to the WAZAMBI terms and privacy policy.</p>
+    </section>
+  </main>
+</body>
+</html>

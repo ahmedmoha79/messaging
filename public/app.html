@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>WAZAMBI</title>
+  <meta name="theme-color" content="#0b8a5f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://twsqvdxhsfvdibhpfvqr.supabase.co" crossorigin>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="/config.js"></script>
+  <script src="/vendor/supabase.js" defer></script>
+  <script type="module" src="/js/app/main.js"></script>
+</head>
+<body>
+  <div class="boot" id="boot" role="status" aria-live="polite">
+    <div class="boot-mark">WAZAMBI</div>
+    <span class="spinner" aria-hidden="true"></span>
+    <p class="boot-text" id="bootText">Opening your chats…</p>
+  </div>
+
+  <div class="app" id="app" hidden>
+    <nav class="rail" aria-label="Main">
+      <div class="rail-mark" aria-hidden="true">W</div>
+      <a class="rail-tab" href="#/chats" data-tab="chats" aria-label="Chats">
+        <span data-icon="chat"></span><span class="rail-label">Chats</span>
+        <span class="badge" id="chatsBadge" hidden></span>
+      </a>
+      <a class="rail-tab" href="#/calls" data-tab="calls" aria-label="Calls">
+        <span data-icon="phone"></span><span class="rail-label">Calls</span>
+        <span class="badge" id="callsBadge" hidden></span>
+      </a>
+      <a class="rail-tab" href="#/map" data-tab="map" aria-label="Team map">
+        <span data-icon="map"></span><span class="rail-label">Map</span>
+      </a>
+      <a class="rail-tab" href="#/settings" data-tab="settings" aria-label="Settings">
+        <span data-icon="settings"></span><span class="rail-label">Settings</span>
+      </a>
+      <button type="button" class="rail-me" id="railMe" aria-label="Your profile"></button>
+    </nav>
+
+    <aside class="list-pane" id="listPane">
+      <!-- Chats -->
+      <section class="panel" data-panel="chats">
+        <header class="panel-head">
+          <h1>Chats</h1>
+          <button type="button" class="icon-btn" id="newGroupBtn" aria-label="New group" data-icon="users"></button>
+          <button type="button" class="icon-btn" id="newChatBtn" aria-label="New chat" data-icon="edit"></button>
+        </header>
+        <div class="search">
+          <span data-icon="search" data-icon-size="sm"></span>
+          <input type="search" id="chatSearch" placeholder="Search chats and people" autocomplete="off" enterkeyhint="search" aria-label="Search chats and people">
+        </div>
+        <div class="filter-row" role="tablist" aria-label="Filter chats">
+          <button type="button" role="tab" class="chip" data-filter="all" aria-selected="true">All</button>
+          <button type="button" role="tab" class="chip" data-filter="unread" aria-selected="false">Unread</button>
+          <button type="button" role="tab" class="chip" data-filter="groups" aria-selected="false">Groups</button>
+        </div>
+        <div class="list" id="chatList" role="list" aria-label="Conversations"></div>
+      </section>
+
+      <!-- Calls -->
+      <section class="panel" data-panel="calls" hidden>
+        <header class="panel-head">
+          <h1>Calls</h1>
+          <button type="button" class="icon-btn" id="newCallBtn" aria-label="Start a call" data-icon="plus"></button>
+        </header>
+        <div class="list" id="callList" role="list" aria-label="Recent calls"></div>
+      </section>
+
+      <!-- Settings -->
+      <section class="panel" data-panel="settings" hidden>
+        <header class="panel-head"><h1>Settings</h1></header>
+        <div class="settings" id="settingsBody"></div>
+      </section>
+
+      <!-- Map list (team on the map) -->
+      <section class="panel" data-panel="map" hidden>
+        <header class="panel-head"><h1>Team map</h1></header>
+        <div class="list" id="mapPeople" role="list" aria-label="Team members on the map"></div>
+      </section>
+    </aside>
+
+    <main class="main-pane" id="mainPane">
+      <div class="welcome" id="welcome">
+        <div class="welcome-art" aria-hidden="true"><span data-icon="chat" data-icon-size="lg"></span></div>
+        <h2>Pick a chat to start</h2>
+        <p>Your messages, voice notes and calls with the team show up here.</p>
+        <button type="button" class="btn primary" id="welcomeNewChat">Start a new chat</button>
+      </div>
+
+      <section class="conversation" id="conversation" hidden aria-label="Conversation"></section>
+      <section class="map-view" id="mapView" hidden aria-label="Team map"></section>
+    </main>
+  </div>
+
+  <div class="net-banner" id="netBanner" role="status" hidden>
+    <span data-icon="wifiOff" data-icon-size="sm"></span>
+    <span id="netText">You're offline. Messages will send when you reconnect.</span>
+  </div>
+
+  <div id="callLayer"></div>
+</body>
+</html>

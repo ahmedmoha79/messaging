@@ -1,234 +1,126 @@
-const CACHE_NAME = 'wazambi-cache-v1';
-const KEEP_ALIVE_INTERVAL = 4 * 60 * 1000; // 4 minutes
-const NOTIFICATION_QUEUE = 'notification-queue';
+/* WAZAMBI service worker
+ * - Opens instantly on repeat visits: the app shell is served from cache
+ *   and refreshed in the background.
+ * - Never caches Supabase traffic or our /api routes (always live data).
+ * - Focuses the right chat when a notification is clicked.
+ * The server stamps the deploy version below, so every deploy installs fresh.
+ */
+const VERSION = '__APP_VERSION__';
+const SHELL_CACHE = `wazambi-shell-${VERSION}`;
+const ASSET_CACHE = `wazambi-assets-${VERSION}`;
 
-// Install service worker
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                return cache.addAll([
-                    '/',
-                    '/index.html',
-                    '/message.html',
-                    '/accounts.html',
-                    '/secure.html',
-                    '/login.html',
-                    '/signup.html',
-                    '/notification.mp3',
-                    '/notification-icon.png'
-                ]);
-            })
-    );
-    self.skipWaiting();
+const SHELL = [
+  '/app',
+  '/',
+  '/config.js',
+  '/vendor/supabase.js',
+  '/css/base.css',
+  '/css/app.css',
+  '/css/auth.css',
+  '/js/lib/supabase.js',
+  '/js/lib/dom.js',
+  '/js/lib/icons.js',
+  '/js/lib/format.js',
+  '/js/auth-page.js',
+  '/js/app/main.js',
+  '/js/app/state.js',
+  '/js/app/data.js',
+  '/js/app/ui.js',
+  '/js/app/router.js',
+  '/js/app/realtime.js',
+  '/js/app/notify.js',
+  '/js/app/chatList.js',
+  '/js/app/conversation.js',
+  '/js/app/media.js',
+  '/js/app/voice.js',
+  '/js/app/calls.js',
+  '/js/app/groups.js',
+  '/js/app/profile.js',
+  '/js/app/settings.js',
+  '/js/app/map.js',
+  '/icons/icon-192.png',
+  '/sounds/notification.mp3',
+  '/manifest.webmanifest'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(SHELL_CACHE)
+      .then(cache => Promise.all(SHELL.map(url => cache.add(new Request(url, { cache: 'reload' })).catch(() => null))))
+      // Take over right away: the previous app version's worker served scripts
+      // cache-first, which would otherwise pin old code until every tab closes.
+      .then(() => self.skipWaiting())
+  );
 });
 
-// Activate service worker
-self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        Promise.all([
-            caches.keys().then((cacheNames) => {
-                return Promise.all(
-                    cacheNames.map((cacheName) => {
-                        if (cacheName !== CACHE_NAME) {
-                            return caches.delete(cacheName);
-                        }
-                    })
-                );
-            }),
-            self.clients.claim(),
-            processNotificationQueue()
-        ])
-    );
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keep = new Set([SHELL_CACHE, ASSET_CACHE]);
+    const names = await caches.keys();
+    await Promise.all(names.filter(n => n.startsWith('wazambi-') && !keep.has(n)).map(n => caches.delete(n)));
+    // Older app versions registered caches with other names; clear those too.
+    await Promise.all(names.filter(n => /^(static|dynamic|messaging|logistics)/i.test(n)).map(n => caches.delete(n)));
+    await self.clients.claim();
+  })());
 });
 
-// Keep-alive mechanism
-setInterval(() => {
-    fetch('/health')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Health check failed');
-            }
-        })
-        .catch(error => {
-            console.error('Keep-alive failed:', error);
-        });
-}, KEEP_ALIVE_INTERVAL);
-
-// Background sync for notifications
-self.addEventListener('sync', event => {
-    if (event.tag === 'notification-sync') {
-        event.waitUntil(processNotificationQueue());
-    }
-});
-
-async function processNotificationQueue() {
-    const queue = await getNotificationQueue();
-    for (const notification of queue) {
-        await showNotification(notification);
-    }
-    await clearNotificationQueue();
-}
-
-async function getNotificationQueue() {
-    const cache = await caches.open(NOTIFICATION_QUEUE);
-    const response = await cache.match('queue');
-    return response ? await response.json() : [];
-}
-
-async function clearNotificationQueue() {
-    const cache = await caches.open(NOTIFICATION_QUEUE);
-    await cache.delete('queue');
-}
-
-// Enhanced push notification handling
-self.addEventListener('push', event => {
-    const data = event.data?.json() || { title: 'New Message', body: '' };
-    
-    // Store notification in queue if app is not active
-    event.waitUntil(
-        Promise.all([
-            showNotification(data),
-            storeNotificationInQueue(data)
-        ])
-    );
-});
-
-async function storeNotificationInQueue(notification) {
-    const queue = await getNotificationQueue();
-    queue.push(notification);
-    const cache = await caches.open(NOTIFICATION_QUEUE);
-    await cache.put('queue', new Response(JSON.stringify(queue)));
-}
-
-async function showNotification(data) {
-    // Ensure we have all required data
-    const notificationData = {
-        title: data.title || 'New Message',
-        body: data.body || '',
-        icon: data.icon || '/notification-icon.png',
-        badge: '/notification-icon.png',
-        vibrate: [200, 100, 200],
-        timestamp: Date.now(),
-        requireInteraction: true,
-        data: { 
-            userId: data.userId,
-            messageId: data.messageId,
-            type: data.type || 'message',
-            userName: data.userName,
-            avatarUrl: data.avatarUrl
-        },
-        actions: [
-            {
-                action: 'open',
-                title: 'Open Chat'
-            },
-            {
-                action: 'dismiss',
-                title: 'Dismiss'
-            }
-        ]
-    };
-
-    // Play notification sound
-    try {
-        const audio = new Audio('/notification.mp3');
-        audio.volume = 0.7;
-        await audio.play();
-    } catch (e) {
-        console.warn('Sound play failed:', e);
-    }
-
-    // Show the notification
-    return self.registration.showNotification(notificationData.title, notificationData);
-}
-
-// Enhanced notification click handling
-self.addEventListener('notificationclick', event => {
-    event.notification.close();
-    
-    const { userId, messageId, userName, avatarUrl } = event.notification.data;
-    
-    event.waitUntil(
-        clients.matchAll({ type: 'window' }).then(clients => {
-            // If a window is already open, focus it and send the message
-            if (clients.length) {
-                const client = clients[0];
-                client.postMessage({
-                    type: 'notificationClick',
-                    userId,
-                    messageId,
-                    userName,
-                    avatarUrl
-                });
-                client.focus();
-            } else {
-                // If no window is open, open a new one
-                clients.openWindow(`/message.html#chat/${userId}`);
-            }
-        })
-    );
-});
-
-// Handle notification actions
-self.addEventListener('notificationclose', event => {
-    const { messageId } = event.notification.data;
-    if (messageId) {
-        // Mark message as read if dismissed
-        event.waitUntil(
-            fetch(`/api/messages/${messageId}/read`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            }).catch(e => console.error('Failed to mark message as read:', e))
-        );
-    }
-});
-
-// Fetch event handler with network-first strategy
-self.addEventListener('fetch', (event) => {
-    if (event.request.url.includes('/api/')) {
-        // API requests use network-first strategy
-        event.respondWith(
-            fetch(event.request)
-                .catch(() => caches.match(event.request))
-        );
-    } else {
-        // Static assets use cache-first strategy
-        event.respondWith(
-            caches.match(event.request)
-                .then((response) => {
-                    return response || fetch(event.request);
-                })
-        );
-    }
-});
-
-// Add message event listener for notifications
 self.addEventListener('message', event => {
-    if (event.data && event.data.type === 'showNotification') {
-        const { data } = event.data;
-        event.waitUntil(
-            showNotification({
-                title: data.title,
-                body: data.body,
-                icon: data.icon,
-                userId: data.userId,
-                messageId: data.messageId,
-                userName: data.userName,
-                avatarUrl: data.avatarUrl,
-                type: data.type || 'message'
-            })
-        );
-    }
+  if (event.data?.type === 'skip-waiting') self.skipWaiting();
 });
 
-// Keep the service worker alive
-setInterval(() => {
-    self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-            client.postMessage({ type: 'keepAlive' });
-        });
-    });
-}, KEEP_ALIVE_INTERVAL);
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // Supabase, tiles, etc. go straight to the network
+  if (url.pathname.startsWith('/api/') || url.pathname === '/health' || url.pathname === '/sw.js') return;
+
+  // Pages and runtime config: network first so deploys show up, cache as fallback for offline.
+  if (req.mode === 'navigate' || url.pathname === '/config.js') {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        if (fresh.ok) {
+          const cache = await caches.open(SHELL_CACHE);
+          cache.put(req.mode === 'navigate' ? new Request(url.pathname) : req, fresh.clone());
+        }
+        return fresh;
+      } catch {
+        const cache = await caches.open(SHELL_CACHE);
+        return (await cache.match(url.pathname)) ||
+          (await cache.match(req)) ||
+          (url.pathname.startsWith('/app') ? cache.match('/app') : cache.match('/')) ||
+          new Response('Offline', { status: 503 });
+      }
+    })());
+    return;
+  }
+
+  // Static assets: serve from cache immediately, refresh in the background.
+  event.respondWith((async () => {
+    const shell = await caches.open(SHELL_CACHE);
+    const cached = (await shell.match(req, { ignoreSearch: true })) || (await caches.match(req));
+    const network = fetch(req).then(async res => {
+      if (res.ok && res.type === 'basic') {
+        const target = (await shell.match(req, { ignoreSearch: true })) ? shell : await caches.open(ASSET_CACHE);
+        target.put(req, res.clone());
+      }
+      return res;
+    }).catch(() => cached);
+    return cached || network;
+  })());
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = event.notification.data?.url || '/app';
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const app = windows.find(w => new URL(w.url).pathname.startsWith('/app'));
+    if (app) {
+      app.postMessage({ type: 'open', url: target });
+      return app.focus();
+    }
+    return self.clients.openWindow(target);
+  })());
+});

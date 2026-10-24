@@ -1,108 +1,95 @@
-# Messaging Service
+# WAZAMBI messaging
 
-A high-performance real-time messaging service built with Elixir and Phoenix.
+Team messaging for crews on the move: one-to-one and group chats, voice and
+video calls, photos, files and voice notes, and a live team map. It runs in
+any modern browser and installs to the home screen as an app.
 
-## Features
+## What's in it
 
-- Real-time presence tracking
-- Follow/unfollow functionality
-- User status updates
-- Caching with Redis
-- Integration with Supabase
-- WebSocket support
-- High concurrency handling
+| | |
+|---|---|
+| **Chats** | Real-time messages with sent / delivered / read ticks, typing indicators, replies (swipe right on phones), emoji reactions, links, unread counts, search, and drafts that survive a reload. Messages typed while offline are queued and sent on reconnect. |
+| **Groups** | Create groups, add and remove members (admins), rename, mute, leave. Sender names on messages. |
+| **Media** | Photos (shrunk on the phone before upload), videos, documents up to 50 MB, voice notes up to 5 minutes. Drag and drop or paste images on desktop. Files live in a private storage bucket and are shown through short-lived signed links. |
+| **Calls** | One-to-one voice and video calls over WebRTC: ringing, accept/decline, busy and missed detection, mute, camera on/off, front/back camera, connection-quality warning, minimise to keep chatting, and a call history tab. |
+| **Team map** | Opt-in live location sharing (only while the app is open), teammates on a map, battery level, street or satellite view, weather. |
+| **Account** | Password, magic-link or Google sign-in; profile photo, bio and work details; followers; theme (system, light, dark); notification and sound settings; change password; recent sign-ins; sign out of other devices. |
 
-## Prerequisites
+## How it fits together
 
-- Elixir 1.14 or later
-- Erlang/OTP 25 or later
-- PostgreSQL 13 or later
-- Redis 6 or later
-- Node.js 16 or later (for assets)
-
-## Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/messaging.git
-cd messaging
+```
+Browser (public/)                      Render (server.js)             Supabase
+─────────────────                      ──────────────────             ────────
+index.html  sign in / sign up   ──►  static files, brotli/gzip,      Auth
+app.html    the app                   security headers (CSP),        Postgres + row-level security
+js/app/*    ES modules, no build      /config.js runtime config,     Realtime (messages, calls, typing, presence)
+sw.js       offline shell             /api/weather proxy             Storage (chat_media private, avatars public)
+                │                                                         ▲
+                └──────────── reads / writes directly, protected by RLS ──┘
+                └──────────── WebRTC audio/video peer-to-peer (STUN/TURN)
 ```
 
-2. Install dependencies:
-```bash
-mix deps.get
-cd assets && npm install
+* The **server has no runtime dependencies** (Node built-ins only), so it starts
+  instantly on Render. It serves `public/`, the browser builds of
+  `@supabase/supabase-js` and `leaflet` from `node_modules`, and keeps the
+  weather API key off the client.
+* **Security lives in the database.** Every table has row-level security: you
+  can only read messages you sent, received or that belong to a group you're
+  in; recipients can only change read/delivery fields; call rows are visible
+  to the two participants only. The migrations are in `supabase/migrations/`.
+* **Fast start:** the chat list paints from the last session's cache before
+  the network answers, one database call (`get_chat_list`) returns every
+  conversation with its last message and unread count, and the map library is
+  only downloaded when you open the Map tab.
+
+```
+public/
+  index.html, app.html, sw.js, manifest.webmanifest
+  css/       base.css (design tokens), auth.css, app.css
+  js/lib/    supabase client, DOM + formatting helpers, icons
+  js/app/    main (boot), state, data (all queries), realtime, router,
+             chatList, conversation, media, voice, calls, groups,
+             profile, settings, map, notify, ui
+supabase/migrations/   database changes applied for this version
+test/                  fake Supabase + browser walkthrough (see below)
 ```
 
-3. Set up the database:
+## Running locally
+
 ```bash
-mix ecto.create
-mix ecto.migrate
+npm install
+cp .env.example .env     # optional: weather key, TURN relay
+npm run dev              # http://localhost:3000
+npm run check            # syntax + import checks for every browser module
 ```
 
-4. Configure environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+## Configuration (Render → Environment)
 
-## Development
+| Variable | Needed | What it does |
+|---|---|---|
+| `SUPABASE_URL` | yes | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | yes | The project's anon (public) key |
+| `OPENWEATHER_API_KEY` | no | Turns on the weather card on the map |
+| `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` | recommended | A TURN relay so calls connect on strict mobile and office networks (e.g. Metered, Twilio, Cloudflare Calls) |
 
-To start the development server:
-```bash
-mix phx.server
-```
-
-Visit `http://localhost:4000` in your browser.
+In Supabase → Authentication → URL configuration, set the **Site URL** to your
+Render URL and add `https://<your-app>.onrender.com/app` to **Redirect URLs**
+(needed for magic links, password resets and Google sign-in). To turn on
+Google sign-in, enable the Google provider under Authentication → Providers.
 
 ## Testing
 
-To run the test suite:
+`test/` contains an in-memory stand-in for Supabase (database rules,
+realtime, storage) and a Playwright walkthrough that signs two people in and
+exercises messaging, reactions, replies, photos, files, voice notes, the
+offline outbox, groups, a real WebRTC video call, declined calls, the map,
+settings and profiles.
+
 ```bash
-mix test
+pip install playwright && playwright install chromium
+test/run-local.sh
 ```
-
-## Production Deployment
-
-1. Set up the required environment variables:
-```bash
-export SECRET_KEY_BASE="your-secret-key-base"
-export DATABASE_URL="your-database-url"
-export SUPABASE_URL="your-supabase-url"
-export SUPABASE_KEY="your-supabase-key"
-export REDIS_HOST="your-redis-host"
-export REDIS_PASSWORD="your-redis-password"
-```
-
-2. Build the release:
-```bash
-MIX_ENV=prod mix release
-```
-
-3. Start the release:
-```bash
-_build/prod/rel/messaging/bin/messaging start
-```
-
-## Architecture
-
-The service is built with the following components:
-
-- **Phoenix Channels**: Handle real-time WebSocket connections
-- **Presence**: Track user presence and status
-- **Cachex**: In-memory caching
-- **Redis**: Distributed caching and pub/sub
-- **Supabase**: User authentication and data storage
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
- 
+MIT, see [LICENSE](LICENSE).
