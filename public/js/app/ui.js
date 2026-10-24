@@ -213,3 +213,37 @@ export function emptyState({ iconName, title, text, action = null }) {
       ${action ? raw(action) : ''}
     </div>`;
 }
+
+/**
+ * Explains a microphone/camera problem with the exact fix and a retry button.
+ * Resolves true when the person taps "Try again".
+ */
+export function mediaHelpDialog(err, { action = 'Try again' } = {}) {
+  const device = err?.device === 'camera' ? 'Camera' : 'Microphone';
+  const titles = {
+    'system-blocked': `${device} blocked by your device`,
+    'site-blocked': `${device} not allowed`,
+    'in-use': `${device} is busy`,
+    missing: `No ${device.toLowerCase()} found`,
+    'in-app': 'Open in your browser',
+    insecure: 'Secure connection needed'
+  };
+  return new Promise(resolve => {
+    const content = el(html`
+      <div class="confirm">
+        <p>${err?.message || 'Something went wrong with your microphone.'}</p>
+        <div class="confirm-actions">
+          <button type="button" class="btn outline" data-act="cancel">Close</button>
+          <button type="button" class="btn primary" data-act="ok">${action}</button>
+        </div>
+      </div>`);
+    let answered = false;
+    const sheet = openSheet({ title: titles[err?.reason] || `${device} problem`, content, className: 'compact', onClose: () => !answered && resolve(false) });
+    content.addEventListener('click', e => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+      answered = true;
+      sheet.close().then(() => resolve(act === 'ok'));
+    });
+  });
+}

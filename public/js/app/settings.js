@@ -10,6 +10,7 @@ import { updateMe, uploadAvatar, loadProfileDetails, saveMyProfile, loadSessions
 import { requestNotificationPermission, notificationPermission, notificationsSupported } from './notify.js';
 import { setLocationSharing } from './map.js';
 import { compressImage } from './media.js';
+import { diagnose } from '../lib/mediaAccess.js';
 
 const body = document.getElementById('settingsBody');
 
@@ -102,6 +103,7 @@ function render() {
     <section class="settings-group">
       <h2>Account and security</h2>
       <div class="settings-card">
+        <button type="button" class="setting" data-s="media-check">${raw(icon('mic'))}<span class="setting-text">Check microphone and camera<small>Find out why calls or voice notes can’t use them</small></span></button>
         <button type="button" class="setting" data-s="password">${raw(icon('lock'))}<span class="setting-text">Change password</span></button>
         <button type="button" class="setting" data-s="sessions">${raw(icon('clock'))}<span class="setting-text">Recent sign-ins</span></button>
         <button type="button" class="setting" data-s="signout-others">${raw(icon('logout'))}<span class="setting-text">Sign out of other devices<small>Keeps you signed in here</small></span></button>
@@ -155,6 +157,7 @@ async function onClick(e) {
     const { openProfile } = await import('./profile.js');
     openProfile(state.me.id);
   } else if (act === 'password') openChangePassword();
+  else if (act === 'media-check') openMediaCheck();
   else if (act === 'sessions') openSessions();
   else if (act === 'signout-others') {
     if (!(await confirmDialog({ title: 'Sign out of other devices?', message: 'Every other phone or computer signed in to your account will be signed out. You stay signed in here.', confirm: 'Sign out others' }))) return;
@@ -338,4 +341,33 @@ function describeAgent(ua = '') {
   const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
   const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Unknown device';
   return `${browser} on ${os}`;
+}
+
+async function openMediaCheck() {
+  const content = el('<div class="empty"><span class="spinner"></span><p>Asking your browser for the microphone and camera…</p></div>');
+  const sheet = openSheet({ title: 'Microphone and camera', content });
+  const r = await diagnose();
+  const row = (name, res) => html`
+    <div class="session-row">
+      ${raw(icon(res.ok ? 'check' : 'alert'))}
+      <span class="row-main">
+        <span class="row-name">${name}: ${res.ok ? 'working' : 'not available'}</span>
+        <span class="row-sub wrap">${res.ok ? res.label : res.message}</span>
+      </span>
+    </div>`.value;
+  const summary = r.microphone.ok
+    ? `Voice calls and voice notes will work.${r.camera.ok ? '' : ' Video calls will continue as voice calls.'}`
+    : 'Fix the microphone first: calls and voice notes need it.';
+  const body = el(html`<div>
+    ${raw(row('Microphone', r.microphone))}
+    ${raw(row('Camera', r.camera))}
+    <p class="hint media-summary">${summary}</p>
+    <div class="form-actions"><button type="button" class="btn outline" data-again>Check again</button></div>
+  </div>`);
+  sheet.body.innerHTML = '';
+  sheet.body.appendChild(body);
+  body.querySelector('[data-again]').addEventListener('click', async () => {
+    await sheet.close();
+    openMediaCheck();
+  });
 }

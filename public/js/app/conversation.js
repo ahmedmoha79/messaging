@@ -9,7 +9,7 @@ import {
   fetchMessages, fetchReactions, fetchMessagesByIds, insertMessage, deleteMessage, setReaction,
   markDirectRead, markGroupRead, signPaths, cachedMediaUrl, mediaUrl, uploadMedia, loadGroup, PAGE_SIZE
 } from './data.js';
-import { avatarHtml, groupAvatarHtml, showMenu, confirmDialog, openSheet, closeMenu } from './ui.js';
+import { avatarHtml, groupAvatarHtml, showMenu, confirmDialog, openSheet, closeMenu, mediaHelpDialog } from './ui.js';
 import { bumpChat, sendTyping, typingNames } from './realtime.js';
 import { updateBadge, closeNotifications, messagePreviewText } from './notify.js';
 import { kindOf, compressImage, imageSize, resampleWave, toggleVoice, stopVoice, openLightbox, MAX_UPLOAD_BYTES } from './media.js';
@@ -1077,9 +1077,7 @@ async function startRecording() {
     await rec.start();
   } catch (err) {
     recorder = null;
-    toast(/denied|not allowed/i.test(String(err?.message || err?.name))
-      ? 'Allow microphone access in your browser settings to record voice messages.'
-      : 'Couldn’t start recording. Check your microphone.', { type: 'error' });
+    if (await mediaHelpDialog(err)) startRecording();
     return;
   }
   els.recWave.innerHTML = '';

@@ -936,3 +936,5 @@ button.setting:hover { background: var(--surface-3); }
 
 /* let the browser handle vertical scrolling while we watch for swipe-to-reply */
 .msg { touch-action: pan-y; }
+.row-sub.wrap { white-space: normal; }
+.media-summary { margin-top: var(--space-4); }

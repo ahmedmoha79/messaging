@@ -1,15 +1,49 @@
-import { sb, migrateLegacySession, getSession } from './lib/supabase.js';
+import { sb, migrateLegacySession, getSession, initialUrl } from './lib/supabase.js';
 import { hydrateIcons, icon } from './lib/icons.js';
 
 migrateLegacySession();
 hydrateIcons();
 
 const APP_URL = `${location.origin}/app`;
+// Password-reset emails come back here. No '#' in this address: Supabase adds
+// its own '#access_token=…' and two fragments would make the link unreadable.
+const RESET_URL = `${location.origin}/?mode=reset-password`;
+
+// Was this page opened from a password-reset email? Supabase can come back in
+// three shapes depending on project settings: #access_token…&type=recovery,
+// ?token_hash=…&type=recovery, or ?code=… (with our mode flag).
+const startHash = new URLSearchParams(initialUrl.hash.slice(1));
+const startQuery = initialUrl.searchParams;
+let recovering = startHash.get('type') === 'recovery' || startQuery.get('type') === 'recovery' ||
+  startQuery.get('mode') === 'reset-password';
+sb.auth.onAuthStateChange(event => {
+  if (event === 'PASSWORD_RECOVERY') {
+    recovering = true;
+    setMode('newpassword');
+  }
+});
+
+async function completeRecoveryLink() {
+  try {
+    const tokenHash = startQuery.get('token_hash');
+    const code = startQuery.get('code');
+    if (tokenHash) {
+      const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+      if (error) throw error;
+    } else if (code) {
+      const { error } = await sb.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+    }
+  } catch (err) {
+    console.warn('Recovery link failed', err);
+  }
+  return getSession();
+}
 
 // Already signed in? Go straight to the app; no form, no waiting.
 // getSession() reads local storage, so this costs no network round trip.
-const existing = await getSession();
-if (existing && !new URLSearchParams(location.search).has('signedout')) {
+const existing = recovering ? await completeRecoveryLink() : await getSession();
+if (existing && !recovering && !new URLSearchParams(location.search).has('signedout')) {
   location.replace('/app');
 }
 
@@ -26,7 +60,8 @@ const COPY = {
   signin: { title: 'Welcome back', sub: 'Sign in to pick up your conversations.', submit: 'Sign in' },
   signup: { title: 'Create your account', sub: 'It takes a minute. Your team will see your name and photo.', submit: 'Create account' },
   magic: { title: 'Sign in with a link', sub: "We'll email you a link that signs you in, no password needed.", submit: 'Email me a link' },
-  reset: { title: 'Reset your password', sub: "Enter your email and we'll send you a link to choose a new password.", submit: 'Send reset link' }
+  reset: { title: 'Reset your password', sub: "Enter your email and we'll send you a link to choose a new password.", submit: 'Send reset link' },
+  newpassword: { title: 'Set a new password', sub: 'Choose a new password for your account. You’ll stay signed in on this device.', submit: 'Save new password' }
 };
 
 let mode = 'signin';
@@ -42,15 +77,18 @@ function setMode(next) {
     const selected = tab.dataset.mode === next || (next !== 'signup' && tab.dataset.mode === 'signin');
     tab.setAttribute('aria-selected', String(selected));
   });
-  passwordInput.autocomplete = next === 'signup' ? 'new-password' : 'current-password';
-  passwordInput.required = next === 'signin' || next === 'signup';
+  passwordInput.autocomplete = next === 'signup' || next === 'newpassword' ? 'new-password' : 'current-password';
+  passwordInput.required = next === 'signin' || next === 'signup' || next === 'newpassword';
+  emailInput.required = next !== 'newpassword' && next !== 'done';
+  $('passwordLabel').textContent = next === 'newpassword' ? 'New password' : 'Password';
   $('authDone').hidden = next !== 'done';
   showError('');
   const params = new URLSearchParams(location.search);
-  params.delete('mode');
+  ['mode', 'type', 'token_hash', 'code'].forEach(k => params.delete(k));
   if (next === 'signup') params.set('mode', 'signup');
+  if (next === 'newpassword') params.set('mode', 'reset-password');
   history.replaceState(null, '', location.pathname + (params.toString() ? `?${params}` : ''));
-  (next === 'signup' ? nameInput : emailInput).focus({ preventScroll: true });
+  (next === 'signup' ? nameInput : next === 'newpassword' ? passwordInput : emailInput).focus({ preventScroll: true });
 }
 
 function showError(message) {
@@ -100,7 +138,7 @@ function strength(pw) {
 }
 
 passwordInput.addEventListener('input', () => {
-  if (mode !== 'signup') return;
+  if (mode !== 'signup' && mode !== 'newpassword') return;
   const s = strength(passwordInput.value);
   const bar = $('strengthBar');
   bar.style.width = `${(s / 5) * 100}%`;
@@ -140,6 +178,7 @@ form.addEventListener('submit', async e => {
   const password = passwordInput.value;
   const name = nameInput.value.trim().replace(/\s+/g, ' ');
 
+  if (mode === 'newpassword') return saveNewPassword(password, $('confirmPassword').value);
   if (!validEmail(email)) return showError('Enter a valid email address.');
   if (mode === 'signup' && name.length < 2) return showError('Enter your name so your team knows who you are.');
   if ((mode === 'signin' || mode === 'signup') && password.length < 8) return showError('Passwords are at least 8 characters.');
@@ -183,7 +222,7 @@ form.addEventListener('submit', async e => {
       return;
     }
     if (mode === 'reset') {
-      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${APP_URL}#/settings/password` });
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: RESET_URL });
       if (error) throw error;
       done('Check your email', `If ${email} has an account, a reset link is on its way.`);
     }
@@ -194,7 +233,40 @@ form.addEventListener('submit', async e => {
   }
 });
 
-setMode(new URLSearchParams(location.search).get('mode') === 'signup' ? 'signup' : 'signin');
+async function saveNewPassword(password, confirm) {
+  if (password.length < 8) return showError('Use at least 8 characters.');
+  if (strength(password) <= 1) return showError('That password is too easy to guess. Try a longer phrase.');
+  if (password !== confirm) return showError('The two passwords don’t match.');
+  const session = await getSession();
+  if (!session) {
+    return showError('This reset link has expired or was already used. Request a new one below.');
+  }
+  busy(true);
+  try {
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw error;
+    sb.from('users').update({ last_password_change: new Date().toISOString() }).eq('id', session.user.id).then(() => {});
+    done('Password updated', 'Your new password is saved. Opening your chats…');
+    setTimeout(() => location.replace('/app'), 1200);
+  } catch (err) {
+    showError(/same|different from the old/i.test(String(err?.message))
+      ? 'Choose a password different from your old one.'
+      : friendly(err));
+  } finally {
+    busy(false);
+  }
+}
+
+if (recovering) {
+  if (existing) {
+    setMode('newpassword');
+  } else {
+    setMode('reset');
+    showError('This reset link has expired or was already used. Enter your email to get a new one.');
+  }
+} else {
+  setMode(new URLSearchParams(location.search).get('mode') === 'signup' ? 'signup' : 'signin');
+}
 
 // Auth errors come back in the URL after a failed magic link / OAuth / expired link.
 const hash = new URLSearchParams(location.hash.slice(1));

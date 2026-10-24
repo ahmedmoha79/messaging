@@ -21,6 +21,7 @@ const SHELL = [
   '/js/lib/dom.js',
   '/js/lib/icons.js',
   '/js/lib/format.js',
+  '/js/lib/mediaAccess.js',
   '/js/auth-page.js',
   '/js/app/main.js',
   '/js/app/state.js',

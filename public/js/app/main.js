@@ -3,7 +3,7 @@
 //   2. paint the chat list from the last-session cache immediately,
 //   3. fetch fresh data in parallel and repaint,
 //   4. start realtime, calls and everything else in the background.
-import { sb, migrateLegacySession } from '../lib/supabase.js';
+import { sb, migrateLegacySession, initialUrl } from '../lib/supabase.js';
 import { hydrateIcons } from '../lib/icons.js';
 import { toast, isNarrow } from '../lib/dom.js';
 import { state, on, applyTheme } from './state.js';
@@ -103,9 +103,9 @@ async function boot() {
   hydrateIcons();
 
   // Failed magic link / OAuth: show the error on the sign-in page.
-  const hashParams = new URLSearchParams(location.hash.slice(1));
-  if (hashParams.get('error_description') || new URLSearchParams(location.search).get('error_description')) {
-    location.replace(`/${location.search}${location.hash}`);
+  const hashParams = new URLSearchParams(initialUrl.hash.slice(1));
+  if (hashParams.get('error_description') || initialUrl.searchParams.get('error_description')) {
+    location.replace(`/${initialUrl.search}${initialUrl.hash}`);
     return;
   }
   const isRecovery = hashParams.get('type') === 'recovery';
@@ -117,8 +117,14 @@ async function boot() {
     return;
   }
   state.session = session;
+  // A password-reset link that landed on the app (older emails, or a Site URL
+  // pointing here): send it to the sign-in page's "Set a new password" screen.
+  if (isRecovery || initialUrl.searchParams.get('type') === 'recovery') {
+    location.replace('/?mode=reset-password');
+    return;
+  }
   if (/access_token=|refresh_token=/.test(location.hash)) {
-    history.replaceState(null, '', isRecovery ? '#/settings/password' : '#/chats');
+    history.replaceState(null, '', '#/chats');
   }
 
   // Paint from cache straight away when we have one.

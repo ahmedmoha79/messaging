@@ -2,6 +2,10 @@
 // by our server), and the library from /vendor/supabase.js, both loaded before
 // any module runs.
 const config = window.APP_CONFIG;
+
+// Captured before the client reads (and clears) auth tokens from the URL, so
+// pages can tell how they were opened, e.g. from a password-reset email.
+export const initialUrl = new URL(location.href);
 if (!config || !window.supabase) {
   throw new Error('App configuration failed to load. Check your connection and refresh.');
 }

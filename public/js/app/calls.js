@@ -16,7 +16,8 @@ import { icon } from '../lib/icons.js';
 import { duration, listStamp, fullDate } from '../lib/format.js';
 import { state, on, emit } from './state.js';
 import { createCall, updateCall, loadCallHistory } from './data.js';
-import { avatarHtml, emptyState, showMenu } from './ui.js';
+import { avatarHtml, emptyState, showMenu, mediaHelpDialog } from './ui.js';
+import { getCallMedia } from '../lib/mediaAccess.js';
 import { startRing, stopRing, beep, systemNotify, closeNotifications } from './notify.js';
 
 const RING_TIMEOUT_MS = 45000;
@@ -74,7 +75,7 @@ export async function startCall(peerId, kind = 'audio') {
     stream = await getMedia(kind);
   } catch (err) {
     if (call === c) cleanup();
-    toast(mediaErrorText(err, kind), { type: 'error' });
+    if (await mediaHelpDialog(err)) startCall(peerId, kind);
     return;
   }
   if (call !== c || c.phase === 'ended') {
@@ -145,13 +146,21 @@ async function acceptCall() {
   stopRing();
   closeNotifications(`call-${call.row.id}`);
   setPhase('connecting', 'Connecting…');
+  let stream;
   try {
-    call.localStream = await getMedia(call.kind);
+    stream = await getMedia(call.kind);
   } catch (err) {
-    toast(mediaErrorText(err, call.kind), { type: 'error' });
-    hangup('declined');
+    // Keep ringing while they fix it: the caller stays on the line.
+    setPhase('incoming', 'Microphone needed to answer');
+    startRing('incoming');
+    if (await mediaHelpDialog(err, { action: 'Try again' }) && call?.phase === 'incoming') acceptCall();
     return;
   }
+  if (!call || call.phase === 'ended') {
+    stream.getTracks().forEach(t => t.stop());
+    return;
+  }
+  call.localStream = stream;
   attachLocalVideo();
   await updateCall(call.row.id, { status: 'accepted', answered_at: new Date().toISOString() });
   await joinSignalChannel();
@@ -397,28 +406,13 @@ async function checkQuality() {
 // Media
 // ---------------------------------------------------------------------------
 async function getMedia(kind) {
-  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-  const video = kind === 'video' ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } : false;
-  try {
-    return await navigator.mediaDevices.getUserMedia({ audio, video });
-  } catch (err) {
-    // No camera (or it's busy): fall back to voice so the call can still happen.
-    if (kind === 'video' && /NotFound|NotReadable|Overconstrained/i.test(err?.name || '')) {
-      toast('Camera not available. Continuing with voice only.');
-      call && (call.cameraOff = true);
-      return navigator.mediaDevices.getUserMedia({ audio, video: false });
-    }
-    throw err;
+  const { stream, cameraProblem } = await getCallMedia(kind);
+  if (cameraProblem) {
+    // The camera failed but the microphone works: carry on as a voice call.
+    if (call) call.cameraOff = true;
+    toast(`${cameraProblem.message} Continuing with voice only.`, { duration: 9000 });
   }
-}
-
-function mediaErrorText(err, kind) {
-  const name = err?.name || '';
-  const what = kind === 'video' ? 'camera and microphone' : 'microphone';
-  if (/NotAllowed|Permission|Security/i.test(name)) return `Allow ${what} access in your browser to make calls.`;
-  if (/NotFound/i.test(name)) return 'No microphone found on this device.';
-  if (/NotReadable/i.test(name)) return 'Your microphone or camera is being used by another app.';
-  return `Couldn’t access your ${what}.`;
+  return stream;
 }
 
 function attachLocalVideo() {

@@ -56,19 +56,24 @@
             <input class="input" id="name" name="name" autocomplete="name" placeholder="e.g. Mutale Banda" maxlength="60">
           </label>
 
-          <label class="field">
+          <label class="field" data-show="signin signup magic reset">
             <span>Email</span>
             <input class="input" id="email" name="email" type="email" autocomplete="username email" inputmode="email" placeholder="you@company.com" required>
           </label>
 
-          <label class="field" data-show="signin signup">
-            <span>Password</span>
+          <label class="field" data-show="signin signup newpassword">
+            <span id="passwordLabel">Password</span>
             <div class="password-wrap">
               <input class="input" id="password" name="password" type="password" autocomplete="current-password" minlength="8" required>
               <button type="button" class="icon-btn reveal" id="togglePassword" aria-label="Show password" data-icon="eye" data-icon-size="sm"></button>
             </div>
-            <div class="strength" data-show="signup" aria-hidden="true"><i id="strengthBar"></i></div>
-            <span class="hint" data-show="signup" id="strengthHint">At least 8 characters. A longer phrase is stronger.</span>
+            <div class="strength" data-show="signup newpassword" aria-hidden="true"><i id="strengthBar"></i></div>
+            <span class="hint" data-show="signup newpassword" id="strengthHint">At least 8 characters. A longer phrase is stronger.</span>
+          </label>
+
+          <label class="field" data-show="newpassword">
+            <span>Confirm new password</span>
+            <input class="input" id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8">
           </label>
 
           <p class="error-text" id="formError" role="alert" hidden></p>

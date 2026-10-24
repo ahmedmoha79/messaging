@@ -1,3 +1,5 @@
+import { getMicrophone } from '../lib/mediaAccess.js';
+
 // Records voice notes with a live level meter. The waveform is built from
 // the levels captured while recording, so nothing has to be decoded afterwards.
 
@@ -23,9 +25,7 @@ export class VoiceRecorder {
   }
 
   async start() {
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
-    });
+    this.stream = await getMicrophone({ channelCount: 1 });
     const mimeType = PREFERRED_TYPES.find(t => MediaRecorder.isTypeSupported?.(t)) || '';
     this.recorder = new MediaRecorder(this.stream, mimeType ? { mimeType, audioBitsPerSecond: 32000 } : undefined);
     this.recorder.ondataavailable = e => e.data.size && this.chunks.push(e.data);

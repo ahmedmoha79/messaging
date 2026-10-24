@@ -20,6 +20,17 @@
       return r.json();
     };
 
+    // Like supabase-js detectSessionInUrl: take a session from #access_token=…
+    // and announce PASSWORD_RECOVERY for reset links.
+    let recoveryPending = false;
+    if (opts.auth?.detectSessionInUrl !== false && /access_token=/.test(location.hash)) {
+      const h = new URLSearchParams(location.hash.slice(1));
+      const t = h.get('access_token');
+      writeSession({ access_token: t, user: { id: t.split(':')[0], email: '' } });
+      recoveryPending = h.get('type') === 'recovery';
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+
     // ---------------- auth ----------------
     const auth = {
       async getSession() { return { data: { session: readSession() }, error: null }; },
@@ -34,8 +45,14 @@
       async signUp({ email }) { return { data: { user: { id: 'x', email, identities: [{}] }, session: null }, error: null }; },
       async signInWithOtp() { return { data: {}, error: null }; },
       async signInWithOAuth() { return { data: {}, error: { message: 'Unsupported provider: provider is not enabled' } }; },
-      async resetPasswordForEmail() { return { data: {}, error: null }; },
-      async updateUser() { return { data: {}, error: null }; },
+      async resetPasswordForEmail(email, o) { window.__lastReset = { email, ...o }; return { data: {}, error: null }; },
+      async updateUser(attrs) { window.__lastUpdateUser = attrs; return readSession() ? { data: {}, error: null } : { data: {}, error: { message: 'Auth session missing!' } }; },
+      async verifyOtp({ token_hash }) {
+        if (!token_hash || token_hash === 'expired') return { data: {}, error: { message: 'Token has expired or is invalid' } };
+        writeSession({ access_token: `${token_hash}:token`, user: { id: token_hash } });
+        return { data: {}, error: null };
+      },
+      async exchangeCodeForSession() { return { data: {}, error: { message: 'invalid flow state' } }; },
       async signOut() {
         writeSession(null);
         authListeners.forEach(cb => cb('SIGNED_OUT', null));
@@ -43,6 +60,7 @@
       },
       onAuthStateChange(cb) {
         authListeners.add(cb);
+        if (recoveryPending) setTimeout(() => cb('PASSWORD_RECOVERY', readSession()), 0);
         return { data: { subscription: { unsubscribe: () => authListeners.delete(cb) } } };
       }
     };

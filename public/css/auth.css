@@ -112,7 +112,9 @@
 [data-mode="signin"] [data-show]:not([data-show~="signin"]),
 [data-mode="signup"] [data-show]:not([data-show~="signup"]),
 [data-mode="magic"] [data-show]:not([data-show~="magic"]),
-[data-mode="reset"] [data-show]:not([data-show~="reset"]) { display: none !important; }
+[data-mode="reset"] [data-show]:not([data-show~="reset"]),
+[data-mode="newpassword"] [data-show]:not([data-show~="newpassword"]) { display: none !important; }
+[data-mode="newpassword"] .google-btn, [data-mode="newpassword"] .divider, [data-mode="newpassword"] .auth-tabs, [data-mode="newpassword"] .auth-links { display: none; }
 [data-mode="done"] #authForm, [data-mode="done"] .auth-links, [data-mode="done"] .google-btn,
 [data-mode="done"] .divider, [data-mode="done"] .auth-tabs, [data-mode="done"] .auth-title, [data-mode="done"] .auth-sub { display: none; }
 [data-mode="reset"] .google-btn, [data-mode="reset"] .divider, [data-mode="magic"] .google-btn, [data-mode="magic"] .divider { display: none; }
