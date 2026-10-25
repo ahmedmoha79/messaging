@@ -1,0 +1,29 @@
+/* Printable proof of delivery (A4) */
+body { background: var(--surface-2); color: #13201b; }
+.proof-bar { position: sticky; top: 0; display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--surface); border-bottom: 1px solid var(--line); z-index: 2; }
+.sheet-a4 { background: #fff; color: #13201b; max-width: 210mm; min-height: 270mm; margin: var(--space-5) auto; padding: 18mm 16mm; box-shadow: var(--shadow-2); }
+.pd-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #0b8a5f; padding-bottom: 10px; margin-bottom: 18px; }
+.pd-org { font-weight: 800; font-size: 15px; color: #076d4b; }
+.pd-head h1 { font-size: 26px; font-weight: 800; }
+.pd-ref { font-family: ui-monospace, Menlo, monospace; font-size: 20px; font-weight: 700; }
+.pd-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pd-table th { text-align: left; width: 32%; color: #4f5f58; font-weight: 600; padding: 7px 10px 7px 0; vertical-align: top; }
+.pd-table td { padding: 7px 0; border-bottom: 1px solid #e3e9e5; }
+.pd-media { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+.pd-media figure { margin: 0; flex: 1 1 220px; }
+.pd-media img { width: 100%; max-height: 300px; object-fit: contain; border: 1px solid #d3ddd6; border-radius: 6px; background: #fff; }
+.pd-media img.sig { max-height: 140px; }
+.pd-media figcaption { font-size: 12px; color: #4f5f58; margin-top: 4px; }
+.pd-seal { border: 1.5px solid #0b8a5f; border-radius: 8px; padding: 12px 14px; font-size: 12.5px; }
+.pd-seal.bad { border-color: #c2372b; }
+.pd-seal b { color: #076d4b; }
+.pd-seal.bad b { color: #c2372b; }
+.pd-seal p { margin: 4px 0 6px; color: #4f5f58; }
+.pd-seal code { font-size: 11px; word-break: break-all; color: #13201b; }
+.pd-foot { margin-top: 24px; font-size: 11px; color: #7d8c85; }
+@page { size: A4; margin: 0; }
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .sheet-a4 { margin: 0; box-shadow: none; max-width: none; min-height: 0; }
+}

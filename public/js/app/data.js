@@ -324,9 +324,20 @@ export async function createCall(calleeId, kind) {
     .select('*').single());
 }
 
+/** Status only: the database stamps answered/ended times with its own clock. */
 export async function updateCall(id, fields) {
-  const { error } = await sb.from('calls').update(fields).eq('id', id);
+  const { error } = await sb.from('calls').update({ status: fields.status }).eq('id', id);
   if (error) console.warn('Call update failed', error);
+}
+
+/** The call as the server sees it now, with its age by the server clock. */
+export async function callState(id) {
+  return check(await sb.rpc('call_state', { call_id: id }));
+}
+
+/** A call ringing for me right now, if any. */
+export async function myRingingCall() {
+  return check(await sb.rpc('my_ringing_call'));
 }
 
 export async function loadCallHistory(limit = 60) {
@@ -379,4 +390,168 @@ export async function stopSharingLocation() {
 
 export function deviceType() {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+}
+
+// ---------------------------------------------------------------------------
+// Companies
+// ---------------------------------------------------------------------------
+const ORG_KEY = 'wazambi-org';
+
+export async function loadOrgs() {
+  const rows = check(await sb.from('org_members')
+    .select('org_id,role,joined_at,orgs(id,name,invite_code,plan,created_at)')
+    .eq('user_id', state.me.id));
+  state.orgs = rows.filter(r => r.orgs).map(r => ({ ...r.orgs, role: r.role }));
+  let chosen = null;
+  try { chosen = localStorage.getItem(`${ORG_KEY}:${state.me.id}`); } catch { /* ignore */ }
+  const org = state.orgs.find(o => o.id === chosen) || state.orgs[0] || null;
+  setActiveOrg(org, { silent: true });
+  return state.orgs;
+}
+
+export function setActiveOrg(org, { silent = false } = {}) {
+  state.org = org;
+  state.role = org?.role || null;
+  try {
+    if (org) localStorage.setItem(`${ORG_KEY}:${state.me.id}`, org.id);
+  } catch { /* ignore */ }
+  if (!silent) emit('org');
+}
+
+export const isStaff = () => ['owner', 'admin', 'dispatcher'].includes(state.role);
+export const isAdmin = () => ['owner', 'admin'].includes(state.role);
+
+export async function createOrg(name) {
+  const id = check(await sb.rpc('create_org', { org_name: name }));
+  await loadOrgs();
+  setActiveOrg(state.orgs.find(o => o.id === id) || state.org);
+  return id;
+}
+
+export async function joinOrg(code) {
+  const id = check(await sb.rpc('join_org', { code }));
+  await loadOrgs();
+  setActiveOrg(state.orgs.find(o => o.id === id) || state.org);
+  return id;
+}
+
+export async function loadOrgMembers(orgId = state.org?.id) {
+  if (!orgId) return [];
+  const rows = check(await sb.from('org_members').select('user_id,role,joined_at').eq('org_id', orgId));
+  state.members = new Map(rows.map(r => [r.user_id, r.role]));
+  return rows;
+}
+
+export async function setMemberRole(userId, role) {
+  check(await sb.rpc('set_member_role', { org: state.org.id, member: userId, new_role: role }));
+}
+
+export async function removeMember(userId) {
+  check(await sb.from('org_members').delete().eq('org_id', state.org.id).eq('user_id', userId));
+}
+
+export async function newInviteCode() {
+  const code = check(await sb.rpc('new_invite_code', { org: state.org.id }));
+  state.org.invite_code = code;
+  emit('org');
+  return code;
+}
+
+export async function renameOrg(name) {
+  check(await sb.from('orgs').update({ name }).eq('id', state.org.id));
+  state.org.name = name;
+  emit('org');
+}
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+export const JOB_COLUMNS = 'id,org_id,ref,title,customer_name,customer_phone,pickup_name,pickup_lat,pickup_lng,dropoff_name,dropoff_lat,dropoff_lng,cargo,vehicle,notes,driver_id,status,due_at,track_token,created_by,created_at,updated_at,delivered_at';
+
+export async function loadJobs({ orgId = state.org?.id, limit = 300 } = {}) {
+  if (!orgId) return [];
+  return check(await sb.from('jobs').select(JOB_COLUMNS).eq('org_id', orgId)
+    .order('created_at', { ascending: false }).limit(limit));
+}
+
+export async function loadJob(id) {
+  return check(await sb.from('jobs').select(JOB_COLUMNS).eq('id', id).maybeSingle());
+}
+
+export async function createJob(fields) {
+  return check(await sb.from('jobs').insert({ ...fields, org_id: state.org.id }).select(JOB_COLUMNS).single());
+}
+
+export async function updateJob(id, fields) {
+  return check(await sb.from('jobs').update(fields).eq('id', id).select(JOB_COLUMNS).single());
+}
+
+export async function deleteJob(id) {
+  check(await sb.from('jobs').delete().eq('id', id));
+}
+
+export async function loadJobEvents(jobId) {
+  return check(await sb.from('job_events').select('id,job_id,kind,status,message,actor_id,lat,lng,meta,created_at')
+    .eq('job_id', jobId).order('created_at', { ascending: true }).limit(500));
+}
+
+export async function addJobEvent(jobId, kind, message, meta = {}) {
+  return check(await sb.from('job_events').insert({ job_id: jobId, kind, message, meta, actor_id: state.me.id })
+    .select('id,job_id,kind,status,message,actor_id,lat,lng,meta,created_at').single());
+}
+
+export async function loadProofs(jobId) {
+  return check(await sb.from('proofs').select('*').eq('job_id', jobId).order('captured_at', { ascending: false }));
+}
+
+export async function createProof(fields) {
+  return check(await sb.from('proofs').insert({ ...fields, created_by: state.me.id }).select('*').single());
+}
+
+export async function verifyProof(id) {
+  return check(await sb.rpc('verify_proof', { proof: id }));
+}
+
+export async function loadPlaces(orgId = state.org?.id) {
+  if (!orgId) return [];
+  return check(await sb.from('places').select('*').eq('org_id', orgId).order('name'));
+}
+
+export async function addPlace(fields) {
+  return check(await sb.from('places').insert({ ...fields, org_id: state.org.id }).select('*').single());
+}
+
+export async function deletePlace(id) {
+  check(await sb.from('places').delete().eq('id', id));
+}
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+export async function vapidPublicKey() {
+  const { data } = await sb.rpc('vapid_public_key');
+  if (data) return data;
+  // First device ever: ask the push function to create the key pair.
+  const res = await fetch(`${config.supabaseUrl}/functions/v1/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'init' })
+  });
+  if (!res.ok) throw new Error('Push is not available right now');
+  return (await res.json()).publicKey;
+}
+
+export async function savePushSubscription(sub) {
+  const j = sub.toJSON();
+  check(await sb.from('push_subscriptions').upsert({
+    user_id: state.me.id,
+    endpoint: j.endpoint,
+    p256dh: j.keys.p256dh,
+    auth: j.keys.auth,
+    user_agent: navigator.userAgent.slice(0, 300)
+  }, { onConflict: 'endpoint' }));
+}
+
+export async function deletePushSubscription(endpoint) {
+  await sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
 }

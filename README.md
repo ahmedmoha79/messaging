@@ -11,7 +11,9 @@ any modern browser and installs to the home screen as an app.
 | **Chats** | Real-time messages with sent / delivered / read ticks, typing indicators, replies (swipe right on phones), emoji reactions, links, unread counts, search, and drafts that survive a reload. Messages typed while offline are queued and sent on reconnect. |
 | **Groups** | Create groups, add and remove members (admins), rename, mute, leave. Sender names on messages. |
 | **Media** | Photos (shrunk on the phone before upload), videos, documents up to 50 MB, voice notes up to 5 minutes. Drag and drop or paste images on desktop. Files live in a private storage bucket and are shown through short-lived signed links. |
-| **Calls** | One-to-one voice and video calls over WebRTC: ringing, accept/decline, busy and missed detection, mute, camera on/off, front/back camera, connection-quality warning, minimise to keep chatting, and a call history tab. |
+| **Calls** | One-to-one voice and video calls over WebRTC: ringing, accept/decline, busy and missed detection, mute, camera on/off, front/back camera, connection-quality warning, minimise to keep chatting, and a call history tab. A ring reaches a phone four ways (live change, inbox nudge, Web Push with Answer/Decline buttons, and a check whenever the app wakes), and both sides re-read the call from the database every 2 s while it rings, so a decline or hang-up is never missed. Call times come from the server clock. |
+| **Companies** | Each company is a private workspace with roles (owner, admin, dispatcher, driver), invite links (`/join/CODE`) and saved places. |
+| **Jobs** | Every delivery is a thread: status track, timeline, notes and photos, customer messages, geofence arrivals, a sealed proof of delivery (photo, signature, GPS, SHA-256 hash chain) with a printable PDF (`/proof?job=…`), and a public tracking link for the customer (`/t/<token>`, no account needed). |
 | **Team map** | Opt-in live location sharing (only while the app is open), teammates on a map, battery level, street or satellite view, weather. |
 | **Account** | Password, magic-link or Google sign-in; profile photo, bio and work details; followers; theme (system, light, dark); notification and sound settings; change password; recent sign-ins; sign out of other devices. |
 
@@ -83,11 +85,17 @@ Google sign-in, enable the Google provider under Authentication → Providers.
 realtime, storage) and a Playwright walkthrough that signs two people in and
 exercises messaging, reactions, replies, photos, files, voice notes, the
 offline outbox, groups, a real WebRTC video call, declined calls, the map,
-settings and profiles.
+settings and profiles. `test/e2e_calls_jobs.py` freezes or drops one
+device's live connection and checks that calls still ring and stop on both
+sides, then runs a job from creation to proof of delivery and the customer
+tracking page.
 
 ```bash
 pip install playwright && playwright install chromium
-test/run-local.sh
+test/run-local.sh                                  # main walkthrough
+TEST=test/e2e_calls_jobs.py test/run-local.sh      # calls across devices + jobs
+TEST=test/e2e_fixes.py test/run-local.sh           # microphone + password reset
+node --experimental-strip-types test/unit/webpush.test.mjs
 ```
 
 ## License

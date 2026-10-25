@@ -2,25 +2,33 @@
 //
 // How a call works:
 //   1. The caller inserts a row in `calls` (status "ringing"). Row-level
-//      security means only the two participants can see it, and the callee's
-//      realtime subscription makes their phone ring.
+//      security means only the two participants can see it. The callee hears
+//      about it four independent ways, so a phone that dropped its connection
+//      still rings: the realtime table change, a nudge to their inbox channel,
+//      a push notification (even with the app closed), and a check for ringing
+//      calls whenever the app wakes up.
 //   2. When the callee accepts, both sides join a private broadcast channel
 //      named after the call's random id and exchange WebRTC offer/answer and
 //      ICE candidates over it.
 //   3. Audio and video then flow directly between the two devices (or via a
 //      TURN relay when networks block direct connections).
 //   4. The `calls` row is updated as the call ends, which doubles as call history.
+//      The database is the source of truth: while a call rings or connects,
+//      both sides re-read its state every 2 seconds, so a missed "declined" or
+//      "cancelled" event can't leave a phone ringing.
 import { sb, config } from '../lib/supabase.js';
 import { html, raw, toast, escapeHtml } from '../lib/dom.js';
 import { icon } from '../lib/icons.js';
 import { duration, listStamp, fullDate } from '../lib/format.js';
 import { state, on, emit } from './state.js';
-import { createCall, updateCall, loadCallHistory } from './data.js';
+import { createCall, updateCall, loadCallHistory, callState, myRingingCall } from './data.js';
+import { nudge, ensureRealtime } from './realtime.js';
 import { avatarHtml, emptyState, showMenu, mediaHelpDialog } from './ui.js';
 import { getCallMedia } from '../lib/mediaAccess.js';
 import { startRing, stopRing, beep, systemNotify, closeNotifications } from './notify.js';
 
 const RING_TIMEOUT_MS = 45000;
+const STATE_POLL_MS = 2000;
 const layer = document.getElementById('callLayer');
 let call = null;
 
@@ -30,12 +38,20 @@ let call = null;
 export function initCalls() {
   on('call:incoming', onIncoming);
   on('call:update', onCallRowUpdate);
+  on('call:nudge', checkCall);
+  on('realtime:recovered', checkRinging);
   on('route', r => {
     if (r.tab === 'calls') {
       markCallsSeen();
       renderHistory();
     }
+    if (r.callId) openCallLink(r.callId, r.answer);
   });
+  // Safety net: a cheap "anything ringing for me?" check while the app is open.
+  setInterval(() => {
+    if (document.visibilityState === 'visible' && !call) checkRinging();
+  }, 8000);
+  checkRinging();
   document.getElementById('newCallBtn').addEventListener('click', pickSomeoneToCall);
   document.getElementById('callList').addEventListener('click', onHistoryClick);
   window.addEventListener('beforeunload', e => {
@@ -95,11 +111,14 @@ export async function startCall(peerId, kind = 'audio') {
   }
   if (call !== c || c.phase === 'ended') {
     // hung up while the call was being created: make sure it never rings
-    updateCall(c.row.id, { status: 'cancelled', ended_at: new Date().toISOString() });
+    updateCall(c.row.id, { status: 'cancelled' });
+    nudge(peerId, { type: 'call', id: c.row.id });
     return;
   }
   setPhase('ringing', state.online.has(peerId) ? 'Ringing…' : 'Calling…');
   startRing('outgoing');
+  nudge(peerId, { type: 'call', id: c.row.id });
+  startStatePoll(c);
   await joinSignalChannel();
   call.ringTimer = setTimeout(() => {
     if (call?.phase === 'ringing') {
@@ -112,13 +131,18 @@ export async function startCall(peerId, kind = 'audio') {
 // Incoming calls
 // ---------------------------------------------------------------------------
 function onIncoming(row) {
-  if (row.status !== 'ringing') return;
-  if (Date.now() - new Date(row.created_at).getTime() > 60000) return; // stale
+  if (!row || row.status !== 'ringing' || row.callee_id !== state.me.id) return;
+  // Freshness is judged by the server's clock (device clocks disagree).
+  if (typeof row.age_seconds === 'number' && row.age_seconds > 50) return;
   if (call) {
+    if (call.row?.id === row.id) return; // already showing it
     // Already on a call: tell the caller we're busy.
-    if (call.row?.id !== row.id) updateCall(row.id, { status: 'busy', ended_at: new Date().toISOString() });
+    updateCall(row.id, { status: 'busy' });
+    nudge(row.caller_id, { type: 'call', id: row.id });
     return;
   }
+  if (handledCalls.has(row.id)) return;
+  handledCalls.add(row.id);
   const peer = state.users.get(row.caller_id) || { id: row.caller_id, name: 'Someone' };
   call = newCallState({ role: 'callee', kind: row.kind, peer });
   call.row = row;
@@ -134,11 +158,83 @@ function onIncoming(row) {
   });
   call.ringTimer = setTimeout(() => {
     if (call?.phase === 'incoming') {
-      // caller's side marks it missed; we just stop ringing
+      // caller's side (or the server) marks it missed; we just stop ringing
       endLocally('Missed call');
     }
   }, RING_TIMEOUT_MS + 5000);
+  startStatePoll(call);
   emit('calls:changed');
+  if (pendingAnswer === row.id) {
+    pendingAnswer = null;
+    acceptCall();
+  }
+}
+
+// Calls we've already shown (so the same ring isn't shown twice from different sources)
+const handledCalls = new Set();
+let pendingAnswer = null;
+
+/** "Is anything ringing for me?" Run on wake-up, reconnect, and periodically. */
+async function checkRinging() {
+  if (call || !state.me) return;
+  try {
+    const row = await myRingingCall();
+    if (row && !call) onIncoming(row);
+  } catch {
+    /* offline: try again next time */
+  }
+}
+
+/** A nudge (or a notification tap) about one call: read its real state. */
+async function checkCall(id) {
+  if (!id) return;
+  if (call?.row?.id === id) {
+    pollNow(call);
+    return;
+  }
+  try {
+    const row = await callState(id);
+    if (row && row.status === 'ringing' && row.callee_id === state.me.id) onIncoming(row);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Opened from a notification: #/call/<id> (or #/call/<id>/answer). */
+async function openCallLink(id, answer) {
+  history.replaceState(history.state, '', '#/calls');
+  if (answer) pendingAnswer = id;
+  if (call?.row?.id === id) {
+    if (answer && call.phase === 'incoming') acceptCall();
+    return;
+  }
+  const row = await callState(id).catch(() => null);
+  if (!row) return;
+  if (row.status === 'ringing' && row.callee_id === state.me.id) {
+    handledCalls.delete(id);
+    onIncoming(row);
+  } else if (row.status !== 'accepted') {
+    toast(row.status === 'ringing' ? 'Call ended' : 'That call has already ended.');
+  }
+}
+
+// While ringing or connecting, the database is re-read every 2 s.
+function startStatePoll(c) {
+  clearInterval(c.statePoll);
+  c.statePoll = setInterval(() => pollNow(c), STATE_POLL_MS);
+}
+
+async function pollNow(c) {
+  if (call !== c || !c.row?.id || c.phase === 'ended' || c.phase === 'active') {
+    if (c.phase === 'active' || c.phase === 'ended') clearInterval(c.statePoll);
+    return;
+  }
+  try {
+    const row = await callState(c.row.id);
+    if (row && call === c) onCallRowUpdate(row);
+  } catch {
+    /* offline for a moment */
+  }
 }
 
 async function acceptCall() {
@@ -162,7 +258,8 @@ async function acceptCall() {
   }
   call.localStream = stream;
   attachLocalVideo();
-  await updateCall(call.row.id, { status: 'accepted', answered_at: new Date().toISOString() });
+  await updateCall(call.row.id, { status: 'accepted' });
+  nudge(call.peer.id, { type: 'call', id: call.row.id });
   await joinSignalChannel();
   createPeerConnection();
   // Tell the caller we're ready for their offer (repeat in case they joined late).
@@ -195,12 +292,17 @@ function onCallRowUpdate(row) {
       endLocally('Call declined');
     } else if (row.status === 'busy') {
       endLocally(`${call.peer.name.split(' ')[0]} is on another call`);
+    } else if ((row.status === 'missed' || row.status === 'cancelled') && call.phase === 'ringing') {
+      endLocally('No answer');
     } else if (row.status === 'ended' && call.phase !== 'ended') {
       endLocally('Call ended');
     }
   } else {
-    if ((row.status === 'cancelled' || row.status === 'missed') && call.phase === 'incoming') {
+    if (['cancelled', 'missed', 'busy'].includes(row.status) && (call.phase === 'incoming' || call.phase === 'connecting')) {
       endLocally('Missed call');
+    } else if (row.status === 'declined' && call.phase === 'incoming') {
+      // declined from the notification or another device
+      endLocally('Call declined', { quiet: true });
     } else if (row.status === 'accepted' && call.phase === 'incoming') {
       // answered on one of our other devices
       endLocally('Answered on another device', { quiet: true });
@@ -213,20 +315,27 @@ function onCallRowUpdate(row) {
 // ---------------------------------------------------------------------------
 // Signalling and WebRTC
 // ---------------------------------------------------------------------------
-async function joinSignalChannel() {
+async function joinSignalChannel(attempt = 1) {
   const c = call;
   if (!c) return;
+  if (c.channel) await sb.removeChannel(c.channel).catch(() => {});
   c.channel = sb.channel(`call:${c.row.id}`, { config: { broadcast: { self: false, ack: false } } })
     .on('broadcast', { event: 'signal' }, ({ payload }) => onSignal(payload));
-  await new Promise(resolve => {
-    const t = setTimeout(resolve, 6000);
+  const joined = await new Promise(resolve => {
+    const t = setTimeout(() => resolve(false), 5000);
     c.channel.subscribe(status => {
       if (status === 'SUBSCRIBED') {
         clearTimeout(t);
-        resolve();
+        resolve(true);
       }
     });
   });
+  if (!joined && attempt < 3 && call === c && c.phase !== 'ended') {
+    // The connection is probably dead (phone woke up): rebuild it and try again.
+    ensureRealtime('call signalling', { force: true });
+    await new Promise(r => setTimeout(r, 1200));
+    return joinSignalChannel(attempt + 1);
+  }
 }
 
 function signal(payload) {
@@ -247,7 +356,7 @@ function createPeerConnection() {
     c.remoteStream = stream;
     const audio = c.ui.querySelector('.call-remote-audio');
     audio.srcObject = stream;
-    audio.play().catch(() => {});
+    audio.play().catch(() => showTapForSound(c, audio));
     if (c.kind === 'video' && e.track.kind === 'video') {
       const video = c.ui.querySelector('.call-remote-video');
       video.srcObject = stream;
@@ -490,7 +599,8 @@ async function hangup(status = 'ended', { message = 'Call ended', silent = false
     : c.role === 'caller' ? (status === 'missed' ? 'missed' : 'cancelled') : status;
   if (c.row?.id) {
     signal({ type: 'hangup', reason: finalStatus });
-    updateCall(c.row.id, { status: finalStatus, ended_at: new Date().toISOString() });
+    updateCall(c.row.id, { status: finalStatus });
+    nudge(c.peer.id, { type: 'call', id: c.row.id });
   }
   if (silent) cleanup();
   else endLocally(message);
@@ -511,6 +621,7 @@ function endLocally(message, { quiet = false } = {}) {
 }
 
 function stopMedia(c) {
+  clearInterval(c.statePoll);
   clearTimeout(c.ringTimer);
   clearTimeout(c.readyTimer);
   clearTimeout(c.restartTimer);
@@ -588,6 +699,21 @@ function renderCallUi() {
   ui.addEventListener('click', onCallClick);
   makeDraggable(ui.querySelector('.call-local-video'));
   renderControls();
+}
+
+// Phones sometimes block call audio until the screen is touched (e.g. a call
+// answered from a notification). Offer one tap to turn the sound on.
+function showTapForSound(c, audio) {
+  if (!c.ui || c.ui.querySelector('.tap-sound')) return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn primary tap-sound';
+  b.textContent = 'Tap to hear the call';
+  b.addEventListener('click', () => {
+    audio.play().then(() => b.remove()).catch(() => {});
+    c.ui.querySelector('.call-remote-video')?.play().catch(() => {});
+  });
+  c.ui.querySelector('.call-who').appendChild(b);
 }
 
 function callBtn(act, iconName, label, extra = '') {

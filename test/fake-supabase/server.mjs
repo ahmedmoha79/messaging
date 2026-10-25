@@ -5,7 +5,7 @@
 //
 //   node test/fake-supabase/server.mjs     (listens on :54321)
 import http from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes, createHash } from 'node:crypto';
 
 const PORT = Number(process.env.FAKE_PORT) || 54321;
 
@@ -38,8 +38,20 @@ const db = {
   user_locations: [
     { user_id: USERS.mutale.id, latitude: -15.4167, longitude: 28.2833, accuracy: 20, last_updated: iso(now - 120e3), battery_level: 64, device_context: { battery_level: 64 } }
   ],
-  notifications: []
+  notifications: [],
+  orgs: [{ id: '55555555-5555-4555-8555-555555555555', name: 'Copperbelt Haulage', invite_code: 'CBH12345', plan: 'crew', created_by: USERS.ahmed.id, created_at: iso(now - 30 * 86400e3), job_seq: 0 }],
+  org_members: [
+    { org_id: '55555555-5555-4555-8555-555555555555', user_id: USERS.ahmed.id, role: 'owner', joined_at: iso(now - 30 * 86400e3) },
+    { org_id: '55555555-5555-4555-8555-555555555555', user_id: USERS.mutale.id, role: 'dispatcher', joined_at: iso(now - 30 * 86400e3) },
+    { org_id: '55555555-5555-4555-8555-555555555555', user_id: USERS.chanda.id, role: 'driver', joined_at: iso(now - 30 * 86400e3) }
+  ],
+  jobs: [],
+  job_events: [],
+  proofs: [],
+  places: [],
+  push_subscriptions: []
 };
+let jobEventSeq = 0;
 let messageSeq = 700;
 
 function seedMessages() {
@@ -83,6 +95,21 @@ seedMessages();
 // Visibility rules (mirrors the row-level security policies)
 // ---------------------------------------------------------------------------
 const isMember = (gid, uid) => db.conversation_members.some(m => m.conversation_id === gid && m.user_id === uid);
+const orgRole = (org, uid) => db.org_members.find(m => m.org_id === org && m.user_id === uid)?.role || null;
+const isOrgMember = (org, uid) => !!orgRole(org, uid);
+const isOrgStaff = (org, uid) => ['owner', 'admin', 'dispatcher'].includes(orgRole(org, uid));
+const sharesOrg = (a, b) => db.org_members.some(m => m.user_id === a && db.org_members.some(n => n.org_id === m.org_id && n.user_id === b));
+const denied = () => Object.assign(new Error('new row violates row-level security policy'), { code: '42501' });
+const TERMINAL = ['declined', 'missed', 'ended', 'cancelled', 'busy', 'failed'];
+const proofHash = p => createHash('sha256').update([p.prev_hash || 'genesis', p.id, p.job_id, p.receiver_name, p.photo_path || '', p.signature_path || '', p.note || '', p.lat ?? '', p.lng ?? '', p.captured_at, p.created_by || ''].join('|')).digest('hex');
+function addJobEvent(e) {
+  const job = db.jobs.find(j => j.id === e.job_id);
+  const row = { id: ++jobEventSeq, org_id: job?.org_id, status: null, message: null, actor_id: null, lat: null, lng: null, meta: {}, ...e, created_at: iso(Date.now()) };
+  db.job_events.push(row);
+  emitChange('job_events', 'INSERT', row);
+  return row;
+}
+const callJson = c => c && ({ ...c, age_seconds: (Date.now() - Date.parse(c.created_at)) / 1000 });
 function visible(table, row, uid) {
   if (!uid) return false;
   switch (table) {
@@ -91,6 +118,13 @@ function visible(table, row, uid) {
     case 'conversations': return isMember(row.id, uid);
     case 'conversation_members': return isMember(row.conversation_id, uid);
     case 'message_reactions': { const m = db.messages.find(x => x.id === row.message_id); return !!m && visible('messages', m, uid); }
+    case 'orgs': return isOrgMember(row.id, uid);
+    case 'org_members': return isOrgMember(row.org_id, uid);
+    case 'jobs': return isOrgStaff(row.org_id, uid) || row.driver_id === uid;
+    case 'job_events':
+    case 'proofs': { const j = db.jobs.find(x => x.id === row.job_id); return !!j && visible('jobs', j, uid); }
+    case 'places': return isOrgMember(row.org_id, uid);
+    case 'push_subscriptions': return row.user_id === uid;
     case 'user_session_logs':
     case 'security_logs':
     case 'notifications': return row.user_id === uid;
@@ -147,6 +181,7 @@ function applyFilters(rows, filters = []) {
 // Realtime (SSE)
 // ---------------------------------------------------------------------------
 const clients = new Map(); // id -> { res, uid }
+const broadcastLog = [];
 const presence = new Map(); // channel -> Map(key -> state)
 function push(client, data) {
   client.res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -200,6 +235,76 @@ const rpc = {
     });
     return null;
   },
+  call_state({ call_id }, uid) {
+    return callJson(db.calls.find(c => c.id === call_id && visible('calls', c, uid))) || null;
+  },
+  my_ringing_call(_, uid) {
+    const c = db.calls.filter(c => c.callee_id === uid && c.status === 'ringing' && Date.now() - Date.parse(c.created_at) < 45e3)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    return callJson(c) || null;
+  },
+  vapid_public_key() { return null; },
+  create_org({ org_name }, uid) {
+    const id = randomUUID();
+    db.orgs.push({ id, name: org_name.trim(), invite_code: randomBytes(4).toString('hex').toUpperCase(), plan: 'crew', created_by: uid, created_at: iso(Date.now()), job_seq: 0 });
+    const m = { org_id: id, user_id: uid, role: 'owner', joined_at: iso(Date.now()) };
+    db.org_members.push(m);
+    emitChange('org_members', 'INSERT', m);
+    return id;
+  },
+  join_org({ code }, uid) {
+    const o = db.orgs.find(x => x.invite_code === String(code).trim().toUpperCase());
+    if (!o) throw new Error('invalid invite code');
+    if (!isOrgMember(o.id, uid)) {
+      const m = { org_id: o.id, user_id: uid, role: 'driver', joined_at: iso(Date.now()) };
+      db.org_members.push(m);
+      emitChange('org_members', 'INSERT', m);
+    }
+    return o.id;
+  },
+  set_member_role({ org, member, new_role }, uid) {
+    if (!['owner', 'admin'].includes(orgRole(org, uid))) throw new Error('only owners and admins can change roles');
+    const m = db.org_members.find(x => x.org_id === org && x.user_id === member);
+    if (!m || m.role === 'owner') throw new Error('the owner\'s role cannot be changed');
+    const old = { ...m };
+    m.role = new_role;
+    emitChange('org_members', 'UPDATE', m, old);
+    return null;
+  },
+  new_invite_code({ org }, uid) {
+    if (!['owner', 'admin'].includes(orgRole(org, uid))) throw new Error('only owners and admins can change the invite code');
+    const o = db.orgs.find(x => x.id === org);
+    o.invite_code = randomBytes(4).toString('hex').toUpperCase();
+    return o.invite_code;
+  },
+  verify_proof({ proof }, uid) {
+    const p = db.proofs.find(x => x.id === proof && visible('proofs', x, uid));
+    return p ? p.hash === proofHash(p) : null;
+  },
+  track_job({ token }) {
+    const j = db.jobs.find(x => x.track_token === token);
+    if (!j || j.status === 'cancelled') return null;
+    const pr = db.proofs.filter(p => p.job_id === j.id).sort((a, b) => b.captured_at.localeCompare(a.captured_at))[0];
+    const loc = ['loading', 'in_transit', 'at_border', 'arrived'].includes(j.status) && db.user_locations.find(l => l.user_id === j.driver_id);
+    return {
+      ref: j.ref, company: db.orgs.find(o => o.id === j.org_id)?.name, status: j.status,
+      pickup: { name: j.pickup_name, lat: j.pickup_lat, lng: j.pickup_lng },
+      dropoff: { name: j.dropoff_name, lat: j.dropoff_lat, lng: j.dropoff_lng },
+      due_at: j.due_at, driver: (db.users.find(u => u.id === j.driver_id)?.name || '').split(' ')[0] || null, vehicle: j.vehicle,
+      position: loc ? { lat: loc.latitude, lng: loc.longitude, at: loc.last_updated } : null,
+      delivered_at: j.delivered_at,
+      proof: pr ? { receiver: pr.receiver_name, at: pr.captured_at, hash: pr.hash } : null,
+      events: db.job_events.filter(e => e.job_id === j.id && ['created', 'status', 'geofence', 'proof', 'customer_message', 'customer_reply'].includes(e.kind))
+        .map(e => ({ kind: e.kind, status: e.status, message: ['geofence', 'proof', 'customer_message', 'customer_reply'].includes(e.kind) ? e.message : null, name: e.kind === 'customer_message' ? e.meta?.name : null, at: e.created_at }))
+    };
+  },
+  track_message({ token, sender_name, body }) {
+    const j = db.jobs.find(x => x.track_token === token);
+    if (!j || ['cancelled', 'paid'].includes(j.status)) throw new Error('tracking link not found');
+    if (!String(body || '').trim()) throw new Error('message must be 1 to 500 characters');
+    addJobEvent({ job_id: j.id, kind: 'customer_message', message: body.trim(), meta: { name: (sender_name || '').trim() || 'Customer' } });
+    return true;
+  },
   create_group({ group_name, member_ids }, uid) {
     const id = randomUUID();
     const t = iso(Date.now());
@@ -229,9 +334,76 @@ function defaults(table, row, uid) {
     if (row.group_id && !isMember(row.group_id, uid)) throw Object.assign(new Error('new row violates row-level security policy'), { code: '42501' });
     return msgRow({ ...row, created_at: t });
   }
-  if (table === 'calls') return { id: randomUUID(), status: 'ringing', created_at: t, answered_at: null, ended_at: null, ...row, caller_id: uid };
+  if (table === 'calls') {
+    if (!sharesOrg(uid, row.callee_id)) throw denied();
+    return { id: randomUUID(), kind: 'audio', ...row, caller_id: uid, status: 'ringing', created_at: t, answered_at: null, ended_at: null };
+  }
+  if (table === 'jobs') {
+    if (!isOrgStaff(row.org_id, uid)) throw denied();
+    const o = db.orgs.find(x => x.id === row.org_id);
+    o.job_seq += 1;
+    return { id: randomUUID(), status: 'assigned', driver_id: null, due_at: null, delivered_at: null, ...row, ref: `J-${String(o.job_seq).padStart(4, '0')}`, track_token: randomBytes(16).toString('hex'), created_by: uid, created_at: t, updated_at: t };
+  }
+  if (table === 'job_events') {
+    const j = db.jobs.find(x => x.id === row.job_id);
+    if (!j || !visible('jobs', j, uid) || !['note', 'photo', 'customer_reply'].includes(row.kind)) throw denied();
+    return { id: ++jobEventSeq, status: null, message: null, lat: null, lng: null, meta: {}, ...row, org_id: j.org_id, actor_id: uid, created_at: t };
+  }
+  if (table === 'proofs') {
+    const j = db.jobs.find(x => x.id === row.job_id);
+    if (!j || !visible('jobs', j, uid)) throw denied();
+    const prev = db.proofs.filter(p => p.org_id === j.org_id).sort((a, b) => b.captured_at.localeCompare(a.captured_at))[0];
+    const p = { id: randomUUID(), photo_path: null, signature_path: null, note: null, lat: null, lng: null, accuracy: null, ...row, org_id: j.org_id, created_by: uid, captured_at: t, prev_hash: prev?.hash || null };
+    p.hash = proofHash(p);
+    return p;
+  }
+  if (table === 'places' && !isOrgStaff(row.org_id, uid)) throw denied();
   if (table === 'message_reactions') return { id: randomUUID(), created_at: t, ...row };
   return { id: row.id ?? randomUUID(), created_at: t, ...row };
+}
+
+function afterInsert(table, row, uid) {
+  if (table === 'jobs') {
+    addJobEvent({ job_id: row.id, kind: 'created', status: row.status, actor_id: uid });
+    if (row.driver_id) addJobEvent({ job_id: row.id, kind: 'assigned', actor_id: uid, meta: { driver_id: row.driver_id } });
+  }
+  if (table === 'proofs') {
+    addJobEvent({ job_id: row.job_id, kind: 'proof', actor_id: uid, lat: row.lat, lng: row.lng, message: `Delivered to ${row.receiver_name}`, meta: { proof_id: row.id, hash: row.hash } });
+    const j = db.jobs.find(x => x.id === row.job_id);
+    if (j && !['delivered', 'paid'].includes(j.status)) {
+      const old = { ...j };
+      Object.assign(j, { status: 'delivered', delivered_at: row.captured_at, updated_at: iso(Date.now()) });
+      emitChange('jobs', 'UPDATE', j, old);
+      addJobEvent({ job_id: j.id, kind: 'status', status: 'delivered', actor_id: uid, meta: { from: old.status } });
+    }
+  }
+}
+
+// mirrors the calls_rules trigger: server clock, terminal states stick, roles decide transitions
+function applyCallRules(r, vals, uid) {
+  const prev = r.status;
+  let next = vals.status ?? prev;
+  if (TERMINAL.includes(prev)) next = prev;
+  if (next !== prev) {
+    if (['accepted', 'declined', 'busy'].includes(next) && uid !== r.callee_id) next = prev;
+    if (['cancelled', 'missed'].includes(next) && uid !== r.caller_id) next = prev;
+    if (prev === 'accepted' && !['ended', 'failed'].includes(next)) next = prev;
+    if (next === 'ringing') next = prev;
+  }
+  r.status = next;
+  if (next === 'accepted' && prev !== 'accepted') r.answered_at = iso(Date.now());
+  if (TERMINAL.includes(next) && !TERMINAL.includes(prev)) r.ended_at = iso(Date.now());
+}
+
+function applyJobRules(r, vals, uid) {
+  const v = { ...vals };
+  for (const k of ['id', 'org_id', 'ref', 'track_token', 'created_by', 'created_at']) delete v[k];
+  if (!isOrgStaff(r.org_id, uid)) {
+    for (const k of Object.keys(v)) if (k !== 'status') delete v[k];
+    if (['paid', 'assigned', 'cancelled'].includes(v.status) && v.status !== r.status) throw new Error(`drivers cannot set a job to ${v.status}`);
+  }
+  if (v.status === 'delivered' && r.status !== 'delivered' && !r.delivered_at) v.delivered_at = iso(Date.now());
+  Object.assign(r, v, { updated_at: iso(Date.now()) });
 }
 
 function runQuery(q, uid) {
@@ -247,6 +419,10 @@ function runQuery(q, uid) {
     const count = out.length;
     if (q.limit) out = out.slice(0, q.limit);
     out = out.map(r => strip(table, r));
+    // embedded resources, e.g. org_members.select('role,orgs(id,name)')
+    for (const [, rel] of String(q.cols || '').matchAll(/(\w+)\(/g)) {
+      out = out.map(r => ({ ...r, [rel]: (db[rel] || []).find(x => x.id === r[`${rel.replace(/s$/, '')}_id`] && visible(rel, x, uid)) || null }));
+    }
     if (q.head) return { data: null, count };
     return { data: out, count };
   }
@@ -271,6 +447,7 @@ function runQuery(q, uid) {
       const row = defaults(table, v, uid);
       rows.push(row);
       emitChange(table, 'INSERT', row);
+      afterInsert(table, row, uid);
       result.push(row);
     }
     return { data: q.single ? strip(table, result[0]) : result.map(r => strip(table, r)) };
@@ -284,8 +461,11 @@ function runQuery(q, uid) {
         // recipients may only touch delivery fields (like the database trigger)
         for (const k of Object.keys(vals)) if (!['status', 'is_read', 'read_at', 'delivered_at'].includes(k)) delete vals[k];
       }
-      Object.assign(r, vals);
+      if (table === 'calls') applyCallRules(r, vals, uid);
+      else if (table === 'jobs') applyJobRules(r, vals, uid);
+      else Object.assign(r, vals);
       emitChange(table, 'UPDATE', r, old);
+      if (table === 'jobs' && r.status !== old.status) addJobEvent({ job_id: r.id, kind: 'status', status: r.status, actor_id: uid, meta: { from: old.status } });
     });
     return { data: q.single ? strip(table, targets[0]) : targets.map(r => strip(table, r)) };
   }
@@ -371,6 +551,24 @@ const server = http.createServer(async (req, res) => {
       for (const c of clients.values()) push(c, { kind: 'broadcast', ...msg });
       return json(res, 200, { ok: true });
     }
+    // Realtime REST broadcast (used for inbox nudges)
+    if (url.pathname === '/realtime/v1/api/broadcast') {
+      const { messages = [] } = JSON.parse(await readBody(req));
+      for (const m of messages) for (const c of clients.values()) push(c, { kind: 'broadcast', channel: m.topic, event: m.event, payload: m.payload, from: uid });
+      broadcastLog.push(...messages.map(m => ({ ...m, from: uid })));
+      res.writeHead(202);
+      return res.end();
+    }
+    if (url.pathname.startsWith('/functions/v1/')) return json(res, 404, { error: 'not deployed locally' });
+    if (url.pathname === '/fake/expire') {
+      // what the pg_cron job does every minute
+      db.calls.filter(c => c.status === 'ringing').forEach(c => {
+        const old = { ...c };
+        Object.assign(c, { status: 'missed', ended_at: iso(Date.now()) });
+        emitChange('calls', 'UPDATE', c, old);
+      });
+      return json(res, 200, { ok: true });
+    }
     if (url.pathname === '/fake/presence') {
       const { channel, key, state, leave } = JSON.parse(await readBody(req));
       if (!presence.has(channel)) presence.set(channel, new Map());
@@ -403,7 +601,7 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
     if (url.pathname === '/fake/state') {
-      return json(res, 200, { messages: db.messages.length, calls: db.calls, reactions: db.message_reactions.length, groups: db.conversations.length });
+      return json(res, 200, { messages: db.messages.length, calls: db.calls, reactions: db.message_reactions.length, groups: db.conversations.length, jobs: db.jobs, job_events: db.job_events, proofs: db.proofs, orgs: db.orgs, org_members: db.org_members, nudges: broadcastLog });
     }
     json(res, 404, { error: 'not found' });
   } catch (err) {

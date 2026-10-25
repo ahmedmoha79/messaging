@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Track your delivery · WAZAMBI</title>
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#0b8a5f">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/track.css">
+  <script src="/config.js"></script>
+  <script src="/vendor/supabase.js" defer></script>
+  <script type="module" src="/js/track-page.js"></script>
+</head>
+<body>
+  <main class="track" id="track" aria-live="polite">
+    <div class="track-loading"><span class="spinner" aria-hidden="true"></span><p>Loading your delivery…</p></div>
+  </main>
+  <footer class="track-foot">
+    <span>Tracking by <b class="wm">WAZAMBI</b></span>
+    <a href="/?mode=signup">Run your own deliveries like this: start free</a>
+  </footer>
+</body>
+</html>

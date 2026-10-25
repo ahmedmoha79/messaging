@@ -7,8 +7,11 @@ import { sb, migrateLegacySession, initialUrl } from '../lib/supabase.js';
 import { hydrateIcons } from '../lib/icons.js';
 import { toast, isNarrow } from '../lib/dom.js';
 import { state, on, applyTheme } from './state.js';
-import { loadMe, loadUsers, loadChatList, touchPresence, markOfflineOnExit, logSession } from './data.js';
-import { startRealtime, resync, refreshUsers } from './realtime.js';
+import { loadMe, loadUsers, loadChatList, touchPresence, markOfflineOnExit, logSession, loadOrgs, loadOrgMembers } from './data.js';
+import { startRealtime, resync, refreshUsers, ensureRealtime } from './realtime.js';
+import { initJobs } from './jobs.js';
+import { showOnboarding, handleInviteLink, pendingInvite, INVITE_KEY } from './org.js';
+import { ensurePushSubscription } from './push.js';
 import { startRouter } from './router.js';
 import { initChatList } from './chatList.js';
 import { initConversation, openChat, closeChat } from './conversation.js';
@@ -19,7 +22,7 @@ import { updateBadge } from './notify.js';
 import { avatarHtml, hasOpenSheet, closeTopSheet, consumeSheetPop } from './ui.js';
 
 const $ = id => document.getElementById(id);
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 function bootMessage(text, { retry = false } = {}) {
   $('bootText').textContent = text;
@@ -56,7 +59,9 @@ function writeCache() {
       me: state.me,
       users: [...state.users.values()],
       direct: [...state.direct.values()],
-      groups: [...state.groups.values()]
+      groups: [...state.groups.values()],
+      orgs: state.orgs,
+      org: state.org?.id || null
     }));
   } catch {
     /* storage full or blocked: no cache, just slower start */
@@ -76,10 +81,13 @@ function applyRoute(route) {
 
   const inChat = !!route.chat;
   const onMap = route.tab === 'map' && !inChat;
-  app.classList.toggle('show-main', inChat || onMap);
-  app.classList.toggle('in-chat', inChat);
+  const inJob = route.tab === 'jobs' && !!route.jobId;
+  app.classList.toggle('show-main', inChat || onMap || inJob);
+  app.classList.toggle('in-chat', inChat || inJob);
   $('mapView').hidden = !onMap;
-  $('welcome').hidden = inChat || onMap;
+  $('jobView').hidden = !inJob;
+  $('welcome').hidden = inChat || onMap || inJob;
+  if (route.join) handleInviteLink(route.join);
 
   if (inChat) {
     // A chat with yourself or someone unknown isn't valid.
@@ -109,6 +117,11 @@ async function boot() {
     return;
   }
   const isRecovery = hashParams.get('type') === 'recovery';
+  // An invite link (/join/CODE → /app#/join/CODE): remember it across sign-in / sign-up.
+  const invite = initialUrl.hash.match(/^#\/join\/([0-9A-Za-z]{6,20})/);
+  if (invite) {
+    try { localStorage.setItem(INVITE_KEY, invite[1].toUpperCase()); } catch { /* ignore */ }
+  }
 
   // getSession() also finishes magic-link / OAuth sign-ins present in the URL.
   const { data: { session } } = await sb.auth.getSession();
@@ -134,14 +147,18 @@ async function boot() {
     cached.users.forEach(u => state.users.set(u.id, u));
     cached.direct.forEach(c => state.direct.set(c.partner_id, c));
     cached.groups.forEach(g => state.groups.set(g.id, g));
+    state.orgs = cached.orgs || [];
+    state.org = state.orgs.find(o => o.id === cached.org) || state.orgs[0] || null;
+    state.role = state.org?.role || null;
     state.chatListLoaded = true;
-    showApp();
+    if (state.org) showApp();
   } else {
     bootMessage('Opening your chats…');
   }
 
   try {
-    await Promise.all([loadMe(session.user), loadUsers(), loadChatList()]);
+    await loadMe(session.user);
+    await Promise.all([loadOrgs(), loadUsers(), loadChatList()]);
   } catch (err) {
     console.error('Initial load failed', err);
     if (/JWT|token|session|not authenticated/i.test(String(err?.message))) {
@@ -149,13 +166,22 @@ async function boot() {
       location.replace('/');
       return;
     }
-    if (!cached) {
+    if (!cached || !state.org) {
       bootMessage(navigator.onLine ? 'We couldn’t reach the server. It may be waking up; try again in a few seconds.' : 'You’re offline. Connect to the internet to open your chats.', { retry: true });
       return;
     }
     toast('Showing saved chats. Reconnecting…');
   }
-  if (!cached) showApp();
+  // No company yet: set one up (or join with an invite) before the app opens.
+  if (!state.org) {
+    $('boot').hidden = true;
+    await showOnboarding();
+    $('boot').hidden = false;
+  } else if (pendingInvite() && !state.orgs.some(o => o.invite_code === pendingInvite())) {
+    setTimeout(() => handleInviteLink(pendingInvite()), 600);
+  }
+  loadOrgMembers().catch(() => {});
+  if (!shown) showApp();
   writeCache();
   afterLoad();
 }
@@ -167,6 +193,7 @@ function showApp() {
   initChatList();
   initConversation();
   initCalls();
+  initJobs();
   initSettings();
   initMap();
   renderRailMe();
@@ -194,6 +221,7 @@ function afterLoad() {
   registerServiceWorker();
 
   on('chatlist', debounceCache);
+  on('org', debounceCache);
   on('users', debounceCache);
   on('me', debounceCache);
 
@@ -240,11 +268,17 @@ function afterLoad() {
     if (event === 'PASSWORD_RECOVERY') openChangePassword({ recovery: true });
   });
 
-  // Service worker relays notification clicks to open the right chat.
+  // Service worker relays notification clicks and pushes that arrive while open.
   navigator.serviceWorker?.addEventListener('message', e => {
     if (e.data?.type === 'open' && e.data.url) {
       const hash = e.data.url.split('#')[1];
       if (hash) location.hash = hash;
+    }
+    if (e.data?.type === 'push') {
+      // A push reached us, so our live connection may have missed it.
+      const d = e.data.data || {};
+      if (d.callId) import('./state.js').then(m => m.emit('call:nudge', d.callId));
+      ensureRealtime('push', { resyncAfter: true });
     }
   });
 
@@ -262,6 +296,8 @@ async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    // Background calls/messages: (re)register this device for push when allowed.
+    navigator.serviceWorker.ready.then(() => ensurePushSubscription()).catch(() => {});
     // A new version was deployed. The new worker takes over straight away;
     // offer a refresh (rather than forcing one mid-chat) so the page picks up the new code.
     let hadController = !!navigator.serviceWorker.controller;

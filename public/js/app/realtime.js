@@ -1,17 +1,82 @@
-// Live updates. One database channel carries every table change this user is
-// allowed to see (row-level security filters it server-side), and one "team"
-// channel carries presence and typing indicators.
-import { sb } from '../lib/supabase.js';
+// Live updates, built to survive phones.
+//
+// Mobile browsers silently drop the WebSocket when the screen locks or the
+// app goes to the background. Nothing in the page is told, so the app used to
+// keep "listening" on a dead connection and missed rings and declines.
+// Here every channel is watched: when one isn't joined (or the page comes back
+// to the foreground) all channels are rebuilt and everything is re-synced.
+//
+// Channels:
+//   db:<uid>          table changes this user may see (row-level security filters server-side)
+//   team:<org>        presence + typing, one per company (never shared across companies)
+//   inbox:<uid>       small "nudges" from other people (a call is ringing for you, it was
+//                     declined...). A nudge only says "look"; the app then reads the truth
+//                     from the database, so a forged nudge can't do anything.
+import { sb, config } from '../lib/supabase.js';
 import { state, emit, chatKey, isActive } from './state.js';
 import { loadChatList, loadUsers, markDelivered } from './data.js';
 import { notifyMessage, updateBadge } from './notify.js';
 
 let dbChannel = null;
 let teamChannel = null;
+let inboxChannel = null;
 let lastStatus = '';
+let started = false;
+let rebuilding = false;
+let rebuildTimer = null;
+let failures = 0;
+let lastHealthy = 0;
+let forceResync = false;
 
 export function startRealtime() {
+  if (started) return;
+  started = true;
+  connect();
+  setInterval(expireTyping, 1000);
+  // Watchdog: cheap local check every 10 s, plus the moments phones wake up.
+  setInterval(() => ensureRealtime('interval'), 10000);
+  // After a long time in the background the socket may look open but be dead
+  // (phones freeze it), so it is rebuilt rather than trusted.
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      return;
+    }
+    const away = hiddenAt ? Date.now() - hiddenAt : 0;
+    ensureRealtime('visible', { force: away > 30000, resyncAfter: true });
+  });
+  window.addEventListener('pageshow', () => ensureRealtime('pageshow', { resyncAfter: true }));
+  window.addEventListener('focus', () => ensureRealtime('focus'));
+  window.addEventListener('online', () => ensureRealtime('online', { force: true, resyncAfter: true }));
+  // New access token: hand it to the realtime connection straight away.
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'TOKEN_REFRESHED' && session?.access_token) {
+      try { sb.realtime.setAuth(session.access_token); } catch { /* older client */ }
+    }
+  });
+}
+
+function connect() {
   const uid = state.me.id;
+  const onStatus = name => status => {
+    if (status === 'SUBSCRIBED') {
+      failures = 0;
+      lastHealthy = Date.now();
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      if (!rebuilding) scheduleRebuild(`${name} ${status}`);
+    }
+    if (name === 'db') {
+      if (status === lastStatus) return;
+      const wasDown = lastStatus && lastStatus !== 'SUBSCRIBED';
+      lastStatus = status;
+      emit('realtime', status);
+      if (status === 'SUBSCRIBED' && (wasDown || forceResync)) {
+        forceResync = false;
+        recovered();
+      }
+    }
+  };
 
   dbChannel = sb.channel(`db:${uid}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => onMessageInsert(p.new))
@@ -22,28 +87,105 @@ export function startRealtime() {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calls' }, p => emit('call:update', p.new))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members' }, p => onMembership(p))
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, p => onGroupUpdate(p.new))
-    .subscribe(status => {
-      if (status === lastStatus) return;
-      const wasDown = lastStatus && lastStatus !== 'SUBSCRIBED';
-      lastStatus = status;
-      emit('realtime', status);
-      // Anything could have happened while we were disconnected: resync.
-      if (status === 'SUBSCRIBED' && wasDown) resync();
-    });
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, p => emit('job:change', p))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'job_events' }, p => emit('job:event', p.new))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'proofs' }, p => emit('job:proof', p.new))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'org_members' }, p => emit('org:members', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'places' }, p => emit('places', p))
+    .subscribe(onStatus('db'));
 
-  teamChannel = sb.channel('team', { config: { presence: { key: uid }, broadcast: { self: false } } })
-    .on('presence', { event: 'sync' }, () => {
-      state.online = new Set(Object.keys(teamChannel.presenceState()));
-      // Someone we have never seen (a new teammate) just came online.
-      if ([...state.online].some(id => !state.users.has(id))) refreshUsers();
-      emit('presence');
-    })
-    .on('broadcast', { event: 'typing' }, ({ payload }) => onTyping(payload))
-    .subscribe(async status => {
-      if (status === 'SUBSCRIBED') await teamChannel.track({ at: Date.now() });
-    });
+  inboxChannel = sb.channel(`inbox:${uid}`, { config: { broadcast: { self: false } } })
+    .on('broadcast', { event: 'nudge' }, ({ payload }) => onNudge(payload))
+    .subscribe(onStatus('inbox'));
 
-  setInterval(expireTyping, 1000);
+  if (state.org) {
+    teamChannel = sb.channel(`team:${state.org.id}`, { config: { presence: { key: uid }, broadcast: { self: false } } })
+      .on('presence', { event: 'sync' }, () => {
+        state.online = new Set(Object.keys(teamChannel.presenceState()));
+        // Someone we have never seen (a new teammate) just came online.
+        if ([...state.online].some(id => !state.users.has(id))) refreshUsers();
+        emit('presence');
+      })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => onTyping(payload))
+      .subscribe(async status => {
+        onStatus('team')(status);
+        if (status === 'SUBSCRIBED') await teamChannel.track({ at: Date.now() });
+      });
+  }
+}
+
+function channelsJoined() {
+  const list = [dbChannel, inboxChannel, teamChannel].filter(Boolean);
+  return list.length > 0 && list.every(ch => ch.state === 'joined');
+}
+
+function socketConnected() {
+  try {
+    return typeof sb.realtime.isConnected === 'function' ? sb.realtime.isConnected() : true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Makes sure the live connection works; rebuilds it when it doesn't.
+ * `resyncAfter` also re-reads chats and checks for a ringing call even if the
+ * connection looks fine (a phone may have slept through events).
+ */
+export function ensureRealtime(reason = 'check', { force = false, resyncAfter = false } = {}) {
+  if (!started) return;
+  const healthy = channelsJoined() && socketConnected();
+  if (force || !healthy) {
+    if (resyncAfter) forceResync = true;
+    scheduleRebuild(reason, 0);
+  } else if (resyncAfter) {
+    recovered();
+  }
+}
+
+function scheduleRebuild(reason, delay) {
+  clearTimeout(rebuildTimer);
+  const wait = delay ?? Math.min(15000, 1000 * 2 ** Math.min(failures, 4));
+  rebuildTimer = setTimeout(() => rebuild(reason), wait);
+}
+
+async function rebuild(reason) {
+  if (rebuilding || !navigator.onLine) return;
+  rebuilding = true;
+  failures += 1;
+  console.info('[realtime] reconnecting:', reason);
+  emit('realtime', 'RECONNECTING');
+  try {
+    const old = [dbChannel, inboxChannel, teamChannel].filter(Boolean);
+    dbChannel = inboxChannel = teamChannel = null;
+    lastStatus = 'RECONNECTING';
+    // a dead socket never acknowledges the leave, so don't wait long for it
+    await Promise.race([
+      Promise.all(old.map(ch => sb.removeChannel(ch).catch(() => {}))),
+      new Promise(resolve => setTimeout(resolve, 1500))
+    ]);
+    try {
+      if (!socketConnected()) sb.realtime.connect();
+    } catch { /* connect() is called by subscribe anyway */ }
+    const { data } = await sb.auth.getSession();
+    if (data.session?.access_token) {
+      state.session = data.session;
+      try { sb.realtime.setAuth(data.session.access_token); } catch { /* older client */ }
+    }
+    connect();
+  } finally {
+    rebuilding = false;
+  }
+}
+
+let recoverTimer = null;
+function recovered() {
+  // collapse bursts (visible + focus + pageshow fire together)
+  clearTimeout(recoverTimer);
+  recoverTimer = setTimeout(() => {
+    resync();
+    emit('realtime:recovered');
+  }, 150);
 }
 
 export async function resync() {
@@ -53,6 +195,47 @@ export async function resync() {
   } catch (err) {
     console.warn('Resync failed', err);
   }
+}
+
+export function realtimeHealthy() {
+  return channelsJoined() && socketConnected() && Date.now() - lastHealthy < 10 * 60 * 1000;
+}
+
+/** Rebuilds the team channel after switching company. */
+export function restartTeamChannel() {
+  if (!started) return;
+  scheduleRebuild('company changed', 0);
+}
+
+// ---------------------------------------------------------------------------
+// Inbox nudges
+// ---------------------------------------------------------------------------
+/**
+ * Sends a small nudge to someone's inbox over the REST broadcast endpoint,
+ * which works even when our own WebSocket is down.
+ */
+export async function nudge(userId, payload) {
+  if (!userId) return;
+  try {
+    await fetch(`${config.supabaseUrl}/realtime/v1/api/broadcast`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        apikey: config.supabaseAnonKey,
+        Authorization: `Bearer ${state.session?.access_token || config.supabaseAnonKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ messages: [{ topic: `inbox:${userId}`, event: 'nudge', payload: { ...payload, from: state.me?.id } }] })
+    });
+  } catch {
+    /* best effort: the database and polling are the source of truth */
+  }
+}
+
+function onNudge(payload) {
+  if (!payload || payload.from === state.me.id) return;
+  if (payload.type === 'call' && payload.id) emit('call:nudge', payload.id);
+  else if (payload.type === 'resync') resync();
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +423,3 @@ export function typingNames(type, id) {
   return [...map.keys()].map(uid => state.users.get(uid)?.name?.split(' ')[0] || 'Someone');
 }
 
-export function realtimeHealthy() {
-  return lastStatus === 'SUBSCRIBED';
-}

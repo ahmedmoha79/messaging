@@ -31,6 +31,10 @@
         <span data-icon="chat"></span><span class="rail-label">Chats</span>
         <span class="badge" id="chatsBadge" hidden></span>
       </a>
+      <a class="rail-tab" href="#/jobs" data-tab="jobs" aria-label="Jobs">
+        <span data-icon="truck"></span><span class="rail-label">Jobs</span>
+        <span class="badge" id="jobsBadge" hidden></span>
+      </a>
       <a class="rail-tab" href="#/calls" data-tab="calls" aria-label="Calls">
         <span data-icon="phone"></span><span class="rail-label">Calls</span>
         <span class="badge" id="callsBadge" hidden></span>
@@ -62,6 +66,25 @@
           <button type="button" role="tab" class="chip" data-filter="groups" aria-selected="false">Groups</button>
         </div>
         <div class="list" id="chatList" role="list" aria-label="Conversations"></div>
+      </section>
+
+      <!-- Jobs -->
+      <section class="panel" data-panel="jobs" hidden>
+        <header class="panel-head">
+          <h1>Jobs</h1>
+          <button type="button" class="btn small primary" id="newJobBtn" hidden><span data-icon="plus" data-icon-size="sm"></span>New job</button>
+        </header>
+        <div class="search">
+          <span data-icon="search" data-icon-size="sm"></span>
+          <input type="search" id="jobSearch" placeholder="Search jobs, customers, vehicles" autocomplete="off" enterkeyhint="search" aria-label="Search jobs">
+        </div>
+        <div class="filter-row" role="tablist" aria-label="Filter jobs">
+          <button type="button" role="tab" class="chip" data-job-filter="active" aria-selected="true">Active</button>
+          <button type="button" role="tab" class="chip" data-job-filter="mine" aria-selected="false">Mine</button>
+          <button type="button" role="tab" class="chip" data-job-filter="done" aria-selected="false">Delivered</button>
+          <button type="button" role="tab" class="chip" data-job-filter="all" aria-selected="false">All</button>
+        </div>
+        <div class="list" id="jobList" role="list" aria-label="Jobs"></div>
       </section>
 
       <!-- Calls -->
@@ -96,6 +119,7 @@
 
       <section class="conversation" id="conversation" hidden aria-label="Conversation"></section>
       <section class="map-view" id="mapView" hidden aria-label="Team map"></section>
+      <section class="job-view" id="jobView" hidden aria-label="Job"></section>
     </main>
   </div>
 

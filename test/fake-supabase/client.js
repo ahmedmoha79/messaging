@@ -122,16 +122,37 @@
 
     // ---------------- realtime ----------------
     let source = null;
+    let deaf = false; // a "frozen" phone: the socket looks fine but nothing arrives
     const channels = new Set();
     function ensureSource() {
       const uid = token().split(':')[0];
       if (source || !uid) return;
+      deaf = false;
       source = new EventSource(`${url}/fake/events?uid=${uid}`);
       source.onmessage = e => {
+        if (deaf) return;
         const msg = JSON.parse(e.data);
         channels.forEach(ch => ch._dispatch(msg));
       };
     }
+    const realtime = {
+      setAuth() {},
+      isConnected() { return !!source && !window.__fakeSocketDown; },
+      connect() { if (window.__fakeSocketDown) return; ensureSource(); }
+    };
+    // Test hooks: simulate a phone losing its live connection.
+    window.__fakeRealtime = {
+      // silently: channels still say "joined", events just stop arriving
+      freeze() { deaf = true; },
+      // detectably: the socket closes and channels error out
+      drop() {
+        window.__fakeSocketDown = true;
+        source?.close();
+        source = null;
+        channels.forEach(ch => { ch.state = 'errored'; ch._status?.('CHANNEL_ERROR'); });
+      },
+      restore() { window.__fakeSocketDown = false; deaf = false; }
+    };
     function matchFilter(row, filter) {
       if (!filter) return true;
       const [col, rest] = filter.split('=');
@@ -145,10 +166,18 @@
       const ch = {
         topic: name,
         on(type, filter, cb) { handlers.push({ type, filter, cb }); return ch; },
+        state: 'closed',
         subscribe(cb) {
+          ch._status = cb;
+          if (window.__fakeSocketDown) {
+            setTimeout(() => cb?.('CHANNEL_ERROR'), 30);
+            ch.state = 'errored';
+            return ch;
+          }
           ensureSource();
           channels.add(ch);
-          setTimeout(() => cb?.('SUBSCRIBED'), 30);
+          ch.state = 'joining';
+          setTimeout(() => { ch.state = 'joined'; cb?.('SUBSCRIBED'); }, 30);
           return ch;
         },
         async send({ event, payload }) {
@@ -157,7 +186,7 @@
         },
         async track(state) { await post('/fake/presence', { channel: name, key: selfKey, state }); return 'ok'; },
         presenceState() { return presenceState; },
-        unsubscribe() { channels.delete(ch); if (selfKey) post('/fake/presence', { channel: name, key: selfKey, leave: true }); },
+        unsubscribe() { ch.state = 'closed'; ch._status = null; channels.delete(ch); if (selfKey) post('/fake/presence', { channel: name, key: selfKey, leave: true }); },
         _dispatch(msg) {
           for (const h of handlers) {
             if (msg.kind === 'db' && h.type === 'postgres_changes' && h.filter.table === msg.table &&
@@ -181,7 +210,7 @@
     }
     function removeChannel(ch) { ch.unsubscribe(); return Promise.resolve('ok'); }
 
-    return { auth, from, rpc, storage, channel, removeChannel };
+    return { auth, from, rpc, storage, channel, removeChannel, realtime };
   }
   window.supabase = { createClient };
 })();

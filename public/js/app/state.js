@@ -10,7 +10,11 @@ export const state = {
   groups: new Map(), // group id -> { id, name, avatar_url, member_count, last, last_at, unread, muted }
   active: null, // { type: 'direct' | 'group', id }
   typing: new Map(), // chat key -> Map(userId -> expiry ms)
-  chatListLoaded: false
+  chatListLoaded: false,
+  orgs: [], // companies I belong to: { id, name, invite_code, plan, role }
+  org: null, // the active company
+  role: null, // my role in it: owner | admin | dispatcher | driver
+  members: new Map() // user id -> role, in the active company
 };
 
 const listeners = new Map();

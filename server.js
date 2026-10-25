@@ -410,6 +410,16 @@ async function handle(req, res) {
   // Pretty routes for the two pages
   if (p === '/') return sendFile(req, res, path.join(PUBLIC_DIR, 'index.html'), '/index.html');
   if (p === '/app' || p === '/app/') return sendFile(req, res, path.join(PUBLIC_DIR, 'app.html'), '/app.html');
+  // Public delivery tracking (no account): /t/<token>
+  if (/^\/t\/[0-9a-f]{24,64}\/?$/i.test(p)) {
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Robots-Tag', 'noindex');
+    return sendFile(req, res, path.join(PUBLIC_DIR, 'track.html'), '/track.html');
+  }
+  if (p === '/proof' || p === '/proof/') return sendFile(req, res, path.join(PUBLIC_DIR, 'proof.html'), '/proof.html');
+  // Company invite links: /join/<CODE> → the app, which joins after sign-in
+  const join = p.match(/^\/join\/([A-Za-z0-9]{4,16})\/?$/);
+  if (join) return redirect(res, `/app#/join/${join[1].toUpperCase()}`, 302);
 
   const full = safeJoin(PUBLIC_DIR, p);
   if (full && (await sendFile(req, res, full, p))) return;

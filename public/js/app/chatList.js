@@ -40,7 +40,13 @@ export function initChatList() {
   listEl.addEventListener('click', e => {
     const b = e.target.closest('[data-action="enable-notifications"]');
     if (b) {
-      requestNotificationPermission().then(render);
+      requestNotificationPermission().then(async perm => {
+        if (perm === 'granted') {
+          const { ensurePushSubscription } = await import('./push.js');
+          ensurePushSubscription({ force: true });
+        }
+        render();
+      });
       return;
     }
     if (e.target.closest('[data-action="dismiss-notifications"]')) {

@@ -11,16 +11,20 @@ import { requestNotificationPermission, notificationPermission, notificationsSup
 import { setLocationSharing } from './map.js';
 import { compressImage } from './media.js';
 import { diagnose } from '../lib/mediaAccess.js';
+import { ensurePushSubscription, removePushSubscription, pushSupported, needsHomeScreenInstall } from './push.js';
+import { companySettingsHtml, onCompanySettingsClick } from './org.js';
 
 const body = document.getElementById('settingsBody');
 
 export function initSettings() {
   on('me', render);
   on('settings', render);
+  on('org', render);
   on('route', r => {
     if (r.tab === 'settings') {
       render();
       if (r.sub === 'password') openChangePassword({ recovery: true });
+      if (r.sub === 'places' || r.sub === 'invite' || r.sub === 'members') onCompanySettingsClick(r.sub);
     }
   });
   body.addEventListener('click', onClick);
@@ -55,6 +59,8 @@ function render() {
       </div>
     </section>
 
+    ${raw(companySettingsHtml())}
+
     <section class="settings-group">
       <h2>Appearance</h2>
       <div class="settings-card">
@@ -78,7 +84,7 @@ function render() {
       <div class="settings-card">
         <label class="setting">
           ${raw(icon('bell'))}
-          <span class="setting-text">Message and call alerts<small>${!notificationsSupported() ? 'Not supported in this browser' : perm === 'denied' ? 'Blocked. Allow notifications for this site in your browser settings.' : 'Shown when WAZAMBI is in the background'}</small></span>
+          <span class="setting-text">Calls, messages and job alerts<small>${!notificationsSupported() ? 'Not supported in this browser' : perm === 'denied' ? 'Blocked. Allow notifications for this site in your browser settings.' : needsHomeScreenInstall() ? 'On iPhone: tap Share → Add to Home Screen, open WAZAMBI from there, then turn this on so calls ring when the app is closed.' : pushSupported() ? 'Your phone rings and shows messages even when WAZAMBI is closed' : 'Shown while WAZAMBI is open in the background'}</small></span>
           ${switchHtml('desktopNotifications', notifOn, 'Message and call alerts')}
         </label>
         <label class="setting">
@@ -131,7 +137,14 @@ async function onChange(e) {
       saveSetting(key, false);
       return;
     }
+    saveSetting(key, true);
+    const res = await ensurePushSubscription({ force: true });
+    if (res === 'subscribed') toast('Done. This device will ring for calls even when WAZAMBI is closed.');
+    else if (res === 'unsupported') toast('Alerts are on while WAZAMBI is open. This browser can’t receive them when it’s closed.');
+    else if (res === 'error') toast('Alerts are on, but this device couldn’t register for background calls. Try again later.', { type: 'error' });
+    return;
   }
+  if (key === 'desktopNotifications' && !on_) removePushSubscription();
   if (key === 'shareLocation') {
     const ok = await setLocationSharing(on_);
     if (!ok) {
@@ -147,6 +160,11 @@ async function onClick(e) {
   if (theme) {
     saveSetting('theme', theme.dataset.themeChoice);
     applyTheme();
+    return;
+  }
+  const orgAct = e.target.closest('[data-org]')?.dataset.org;
+  if (orgAct) {
+    onCompanySettingsClick(orgAct);
     return;
   }
   const act = e.target.closest('[data-s]')?.dataset.s;
@@ -170,6 +188,7 @@ async function onClick(e) {
 }
 
 export async function signOut() {
+  await removePushSubscription();
   try {
     await sb.from('users').update({ status: 'offline', lastonline: new Date().toISOString() }).eq('id', state.me.id);
   } catch {

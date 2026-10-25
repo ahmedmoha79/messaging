@@ -36,7 +36,7 @@ export function initMap() {
   if (settings.shareLocation) startWatching();
 }
 
-function loadLeaflet() {
+export function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
   return new Promise((resolve, reject) => {
     const css = document.createElement('link');
